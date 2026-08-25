@@ -39,10 +39,10 @@ Row order is preserved.
 Recognised per row (column or constant): \code{l}, \code{u}, \code{n}, \code{mean}, \code{sd},
 \code{digits}, \code{mean_digits}, \code{sd_digits}, \code{scoring}, \code{n_items}.
 
-\code{rounding}, \code{max_cells} and \code{search_budget} may be given only as constants,
-never as columns. \code{rounding} is a \emph{set} of admitted rules rather than one
-value per row, and the other two are cost controls on the call; passing any
-of them as a column is an error rather than a silent per-row reading.
+\code{rounding}, \code{max_cells}, \code{search_budget} and \code{engine} may be given only as
+constants, never as columns. \code{rounding} is a \emph{set} of admitted rules rather
+than one value per row, and the others are controls on the call; passing
+any of them as a column is an error rather than a silent per-row reading.
 }
 \examples{
 reports <- data.frame(mean = c(3.0, 1.3, 2.5),

@@ -1,3 +1,38 @@
+# strait 0.4.11
+
+## New features
+
+* `brimmest()` gains an `engine` argument. The new default, `"analytic"`,
+  certifies single reports against the structure of the attainable
+  sum-of-squares spectrum (the demotion decomposition in
+  `R/certify-analytic.R`): exact in both directions, with no node budget and
+  no corridor-sweep fallback, and typically 5-150x faster than the search on
+  wide or large-n designs. `"search"` keeps the original constructive-search /
+  corridor-DP machinery unchanged, and `"both"` runs the two independent
+  methods on every tuple and errors on any disagreement -- a built-in
+  cross-check (against the full lattice too, when the lattice route is
+  taken). All seven rounding rules are supported identically by every engine.
+  `brimmest_multiple()` accepts `engine` as a call-level constant.
+
+  The underlying characterization of which GRIMMER-consistent tuples lack
+  integer solutions, with its validation suite (about 1.5 million checks
+  against brute force, the search engine, and the lattice, at 1-3 reported
+  decimals), is developed in `dev/analytic_certification/`.
+
+## Bug fixes
+
+* The lattice route declared some reports impossible that real samples
+  produce exactly, under the directional rounding rules. An attainable mean
+  of exactly 113/25 = 4.52 scales to the double 451.99999999999994, which
+  `trunc` files under 4.51, so `brimmest(1, 7, 25, mean = 4.52, sd = 2.95,
+  digits = 2, rounding = "trunc")` returned FALSE for a report that the
+  sample {7 x 14, 5, 1 x 10} yields exactly. `trunc`, `floor`, `ceiling` and
+  `anti_trunc` were affected at grid boundaries, the half rules at
+  half-boundaries. The lattice's forward rounding now snaps scaled values to
+  the boundary when within 1e-9 of one -- the same tolerance the targeted
+  route has always used -- and rounds in scaled integer space. Found by the
+  new `engine = "both"` cross-check on its first extended run.
+
 # strait 0.4.10
 
 ## Bug fixes

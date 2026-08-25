@@ -2,6 +2,42 @@
 # lattice of strictly integer data. See R/plot_sd_region.R for the dynamic
 # program that enumerates the lattice.
 
+# Internal: forward-round lattice values straight to whole numbers of
+# reporting-grid steps, with the boundary snap the naive route lacks.
+#
+# Rounding x by first computing x * 10^digits invites a floating-point
+# hazard: an attainable mean of exactly 113/25 = 4.52 scales to
+# 451.99999999999994, which trunc() files under 4.51 -- so the lattice route
+# declared reports impossible that a real sample produces exactly (caught by
+# brimmest(engine = "both"); see tests/testthat/test-certify-analytic.R).
+# The directional rules (trunc, floor, ceiling, anti_trunc) fall hardest, the
+# half rules at half-boundaries. The fix mirrors the 1e-9 tolerances the
+# targeted route has always used: snap the scaled value to the nearest half
+# grid step when it is within 1e-9 of one -- attainable values are rationals
+# (or square roots of rationals) that are never that close to a boundary
+# without being on it, for any design the lattice route accepts -- then apply
+# the rule in scaled space, where it is exact integer arithmetic.
+#
+# Semantics match scrutiny's forward rounding (verified against it in the
+# tests): half_up takes halves toward +Inf, half_down toward -Inf, native to
+# even, trunc toward zero, anti_trunc away from zero.
+.round_scaled <- function(x, digits, rounding) {
+  y <- x * 10^digits
+  r2 <- round(y * 2) / 2
+  snap <- abs(y - r2) < 1e-9
+  y[snap] <- r2[snap]
+  switch(rounding,
+    half_up    = floor(y + 0.5),
+    half_down  = ceiling(y - 0.5),
+    native     = round(y),
+    ceiling    = ceiling(y),
+    floor      = floor(y),
+    trunc      = trunc(y),
+    anti_trunc = sign(y) * ceiling(abs(y)),
+    stop("unknown rounding rule: ", rounding)
+  )
+}
+
 #' BRIMMEST: certify whether a reported (mean, SD) is attainable
 #'
 #' Bounds-Related Inconsistency of Means and Errors, Settled Test. An exact
@@ -61,14 +97,17 @@
 #' A closed-form sandwich comes first. For a given sum the achievable sums of
 #' squares lie between the clustered configuration and the Structure-S one,
 #' and all share the sum's parity; a window meeting no admissible integer
-#' between them is impossible on arithmetic alone. What survives goes to a
-#' constructive search over non-increasing samples — the partitions of the sum
-#' — with the same sandwich re-applied at every step to what is left to place.
-#' Reaching a complete sample proves possibility and produces a witness;
-#' exhausting the search proves impossibility. Only when neither happens
-#' inside `search_budget` does the corridor sweep run: a dynamic program
-#' confined to the states that can still reach a target, roughly a tenth of
-#' the full table.
+#' between them is impossible on arithmetic alone. What survives is decided by
+#' the engine chosen via `engine`. The default `"analytic"` engine settles the
+#' window against the structure of the attainable spectrum directly (the
+#' demotion decomposition in `R/certify-analytic.R`): exact in both
+#' directions, with no node budget and no fallback, so a verdict is always
+#' produced. The `"search"` engine is the original machinery — a constructive
+#' search over non-increasing samples with the sandwich re-applied at every
+#' step, escalating to the corridor sweep (a dynamic program confined to the
+#' states that can still reach a target) when `search_budget` runs out.
+#' `"both"` runs the two independently and stops with an error if they ever
+#' disagree, which is the recommended setting for validation work.
 #'
 #' The practical effect is that designs the lattice refuses outright become
 #' answerable — a 0-63 inventory at `n = 50` needs a 3151 x 24801 table — and
@@ -106,7 +145,14 @@
 #' @param search_budget Node budget for the constructive search (default
 #'   `2e5`). Raising it lets the search settle more reports on its own;
 #'   lowering it hands them to the corridor sweep sooner. The verdict is the
-#'   same either way — only which route produces it changes.
+#'   same either way — only which route produces it changes. Used by the
+#'   `"search"` and `"both"` engines; the `"analytic"` engine has no budget.
+#' @param engine How single reports are certified: `"analytic"` (default) for
+#'   the exact spectrum-structure certification, `"search"` for the original
+#'   constructive search with corridor-sweep fallback, or `"both"` to run the
+#'   two independent methods and error on any disagreement (a built-in
+#'   cross-check; also applied against the lattice when the lattice route is
+#'   taken). All rounding rules are supported identically by every engine.
 #' @return A data.frame with one row per reported tuple: `mean`, `sd`,
 #'   `possible` (logical), and `rules` — the rounding rules under which the
 #'   tuple is reachable, comma-separated and `""` when none.
@@ -128,8 +174,10 @@ brimmest <- function(l, u, n, mean, sd, digits = NULL,
                     mean_digits = NULL, sd_digits = NULL,
                     rounding = c("half_up", "half_down"),
                     scoring = c("singleitem", "sumscored", "meanscored"),
-                    n_items = 1, max_cells = 2e7, search_budget = 2e5) {
+                    n_items = 1, max_cells = 2e7, search_budget = 2e5,
+                    engine = c("analytic", "search", "both")) {
   scoring <- match.arg(scoring)
+  engine <- match.arg(engine)
   valid <- c("half_up", "half_down", "native", "ceiling", "floor",
              "trunc", "anti_trunc")
   bad <- setdiff(rounding, valid)
@@ -172,22 +220,32 @@ brimmest <- function(l, u, n, mean, sd, digits = NULL,
   use_target <- !affordable ||
     (cells > 1e6 && nn * length(rounding) <= 64)
 
+  # One target certified under one rounding rule, by the requested engine.
+  # "analytic" is total (never NA); "search" keeps the original escalation
+  # (constructive search, then corridor sweep); "both" runs the two
+  # independent methods and refuses to answer if they disagree.
+  certify_one <- function(i, rr) {
+    tg <- .target_states(l, u, n, g$mg, mean[i], sd[i], md, sdd, rr)
+    got_a <- if (engine != "search") .certify_analytic(W, n, tg) else NA
+    got_s <- NA
+    if (engine != "analytic") {
+      got_s <- .certify_fast(W, n, tg, budget = search_budget)
+      if (is.na(got_s)) got_s <- .attainable_target(W, n, tg,
+                                                    max_cells = max_cells)
+      if (is.na(got_s) && engine == "search") stop(
+        "this design is too large to certify at the requested precision; ",
+        "raise max_cells, or report to fewer decimal places")
+    }
+    if (engine == "both" && !is.na(got_s) && got_a != got_s) stop(
+      "engine disagreement at mean = ", mean[i], ", sd = ", sd[i],
+      ", rounding = ", rr, ": analytic says ", got_a, ", search says ",
+      got_s, ". This is a bug; please report it with these inputs.")
+    if (engine == "search") got_s else got_a
+  }
+
   if (use_target) {
     hit_mat <- vapply(rounding, function(rr) {
-      vapply(seq_len(nn), function(i) {
-        tg <- .target_states(l, u, n, g$mg, mean[i], sd[i], md, sdd, rr)
-        # Arithmetic and a pruned constructive search first (see
-        # R/certify-sandwich.R); the corridor sweep only for what they leave
-        # undecided. Both give the same verdict, so the order is purely a
-        # matter of cost.
-        got <- .certify_fast(W, n, tg, budget = search_budget)
-        if (is.na(got)) got <- .attainable_target(W, n, tg,
-                                                  max_cells = max_cells)
-        if (is.na(got)) stop(
-          "this design is too large to certify at the requested precision; ",
-          "raise max_cells, or report to fewer decimal places")
-        got
-      }, logical(1))
+      vapply(seq_len(nn), function(i) certify_one(i, rr), logical(1))
     }, logical(nn))
   } else {
     # one lattice per design, reused across every reported tuple and cached so
@@ -203,11 +261,26 @@ brimmest <- function(l, u, n, mean, sd, digits = NULL,
     qm <- round(mean * mult_m)
     qs <- round(sd * mult_s)
     hit_mat <- vapply(rounding, function(rr) {
-      lm <- round(.round_reported(lat$mean, md, rr) * mult_m)
-      ls <- round(.round_reported(lat$sd, sdd, rr) * mult_s)
+      lm <- .round_scaled(lat$mean, md, rr)
+      ls <- .round_scaled(lat$sd, sdd, rr)
       span <- max(c(ls, qs), 0) + 1            # same packing for both sides
       (qm * span + qs) %in% (lm * span + ls)
     }, logical(nn))
+    if (engine == "both") {
+      # cross-check the lattice verdicts against the analytic engine, tuple
+      # by tuple -- two entirely independent computations of the same answer
+      hm <- matrix(hit_mat, nn, length(rounding))
+      for (ri in seq_along(rounding)) for (i in seq_len(nn)) {
+        tg <- .target_states(l, u, n, g$mg, mean[i], sd[i], md, sdd,
+                             rounding[ri])
+        got_a <- .certify_analytic(W, n, tg)
+        if (got_a != hm[i, ri]) stop(
+          "engine disagreement at mean = ", mean[i], ", sd = ", sd[i],
+          ", rounding = ", rounding[ri], ": analytic says ", got_a,
+          ", lattice says ", hm[i, ri],
+          ". This is a bug; please report it with these inputs.")
+      }
+    }
   }
   dim(hit_mat) <- c(nn, length(rounding))
 
@@ -236,10 +309,10 @@ brimmest <- function(l, u, n, mean, sd, digits = NULL,
 #' Recognised per row (column or constant): `l`, `u`, `n`, `mean`, `sd`,
 #' `digits`, `mean_digits`, `sd_digits`, `scoring`, `n_items`.
 #'
-#' `rounding`, `max_cells` and `search_budget` may be given only as constants,
-#' never as columns. `rounding` is a *set* of admitted rules rather than one
-#' value per row, and the other two are cost controls on the call; passing any
-#' of them as a column is an error rather than a silent per-row reading.
+#' `rounding`, `max_cells`, `search_budget` and `engine` may be given only as
+#' constants, never as columns. `rounding` is a *set* of admitted rules rather
+#' than one value per row, and the others are controls on the call; passing
+#' any of them as a column is an error rather than a silent per-row reading.
 #'
 #' @param data A data frame, one reported statistic set per row.
 #' @param ... Constant arguments applied to all rows.
@@ -273,7 +346,7 @@ brimmest_multiple <- function(data, ..., include_inputs = TRUE) {
   if (!is.data.frame(data)) stop("data must be a data frame")
   row_args <- c("l", "u", "n", "mean", "sd", "digits",
                 "mean_digits", "sd_digits", "scoring", "n_items")
-  call_args <- c("rounding", "max_cells", "search_budget")
+  call_args <- c("rounding", "max_cells", "search_budget", "engine")
   consts <- list(...)
   unknown <- setdiff(names(consts), c(row_args, call_args))
   if (length(unknown))

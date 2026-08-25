@@ -17,7 +17,8 @@ brimmest(
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1,
   max_cells = 2e+07,
-  search_budget = 2e+05
+  search_budget = 2e+05,
+  engine = c("analytic", "search", "both")
 )
 }
 \arguments{
@@ -50,7 +51,15 @@ any of them.}
 \item{search_budget}{Node budget for the constructive search (default
 \code{2e5}). Raising it lets the search settle more reports on its own;
 lowering it hands them to the corridor sweep sooner. The verdict is the
-same either way — only which route produces it changes.}
+same either way — only which route produces it changes. Used by the
+\code{"search"} and \code{"both"} engines; the \code{"analytic"} engine has no budget.}
+
+\item{engine}{How single reports are certified: \code{"analytic"} (default) for
+the exact spectrum-structure certification, \code{"search"} for the original
+constructive search with corridor-sweep fallback, or \code{"both"} to run the
+two independent methods and error on any disagreement (a built-in
+cross-check; also applied against the lattice when the lattice route is
+taken). All rounding rules are supported identically by every engine.}
 }
 \value{
 A data.frame with one row per reported tuple: \code{mean}, \code{sd},
@@ -117,14 +126,17 @@ sample sum at a time, which is answered in three escalating steps.
 A closed-form sandwich comes first. For a given sum the achievable sums of
 squares lie between the clustered configuration and the Structure-S one,
 and all share the sum's parity; a window meeting no admissible integer
-between them is impossible on arithmetic alone. What survives goes to a
-constructive search over non-increasing samples — the partitions of the sum
-— with the same sandwich re-applied at every step to what is left to place.
-Reaching a complete sample proves possibility and produces a witness;
-exhausting the search proves impossibility. Only when neither happens
-inside \code{search_budget} does the corridor sweep run: a dynamic program
-confined to the states that can still reach a target, roughly a tenth of
-the full table.
+between them is impossible on arithmetic alone. What survives is decided by
+the engine chosen via \code{engine}. The default \code{"analytic"} engine settles the
+window against the structure of the attainable spectrum directly (the
+demotion decomposition in \code{R/certify-analytic.R}): exact in both
+directions, with no node budget and no fallback, so a verdict is always
+produced. The \code{"search"} engine is the original machinery — a constructive
+search over non-increasing samples with the sandwich re-applied at every
+step, escalating to the corridor sweep (a dynamic program confined to the
+states that can still reach a target) when \code{search_budget} runs out.
+\code{"both"} runs the two independently and stops with an error if they ever
+disagree, which is the recommended setting for validation work.
 
 The practical effect is that designs the lattice refuses outright become
 answerable — a 0-63 inventory at \code{n = 50} needs a 3151 x 24801 table — and

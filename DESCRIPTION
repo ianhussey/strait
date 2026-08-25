@@ -1,6 +1,6 @@
 Package: strait
 Title: Bounds Checks for Reported Summary Statistics
-Version: 0.4.10
+Version: 0.4.11
 Authors@R:
     person("Ian", "Hussey", , "ian.hussey@unibe.ch", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-8906-7559"))
