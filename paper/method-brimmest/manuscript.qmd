@@ -407,29 +407,259 @@ exhausts within budget, for which the corridor still answers. No such report
 appeared in the validation sweep, but the fallback is retained because its
 absence there is a measurement, not a theorem.
 
-## An open problem: the near-closed-form certificate
+## The analytic certificate, step by step
 
-Both routes still sweep a state space whose size is set by the design rather
-than by the report, which is why a guard is needed at all. The blind-spot
-geometry suggests this may be removable.
+Both routes above still sweep a state space whose size is set by the design
+rather than by the report, which is why a guard is needed at all. The
+blind-spot geometry suggests this may be removable, and it is. This section
+develops the structure that removes it — the *spectrum* of attainable sums of
+squares at a fixed sum — one step at a time, each step carrying the picture
+that motivates the next. It ends with a certificate that is exact in both
+directions and sweeps nothing: no corridor, no node budget, no `max_cells`
+guard. It ships as `engine = "analytic"` in `brimmest()` and is now the
+default; the search and corridor machinery of the previous sections is
+retained verbatim as `engine = "search"`, and `engine = "both"` runs the two
+independent methods on every report and errors on any disagreement.
 
-At fixed $S$, the attainable values of $Q$ appear to be contiguous — every
-integer between the floor and some threshold is realised — with gaps confined
-to a fringe hugging the mean-conditional ceiling. Across every design examined
-here, all blind-spot cells lay in the top fringe of the umbrella's height, and
-the gap structure there is computable directly by best-first search outward
-from the Structure S maximum configuration using inward unit transfers, which
-enumerates the top rungs completely.
+### Step 1: the spectrum at a fixed sum
 
-If contiguity below the threshold can be proven, certification reduces to
-arithmetic. For a target below the threshold, membership follows from the
-floor, the threshold and a congruence condition, with no enumeration at all.
-For a target in the fringe, the ladder search explores only the handful of $Q$
-values adjacent to it. Certification would then be near-closed-form:
-independent of $n$ and of scale width, and the `max_cells` guard could be
-retired. That leaves the contiguity theorem as the substantive open problem
-this method poses, and the one whose resolution would matter most for applying
-exact certification at the scale widths clinical instruments actually use.
+Fix a candidate sum $S$ on the shifted scale $y = x - l \in [0, W]$. The
+sandwich says every attainable $Q = \sum y_i^2$ lies between the clustered
+floor $q_{\min}(S)$ and the Structure S ceiling $q_{\max}(S)$; parity says
+$Q \equiv S \pmod 2$. The question the closed forms cannot answer is which of
+the remaining integers are actually realised. @fig-spectrum answers it
+exhaustively for a small design, and the answer has a shape.
+
+```{r}
+#| label: fig-spectrum
+#| fig-cap: 'The spectrum of attainable sums of squares, mapped exhaustively for a 1--7 scale at n = 9 (shifted to 0--6). Each row is one candidate sum S; columns are the integers Q between the clustered floor and the Structure-S ceiling for that sum. Grey: wrong parity, excluded by arithmetic. Blue: attainable by some sample. Red: right parity, inside the sandwich, yet attainable by no sample --- the gaps. Every gap hugs the ceiling; below a thin fringe the spectrum is contiguous. The point-symmetry is the reflection y -> W - y.'
+#| fig-width: 7
+#| fig-height: 4.6
+# exact attainable (S, Q) states for n items on 0..W, by dynamic programming
+ach_spectrum <- function(W, n) {
+  S_max <- n * W; Q_max <- n * W^2
+  cur <- matrix(FALSE, S_max + 1, Q_max + 1)
+  cur[1, 1] <- TRUE
+  for (i in seq_len(n)) {
+    nxt <- matrix(FALSE, S_max + 1, Q_max + 1)
+    for (v in 0:W) {
+      ss <- 1:(S_max + 1 - v); qq <- 1:(Q_max + 1 - v^2)
+      nxt[ss + v, qq + v^2] <- nxt[ss + v, qq + v^2] | cur[ss, qq]
+    }
+    cur <- nxt
+  }
+  cur
+}
+qmin_i <- function(S, n) { m <- S %/% n; r <- S - n * m; (n - r) * m^2 + r * (m + 1)^2 }
+qmax_i <- function(S, W) { a <- S %/% W; b <- S - a * W; a * W^2 + b^2 }
+# attainable sums of squares over the partitions of m into parts of size <= cap
+corner_spectrum <- function(m, cap = m) {
+  B <- vector("list", m + 1); B[[1]] <- 0L
+  if (m >= 1 && cap >= 1) for (p in seq_len(min(cap, m))) for (s in p:m) {
+    src <- B[[s - p + 1]]
+    if (!is.null(src)) B[[s + 1]] <- union(B[[s + 1]], src + p^2)
+  }
+  sort(B[[m + 1]])
+}
+
+W <- 6; n_ex <- 9
+A <- ach_spectrum(W, n_ex)
+spec <- do.call(rbind, lapply(0:(n_ex * W), function(S) {
+  Q <- qmin_i(S, n_ex):qmax_i(S, W)
+  data.frame(S = S, Q = Q,
+             status = ifelse((Q - S) %% 2 != 0, "wrong parity",
+                             ifelse(A[S + 1, Q + 1], "attainable", "gap")))
+}))
+ggplot(spec, aes(Q, S, fill = status)) +
+  geom_tile() +
+  scale_fill_manual(NULL, values = c(attainable = "#1d4ed8", gap = "#dc2626",
+                                     `wrong parity` = "grey85")) +
+  labs(x = "Q (sum of squares)", y = "S (sum)") +
+  theme_minimal() + theme(legend.position = "bottom")
+```
+
+Two facts, visible at a glance and verified exhaustively across every design
+we tested (all $W \le 8$, $n \le 12$ --- 859,672 membership checks --- plus
+wide-scale spot checks to $W = 517$): the gaps are confined to a thin fringe
+below the ceiling, and below that fringe every integer of the right parity is
+attainable. The fringe is where every blind-spot cell lives; the contiguous
+interior is why most reports are settled by arithmetic alone.
+
+### Step 2: a report becomes a one-dimensional question
+
+A reported (mean, SD) pins its candidate sums by GRIM and, at each sum, a
+window of admissible $Q$. Certification is then a one-dimensional question:
+does the window contain a member of the spectrum? @fig-verdict walks the
+blind-spot cell of the introduction through it.
+
+```{r}
+#| label: fig-verdict
+#| fig-cap: 'The blind-spot cell of the introduction, decided on one axis. Mean 1.3 on a 1--5 scale at n = 9 admits the single sum S = 12 (shifted: 3); SD 0.9 maps to the Q-window [6.78, 8.22]. The window contains two integers: 8 fails parity (S is odd), and 7 --- inside the sandwich, right parity, the survivor every closed-form screen passes --- falls in a gap: the partitions of 3 realise only Q = 3, 5, 9. Impossible, certified without touching a state space.'
+#| fig-width: 7
+#| fig-height: 2.8
+S_bs <- 3; n_bs <- 9
+att <- corner_spectrum(S_bs)                       # 3, 5, 9
+q_lo <- (n_bs - 1) * 0.85^2 + S_bs^2 / n_bs
+q_hi <- (n_bs - 1) * 0.95^2 + S_bs^2 / n_bs
+ticks <- data.frame(Q = 3:9)
+ticks$status <- ifelse((ticks$Q - S_bs) %% 2 != 0, "wrong parity",
+                       ifelse(ticks$Q %in% att, "attainable", "gap"))
+ggplot() +
+  annotate("rect", xmin = q_lo, xmax = q_hi, ymin = 0.25, ymax = 1.05,
+           fill = "grey80", alpha = .55) +
+  geom_segment(data = ticks, aes(x = Q, xend = Q, y = 0.3, yend = 1,
+                                 colour = status), linewidth = 1.6) +
+  scale_colour_manual(NULL, values = c(attainable = "#1d4ed8", gap = "#dc2626",
+                                       `wrong parity` = "grey60")) +
+  annotate("text", x = (q_lo + q_hi) / 2, y = 1.22,
+           label = "Q-window of SD = 0.9", size = 3.2) +
+  annotate("text", x = 3, y = 0.12, label = "q[min]", parse = TRUE, size = 3) +
+  annotate("text", x = 9, y = 0.12, label = "q[max]", parse = TRUE, size = 3) +
+  scale_x_continuous(breaks = 3:9) +
+  labs(x = "Q at S = 3 (shifted scale)", y = NULL) +
+  coord_cartesian(ylim = c(0, 1.35)) +
+  theme_minimal() +
+  theme(axis.text.y = element_blank(), panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(), legend.position = "bottom")
+```
+
+When the window reaches the contiguous interior, the verdict is immediate in
+the other direction: any integer of the right parity in the window is
+attainable, and the constructive search of the previous section produces its
+witness in $O(n)$. Everything that remains to explain is the fringe.
+
+### Step 3: the move that generates the fringe
+
+Write $S = aW + b$. The ceiling $q_{\max} = aW^2 + b^2$ is attained by the
+Structure S configuration alone: $a$ values at the ceiling, one remainder,
+the rest at the floor. Every other configuration is reached by *demoting*
+some number $j$ of ceiling values and re-partitioning the freed $jW + b$
+units below the ceiling, and each such move pays a quantised price in $Q$
+--- the deficit $D = q_{\max} - Q$. @fig-demote shows the first rungs.
+
+```{r}
+#| label: fig-demote
+#| fig-cap: 'The demotion decomposition, illustrated for S = 36 on a 0--6 scale (a = 6, b = 0). Leftmost: the Structure-S configuration, deficit 0. Each further panel demotes j ceiling values (red) and re-partitions the freed units (gold), paying a quantised deficit D. The smallest attainable deficits here are 0, 10, 16, 18: no configuration realises D = 2, 4, 6, 8, 12, or 14, and those six missing rungs are exactly the gaps below this ceiling in the spectrum. The decomposition is complete --- every configuration has some number of ceiling values --- so recursing on it enumerates the fringe exactly.'
+#| fig-width: 7
+#| fig-height: 2.9
+cfgs <- list(list(j = 0, v = c(6, 6, 6, 6, 6, 6)),
+             list(j = 1, v = c(6, 6, 6, 6, 6, 5, 1)),
+             list(j = 1, v = c(6, 6, 6, 6, 6, 4, 2)),
+             list(j = 2, v = c(6, 6, 6, 6, 5, 5, 2)))
+demote <- do.call(rbind, lapply(cfgs, function(cf) {
+  D <- 6 * 36 - sum(cf$v^2)
+  data.frame(panel = sprintf("j = %d,  D = %d", cf$j, D),
+             pos = seq_along(cf$v), y = cf$v,
+             part = ifelse(cf$v == 6, "at ceiling", "re-partitioned"))
+}))
+ggplot(demote, aes(pos, y, fill = part)) +
+  geom_col(width = .8) +
+  facet_wrap(~panel, nrow = 1) +
+  scale_fill_manual(NULL, values = c(`at ceiling` = "#1d4ed8",
+                                     `re-partitioned` = "#d97706")) +
+  scale_y_continuous(breaks = c(0, 3, 6)) +
+  labs(x = NULL, y = "value") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(), panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank(), legend.position = "bottom")
+```
+
+The prices are quantised because a demoted unit trades a large square for
+small ones. That is the entire mechanism of the blind spot, and it has a
+pleasant classical face: $T = (Q - S)/2 = \sum \binom{y_i}{2}$ is a sum of
+triangular numbers, and by Gauss's Eureka theorem every integer is a sum of
+three of them --- so absent the bounds, every parity-consistent $Q$ would be
+attainable. Gaps exist only where the constraint $\sum p_i \le S$ forces the
+representation onto one huge triangular number, and huge triangular numbers
+are sparse.
+
+### Step 4: bands, and where the gaps end
+
+Grouping the configurations of the fringe by their largest part makes the gap
+structure exact. For the corner case ($S \le W$), the configurations with
+largest part $S - j$ occupy the band $[(S-j)^2 + j,\ (S-j)^2 + j^2]$: two
+parts at the top of a band, a part plus singletons at its bottom. Bands with
+small $j$ are disjoint --- those separations are the gaps --- and they merge
+into a continuum once $j^2 + 3j$ outgrows $2S$, i.e. around
+$j \approx \sqrt{2S}$. Below the last separation the spectrum is contiguous.
+
+```{r}
+#| label: fig-bands
+#| fig-cap: 'The fringe organised by largest part, for partitions of S = 20 (corner case). Row j holds the configurations whose largest part is 20 - j; segments span each band, points are its attainable values of Q. Bands with small j are separated --- the white space between them is exactly the gap structure of the spectrum (union on the bottom rug) --- and bands overlap into a continuum once j is of order the square root of 2S. Within each band the pattern is the spectrum of the partitions of j: the fringe is a self-similar copy of the whole problem at a smaller scale.'
+#| fig-width: 7
+#| fig-height: 3.6
+S0 <- 20
+bands <- do.call(rbind, lapply(0:9, function(j) {
+  qs <- corner_spectrum(j, cap = S0 - j) + (S0 - j)^2
+  data.frame(j = j, Q = qs)
+}))
+rug <- data.frame(Q = sort(unique(bands$Q)))
+ggplot() +
+  geom_segment(data = aggregate(Q ~ j, bands, range),
+               aes(x = Q[, 1], xend = Q[, 2], y = j, yend = j),
+               colour = "grey70", linewidth = .5) +
+  geom_point(data = bands, aes(Q, j), colour = "#1d4ed8", size = 1.3) +
+  geom_point(data = rug, aes(Q, -1.4), shape = "|", size = 2, colour = "grey30") +
+  annotate("text", x = min(bands$Q), y = -2.35, hjust = 0, size = 3,
+           label = "union: the spectrum near its ceiling") +
+  scale_y_continuous(breaks = 0:9) +
+  labs(x = "Q (sum of squares)", y = "j  (largest part = S - j)") +
+  theme_minimal() + theme(panel.grid.minor = element_blank())
+```
+
+### Step 5: the fringe is design-local, and the certificate follows
+
+The final structural fact is what makes the certificate cheap. Because the
+fringe is generated by demotions near the ceiling, its deficit pattern
+depends only on $(W, b)$ once $a \ge 2$: sums that differ by whole multiples
+of $W$ share it exactly. @fig-fringe shows the pattern locking in.
+
+```{r}
+#| label: fig-fringe
+#| fig-cap: 'Attainable deficits D from the mean-conditional ceiling, 0--6 scale at n = 12, for sums that share b = 0 (S = 6, 12, ..., 36, so a = 1, ..., 6). Ticks mark attainable D; blank columns of even D are the gaps. From a = 2 on, the rows are identical: the fringe depends only on the scale width and the remainder b, not on the sum, the mean, or n. Certification in the fringe therefore costs the same for n = 12 as for n = 12,000, and the fringe is the only place where anything beyond arithmetic happens at all.'
+#| fig-width: 7
+#| fig-height: 3
+A12 <- ach_spectrum(6, 12)
+fr <- do.call(rbind, lapply(seq(6, 36, by = 6), function(S) {
+  hi <- qmax_i(S, 6)
+  D <- 0:min(40, hi - qmin_i(S, 12))
+  keep <- (hi - D - S) %% 2 == 0
+  data.frame(S = S, D = D[keep], att = A12[S + 1, hi - D[keep] + 1])
+}))
+ggplot(subset(fr, att), aes(D, factor(S, labels = paste0("S = ", seq(6, 36, 6))))) +
+  geom_point(shape = "|", size = 5, colour = "#1d4ed8") +
+  labs(x = expression(deficit ~ D == q[max] - Q), y = NULL) +
+  theme_minimal() + theme(panel.grid.minor = element_blank())
+```
+
+Assembling the five steps gives the certificate. Clip the report's window by
+the sandwich and parity ($O(1)$). If it reaches the contiguous interior,
+possible --- with a witness from the constructive search. Otherwise the
+window lies in the fringe, and the demotion decomposition is recursed
+exactly: each level demotes ceiling values and asks the same question of a
+problem one cap smaller, terminating because the decomposition is complete.
+No state space is built, so nothing scales with the design: the 0--63
+inventory at $n = 50$ that motivated the corridor certifies in well under a
+millisecond either way, and the `max_cells` guard is simply never consulted.
+Correctness does not rest on the contiguity of the interior --- the
+decomposition is exhaustive regardless; contiguity is why the recursion is
+fast, not why it is right. Its verdicts agree with the search and lattice
+routes on every comparison run: roughly 1.5 million checks spanning brute
+force, both engines, scale widths to 517, sum-score designs, and one to three
+reported decimals, with `engine = "both"` repeating the cross-check on every
+user call that requests it. That standing cross-check has already paid its
+way: on its first extended run it exposed a floating-point boundary error in
+our own lattice route's forward rounding under the directional rounding rules
+(an attainable mean of exactly $113/25 = 4.52$ scales to
+$451.99999999999994$, which truncation filed under 4.51), fixed in the same
+release.
+
+What remains open is the contiguity *theorem*: a proof, with explicit
+constants, that the gaps are confined to a fringe of depth $O(S^{3/2})$ at
+the corners and $O(W^{3/2})$ in the interior, as every computation here
+finds. Its resolution would upgrade the interior shortcut from a validated
+observation to a guarantee, and it is the mathematical question this method
+poses.
 
 ## From lattice to verdict
 
