@@ -957,6 +957,275 @@ computation for more of the reported record brought under exact scrutiny,
 which is the direction error detection should move: fewer heuristics, more
 certificates.
 
+# Appendix A: exactness of the analytic certificate {.unnumbered}
+
+This appendix proves that the analytic certificate of section 4.6 is exact:
+`engine = "analytic"` returns *possible* if and only if some sample of $n$
+integers on the scale produces the reported (mean, SD) under an admitted
+rounding rule. The proof is unconditional. In particular it does not use the
+contiguity of the spectrum's interior: contiguity (section A.5) governs how
+fast the recursion runs, never whether its verdict is right. Throughout,
+lemma-level claims have also been machine-verified exhaustively on small
+designs; the sweep counts are reported in section 5 of the main text.
+
+## A.1 Setting {.unnumbered}
+
+Work on the shifted scale $y = x - l$. A *configuration* is a multiset
+$y = (y_1, \dots, y_n)$ of integers with $0 \le y_i \le W$; write
+$S = \sum y_i$ and $Q = \sum y_i^2$. For the sub-problems of the recursion we
+need the general form: $\mathcal{C}(M, c, \nu)$ denotes the configurations of
+exactly $\nu$ values in $[0, c]$ summing to $M$, which is non-empty iff
+$0 \le M \le \nu c$. Its *spectrum* is
+$\mathrm{Spec}(M, c, \nu) = \{\, \textstyle\sum y_i^2 : y \in \mathcal{C}(M, c, \nu) \,\}$.
+Values equal to $0$ are unused slots, so "at most $\nu$ parts" and "exactly
+$\nu$ values" coincide. Write $M = a c + b$ with $0 \le b < c$.
+
+## A.2 Elementary invariants {.unnumbered}
+
+**Lemma A1 (parity).** Every $Q \in \mathrm{Spec}(M, c, \nu)$ satisfies
+$Q \equiv M \pmod 2$.
+
+*Proof.* $y^2 \equiv y \pmod 2$ for every integer $y$; sum over the
+configuration. $\square$
+
+**Lemma A2 (floor).** $\min \mathrm{Spec}(M, c, \nu) = q_{\min}(M, \nu) :=
+(\nu - r)m^2 + r(m+1)^2$ where $m = \lfloor M/\nu \rfloor$,
+$r = M - \nu m$.
+
+*Proof.* If a configuration has two values with $y_i \ge y_j + 2$, replacing
+them by $(y_i - 1, y_j + 1)$ preserves the sum and changes $Q$ by
+$-2(y_i - y_j - 1) \le -2$. A minimiser therefore has all values within $1$
+of one another, which forces the stated multiset ($r$ values at $m + 1$, the
+rest at $m$); it is feasible because $m + 1 \le c$ whenever $M \le \nu c$.
+$\square$
+
+**Lemma A3 (ceiling).** If $M \le \nu c$ then
+$\max \mathrm{Spec}(M, c, \nu) = q_{\max}(M, c) := a c^2 + b^2$, attained by
+the Structure-S configuration ($a$ values at $c$, one at $b$, the rest at
+$0$), which uses $a + \mathbb{1}[b > 0] \le \nu$ slots.
+
+*Proof.* If a configuration has two values with $0 < y_j$ and $y_i < c$
+($i \neq j$, $y_j \le y_i$), moving one unit from $j$ to $i$ preserves the
+sum and increases $Q$ by $2(y_i - y_j + 1) \ge 2$. A maximiser therefore has
+at most one value strictly inside $(0, c)$, which forces the Structure-S
+multiset. Feasibility of the slot count: if $a = \nu$ then $b = 0$; otherwise
+$a \le \nu - 1$. $\square$
+
+**Lemma A4 (reflection).** $y \mapsto (c - y_1, \dots, c - y_\nu)$ is a
+bijection of $\mathcal{C}(M, c, \nu)$ onto $\mathcal{C}(\nu c - M, c, \nu)$
+under which $Q \mapsto Q + \nu c^2 - 2cM$.
+
+*Proof.* Direct computation:
+$\sum (c - y_i)^2 = \nu c^2 - 2cM + Q$; the map is an involution. $\square$
+
+## A.3 The demotion decomposition and the certificate {.unnumbered}
+
+The engine decides membership of a whole window at once through the deficit
+$D(y) = q_{\max}(M, c) - \sum y_i^2 \ge 0$.
+
+**Theorem A5 (demotion decomposition).** Let $0 \le M \le \nu c$, $c \ge 1$,
+and $M = ac + b$ as above. For $y \in \mathcal{C}(M, c, \nu)$ let
+$t = \#\{i : y_i = c\}$. Then $t \le a$, and removing those $t$ values is a
+bijection between $\{y \in \mathcal{C}(M, c, \nu) : \#\{y_i = c\} = t\}$ and
+$\mathcal{C}(M - tc,\ c - 1,\ \nu - t)$. Consequently, writing $j = a - t$,
+
+$$
+\mathrm{Spec}(M, c, \nu) \;=\; \bigcup_{j = 0}^{a}
+\Big\{\, (a - j)\,c^2 + q \;:\; q \in \mathrm{Spec}(jc + b,\ c - 1,\ \nu - a + j) \,\Big\},
+$$
+
+and in deficit terms $D(y) = d_j + D'(y')$, where
+$d_j = jc^2 + b^2 - q_{\max}(jc + b,\ c - 1)$ is the branch offset, $y'$ is
+the sub-configuration, and $D'$ is its deficit from its own ceiling.
+
+*Proof.* $t$ values at $c$ sum to $tc \le M < (a+1)c$, so $t \le a$. Removing
+them leaves $\nu - t$ values, each $\le c - 1$ by the definition of $t$,
+summing to $M - tc = jc + b$; conversely appending $t$ values at $c$ to any
+member of $\mathcal{C}(jc + b, c-1, \nu - t)$ recovers a configuration with
+exactly $t$ values at $c$. The two maps are mutually inverse, and every
+configuration has some $t$, so the union is exhaustive; it is a union over
+$j = a - t \in \{0, \dots, a\}$. The deficit identity is arithmetic:
+$D(y) = ac^2 + b^2 - tc^2 - \sum y_i'^2 = jc^2 + b^2 - \sum y_i'^2 =
+d_j + \big(q_{\max}(jc+b, c-1) - \sum y_i'^2\big)$. $\square$
+
+**Theorem A6 (correctness and termination of the deficit recursion).** The
+procedure `.hit_deficit(M, c, ν, d_lo, d_hi)` of `R/certify-analytic.R`
+terminates and returns TRUE iff some $y \in \mathcal{C}(M, c, \nu)$ has
+$D(y) \in [d_{lo}, d_{hi}]$.
+
+*Proof.* Termination: each recursive call strictly decreases $c$, the branch
+index is bounded by $a \le M$, and the base cases $M = 0$, $c \le 0$,
+$\nu \le 0$ halt. Each guard is sound and, jointly with the recursion,
+complete:
+
+* *$M = 0$:* the empty configuration is the only member; its deficit is $0$,
+  so the answer is $\mathbb{1}[d_{lo} \le 0 \le d_{hi}]$.
+* *Clamping $c > M$ to $c = M$:* values cannot exceed $M$, and
+  $q_{\max}(M, c) = M^2 = q_{\max}(M, M)$ for every $c > M$, so both the
+  configuration set and the deficit origin are unchanged.
+* *$M > \nu c$ (the `NA` guard):* $\mathcal{C}$ is empty; FALSE.
+* *$d_{hi} < 0$:* deficits are non-negative (Lemma A3); FALSE.
+* *$d_{lo} > q_{\max} - q_{\min}$:* deficits cannot exceed
+  $q_{\max} - q_{\min}$ (Lemmas A2, A3); FALSE.
+* *$d_{lo} \le 0 \le d_{hi}$:* the Structure-S configuration realises
+  deficit $0$ and is feasible (Lemma A3); TRUE.
+* *Branch scan:* by Theorem A5 every configuration lies in exactly one
+  branch $j$, where its deficit is $d_j + D'$ with $D' \ge 0$; a branch with
+  $d_j > d_{hi}$ therefore contains no solution and is soundly skipped, and
+  otherwise the recursive call decides
+  $D' \in [d_{lo} - d_j,\ d_{hi} - d_j]$ for the sub-problem
+  $(jc + b,\ c - 1,\ \nu - a + j)$, which by induction on $c$ is exact.
+  The scan covers $j = 0, \dots, a$, so no branch is missed. $\square$
+
+**Theorem A7 (exactness of the certificate).** For a reported tuple, an
+admitted rounding rule, and a candidate sum $S$ with clipped integer window
+$[k_{lo}, k_{hi}]$ (sandwich-clipped and parity-aligned as in `.k_window`),
+`.analytic_window` returns TRUE iff some configuration attains
+$Q \in [k_{lo}, k_{hi}]$ at sum $S$; consequently `brimmest(engine =
+"analytic")` returns *possible* iff some sample of $n$ integers on $[l, u]$
+rounds to the reported (mean, SD) under an admitted rule.
+
+*Proof.* Clipping is lossless: attainable $Q$ lie in
+$[q_{\min}, q_{\max}]$ and have the parity of $S$ (Lemmas A1–A3), so no
+attainable value is removed and no unattainable value retained as an
+endpoint. Reflection (Lemma A4) maps the question to $S \le nW/2$ without
+changing it. If $k_{hi} = q_{\max}$ or $k_{lo} = q_{\min}$ the corresponding
+extremal configuration is a witness. The constructive-search fast path
+alters no verdict: a completed sample is a witness (TRUE is correct), an
+exhausted search is a proof of emptiness over the same clipped window (its
+orderings and prunes lose no multiset, by Lemmas A2–A3 applied at every
+node — the argument of section 4.5), and a budget-capped search falls
+through. What falls through is decided by
+`.hit_deficit`$(S, W, n, q_{\max} - k_{hi}, q_{\max} - k_{lo})$, which by
+Theorem A6 decides exactly whether some deficit — equivalently some
+$Q \in [k_{lo}, k_{hi}]$ — is attained. The tuple-level claim follows by
+taking the union over the (finitely many) candidate sums generated by
+inverse rounding of the mean and the admitted rules, which is precisely the
+loop of `.certify_analytic`. $\square$
+
+## A.4 The fringe: bands and the first-gap catalogue {.unnumbered}
+
+The next results locate the gaps; they justify the figures of section 4.6
+and yield closed forms for the shallowest gaps, but Theorems A6–A7 do not
+depend on them.
+
+**Proposition A8 (bands by largest part).** For the corner case
+($M \le c$ and $\nu \ge M$, so neither the cap nor the slot count binds),
+conditioning on the largest part
+$p_1 = M - j$ gives
+$\mathrm{Spec} = \bigcup_{j \ge 0} \big\{ (M-j)^2 + q : q \in
+\mathrm{Spec}(j,\ \min(j, M-j),\ \cdot) \big\}$, and for $j \le M/2$ band
+$j$ occupies exactly the interval of parity-$M$ integers
+$[(M-j)^2 + j,\ (M-j)^2 + j^2]$ at its ends (all-ones remainder; single-part
+remainder). Consecutive bands $j, j+1$ with small $j$ are disjoint whenever
+$(M - j - 1)^2 + (j+1)^2 < (M - j)^2 + j$, and the space between them is a
+run of unattainable parity-consistent integers — a gap.
+
+*Proof.* Conditioning on the largest part is a partition of the
+configuration set; the remainder $j$ carries the cap $p_1 = M - j$, which is
+non-binding for $j \le M/2$. The band endpoints are Lemmas A2–A3 applied to
+the remainder. Disjointness is the stated inequality. $\square$
+
+**Proposition A9 (branch offsets and the first gap).** Let $M = aW + b$ with
+$a \ge 1$, slots ample. For $1 \le j$ with $j + b \le W - 2$, the branch
+offset of Theorem A5 is
+
+$$
+d_j \;=\; j\,\big(2(W - b) - (j + 1)\big),
+$$
+
+and the smallest positive attainable deficit is
+
+$$
+D_{\min} \;=\;
+\begin{cases}
+2(W - 1) & b = 0\\
+2(W - 2) & b = 1\\
+\min\{\, 2(b - 1),\ 2(W - b - 1) \,\} & 2 \le b \le W - 2\\
+2(W - 2) & b = W - 1,
+\end{cases}
+$$
+
+while for the corner $a = 0$, $2 \le M < W$, it is $D_{\min} = 2(M - 1)$.
+Every parity-consistent $Q$ with $0 < q_{\max} - Q < D_{\min}$ is
+unattainable.
+
+*Proof.* For the offset, $jW + b = j(W-1) + (j + b)$ with
+$j + b \le W - 2 < W - 1$, so $q_{\max}(jW + b, W - 1) = j(W-1)^2 +
+(j+b)^2$ and $d_j = jW^2 + b^2 - j(W-1)^2 - (j+b)^2 = j(2W - 1 - j - 2b)$,
+which is the stated form. For $D_{\min}$: branch $j = 0$ re-partitions $b$
+below the cap; its smallest positive deficit is $b^2 - (b-1)^2 - 1 =
+2(b-1)$, available iff $b \ge 2$ (Lemma A3 applied to the remainder $b$).
+Branch $j \ge 1$ contributes deficits $\ge d_j$, with $d_1 = 2(W - b - 1)$
+when $b \le W - 2$ and $d_j$ increasing in $j$ on the relevant range
+($d_{j+1} - d_j = 2(W - b - 1 - j) > 0$ there), so branch $1$ carries the
+branch-side minimum. The four cases collect the boundary situations: at
+$b = 0$ branch $0$ is empty of positive deficits and $d_1 = 2(W-1)$; at
+$b = 1$ the remainder $1$ cannot split and $d_1 = 2(W - 2)$; at $b = W - 1$
+the $j = 1$ sub-problem has $j + b = W > W - 2$ and direct evaluation gives
+offset $2W - 2$, exceeded by the split deficit $2(b - 1) = 2(W - 2)$. The
+corner case is Proposition A8's first disjointness: the band below $M^2$
+begins at $(M-1)^2 + 1$. Each case was additionally machine-verified for all
+$3 \le W \le 7$, $a \le 3$, all $b$. $\square$
+
+## A.5 Contiguity: what is proved, what is conjectured {.unnumbered}
+
+**Lemma A10 (merge).** In the corner setting of Proposition A8, suppose
+every parity-consistent integer in $[\,j + 1,\ Q_d(j+1)\,]$ is attainable
+for the sub-problem of size $j + 1$ (its dense range). Then bands $j$ and
+$j + 1$ tile without a gap iff
+
+$$
+Q_d(j + 1) \;\ge\; 2M - j - 3 .
+$$
+
+*Proof.* Band $j+1$'s dense part reaches up to $(M-j-1)^2 + Q_d(j+1)$; band
+$j$ begins at $(M-j)^2 + j$. Adjacent parity-consistent integers differ by
+$2$, so the tiles meet iff $(M-j-1)^2 + Q_d(j+1) \ge (M-j)^2 + j - 2$, and
+the stated inequality is its rearrangement. $\square$
+
+With $Q_d(m) \ge m^2 - \kappa m^{3/2}$ as an inductive hypothesis, Lemma A10
+holds for all $j \gtrsim \sqrt{2M}$, and the induction closes for any
+$\kappa > 2\sqrt{2}$ once $M$ is large — *for the range the bands cover*.
+What the band induction alone does not deliver is the lower reach: bands
+with $j > M/2$ carry a binding cap, so a complete proof must run the same
+argument on the two-parameter family $\mathrm{Spec}(M, c, \nu)$, where the
+role of Lemma A10 is played by the overlap of consecutive demotion branches
+of Theorem A5. The overlap algebra is identical; what is missing is a
+closed-form bound on the fringe depth of the capped sub-problems that closes
+the induction uniformly in both parameters.
+
+We therefore record the remaining statement as a conjecture, in the form
+every computation in this paper supports.
+
+**Conjecture A11 (contiguity).** There are constants $\kappa$ such that for
+all $(M, c, \nu)$, every parity-consistent integer $Q$ with
+$q_{\min} \le Q \le q_{\max} - \kappa\,\min(M, c)^{3/2}$ is attainable.
+
+The evidence: exhaustive verification for all $c \le 8$, $\nu \le 12$
+(859,672 membership checks — every gap in every spectrum lies in the fringe);
+corner spectra to $M = 160$, where the observed fringe depth is
+$(2.8\text{–}3.4)\,M^{3/2}$ against the heuristic constant $2\sqrt 2$; and
+wide-scale spot checks to $c = 517$. The conjecture is consequential for
+*complexity* — it is why the recursion of Theorem A6 exhausts only a thin
+tree when a verdict is negative — and for nothing else: Theorems A6–A7 hold
+without it.
+
+## A.6 From theorems to code {.unnumbered}
+
+| statement | implementation |
+|---|---|
+| Lemmas A1–A3 (parity, floor, ceiling) | `.k_window`, `.q_min_int`, `.q_max_cnt` |
+| Lemma A4 (reflection) | `.analytic_window`, first block |
+| Theorems A5–A6 (decomposition, recursion) | `.hit_deficit` |
+| Theorem A7 (certificate) | `.analytic_window`, `.certify_analytic` |
+| Proposition A9 ($D_{\min}$) | not needed at run time; predicts the phantom streaks of section 3 |
+
+The standing cross-check `engine = "both"` re-derives every verdict by the
+independent search/lattice machinery and stops on any disagreement, so the
+proofs above are continuously re-tested against an implementation that
+shares none of their reasoning.
+
 # References {.unnumbered}
 
 ::: {#refs}
