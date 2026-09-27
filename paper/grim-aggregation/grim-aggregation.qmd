@@ -1,0 +1,501 @@
+---
+title: "Pooling GRIM tests: an assumption ladder"
+subtitle: "The logic and mathematics of `grim_aggregate()` in the strait package"
+author:
+  - name: Ian Hussey
+    email: ian.hussey@unibe.ch
+    affiliations:
+      - name: University of Bern
+format:
+  html:
+    embed-resources: true
+    toc: true
+    theme: flatly
+execute:
+  warning: false
+  message: false
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+# Load the package from source, so this document always runs against the
+# code in this repository rather than an installed version.
+pkgload::load_all(here::here(), quiet = TRUE)
+library(ggplot2)
+theme_set(theme_minimal(base_size = 12))
+```
+
+# The problem
+
+A single GRIM test is a clean deductive instrument. A reported mean either is
+or is not reachable as $S/(Nm)$ for some integer sum $S$ after rounding to the
+reported precision (Brown & Heathers, 2017). But forensic questions are rarely
+about one mean. They are about a paper, a lab, or a literature, and the
+question becomes: *what do many GRIM results say together?*
+
+The naive summary, "3 of 20 means failed", is hard to read for two reasons.
+
+1. **Values differ in how much they can say.** At two decimals, a mean from
+   $N = 12$ fails for 88% of possible endings. A mean from $N = 150$ can never
+   fail. Counting passes treats both as evidence of the same weight.
+2. **Every step beyond counting needs an assumption, and the assumptions
+   differ in how defensible they are.** "Every failure is a problem" needs
+   only that the rounding, items and extraction are right. "Fewer failures
+   than random numbers would produce" needs a model of what random numbers
+   look like. "About 30% of values are non-genuine" needs that model plus
+   independence plus a mixture structure.
+
+`grim_aggregate()` answers the pooling question as an **assumption ladder**.
+Each quantity is reported next to the assumptions it rests on. The reader
+climbs only as far as they are willing to defend. The deterministic rungs are
+the headline, and the model-based rungs are secondary.
+
+# Notation and assumptions
+
+Value $i = 1, \dots, n$ has reported mean $x_i$ with $d_i$ decimals, sample
+size $N_i$ and $m_i$ items. Means are supplied as **character** strings, so
+that trailing zeros fix $d_i$: `"5.10"` has $d = 2$, while `5.1` has lost
+that information. The rounding rule (default `"up_or_down"`) is used
+identically everywhere, for observed consistency and for pass rates.
+
+| Label | Assumption | Fails when |
+|---|---|---|
+| **A0** | No authentic failures: correct values never fail GRIM | the rounding convention, items or $N$ are wrong, or a value was mis-extracted |
+| **U** | Uniform counterfactual: a non-genuine value is equally likely to be any value on the reporting grid | fabricators favour or avoid particular digits |
+| **I** | Independence: values pass or fail independently | a shared wrong $N$; copied or derived values |
+| **M** | Mixture: each value is non-genuine with probability $\lambda$, otherwise correct | non-genuineness is clustered or structured |
+| **B** | Authentic baseline: an authentic value fails with known probability $\varepsilon_i$ | the calibration corpus does not match the paper |
+
+: The assumptions, and the ways each can fail. {#tbl-assumptions}
+
+The rest of the document climbs the ladder one rung at a time, using a
+running example. The example is **illustrative only** and is not from any
+real paper. Nine of its twelve means are computed from integer sums, so they
+are genuine. The other three were chosen to fail GRIM.
+
+```{r}
+paper <- data.frame(
+  x = c("3.39", "2.87", "4.12", "3.05", "2.65", "3.89",
+        "1.93", "4.45", "3.27", "2.14", "3.71", "5.06"),
+  n = c(28, 31, 45, 22, 37, 19, 26, 33, 41, 24, 150, 17)
+)
+res <- grim_aggregate(paper)
+res
+```
+
+# Rungs 0–2: counting (no assumptions)
+
+## Rung 0: the GRIM result per value
+
+$$
+c_i = \mathbb{1}\Big[\exists\, S \in \mathbb{Z} : \operatorname{round}_{d_i}\!\big(S / (N_i m_i)\big) = x_i\Big],
+\qquad f_i = 1 - c_i .
+$$
+
+This is computed by `scrutiny::grim_map()` (Jung, scrutiny package). No assumption is
+involved. It is arithmetic about the reported numbers.
+
+## Rung 1: pass rate and fail rate
+
+How often *could* value $i$ fail? Let $\text{grid}_d = \{0, 10^{-d}, \dots,
+1 - 10^{-d}\}$ be the $10^d$ possible decimal endings. The pass rate is the
+share of endings that are consistent with the design:
+
+$$
+p_i = \frac{1}{10^{d_i}} \sum_{j = 0}^{10^{d_i} - 1} c\big(j / 10^{d_i};\ N_i, m_i, d_i\big),
+\qquad q_i = 1 - p_i .
+$$
+
+**Why enumerating one unit interval is exact.** If $x$ is consistent through
+the sum $S$, then $x + 1$ is consistent through $S + N_i m_i$. Adding an
+integer to both the mean and to $S/(N_i m_i)$ shifts the rounding problem by
+a whole number, and that leaves the decimal ending unchanged. Consistency is
+therefore periodic with period 1 in $x$, and the $10^d$ endings in $[0, 1)$
+are the whole story.
+
+$p_i$ is a property of $(N_i, m_i, d_i, \text{rounding})$, not of the
+reported value. The package computes it by GRIM-testing every grid point with
+the same scrutiny call used for the observed values, so the rounding rule
+cannot drift between the two. Results are cached by design.
+
+The familiar approximation is $q_i \approx \max(0, 1 - N_i m_i / 10^{d_i})$.
+This is what scrutiny's `probability` column reports. It is exact unless
+$S/(Nm)$ can land exactly on a rounding tie. Under `"up_or_down"`, a tie is
+accepted in both directions, so the tie ending passes twice over and the
+exact pass rate is *higher*. At $d = 2$ this happens whenever
+$N m$ has a factor that puts $S/(Nm)$ on a $.xx5$. For example, at $N = 40$
+the endings $.x25$ and $.x75$ are ties, and the exact $p$ is $0.60$ rather
+than $0.40$.
+
+```{r}
+#| label: fig-pass-rate
+#| fig-cap: "Exact GRIM pass rate at two decimals (points) against the closed-form approximation $\\min(1, N/100)$ (line). The points above the line are sample sizes whose means can land exactly on a rounding tie."
+#| fig-height: 3.5
+ns <- 5:120
+pr <- grim_aggregate(data.frame(x = "1.00", n = ns))$data
+ggplot(pr, aes(n, p_pass)) +
+  geom_line(aes(y = pmin(1, n / 100)), colour = "grey60") +
+  geom_point(size = 1) +
+  labs(x = "N (items = 1)", y = "pass rate p")
+```
+
+With `items` $= m$, the relevant denominator is $N m$. A 4-item scale with
+$N = 30$ therefore behaves like $N = 120$: it cannot fail at two decimals.
+
+## Rung 2: informative values, k and F
+
+A value with $q_i = 0$ cannot fail. It carries no information about
+genuineness, and including it would dilute every rate below. So it is
+excluded and counted:
+
+$$
+k = \#\{i : q_i > 0\}, \qquad F = \sum_{i:\, q_i > 0} f_i .
+$$
+
+A value that fails even though $q_i = 0$ should be impossible: GRIM cannot
+fail on a full grid. Such a value signals a broken pipeline (a wrong $N$, a
+mis-typed value, a verdict pasted in from elsewhere). `grim_aggregate()`
+warns about it, flags it in `data$flag_impossible`, and excludes it.
+
+In the example, the $N = 150$ mean is uninformative:
+
+```{r}
+res$data[, c("x", "n", "consistency", "p_pass", "q", "informative")]
+```
+
+# Rung 3: a bound that needs only A0
+
+Let $\theta$ be the proportion of informative values that are non-genuine,
+whether through error or fabrication. Under A0, every failure is
+non-genuine. A pass could be either, because a random value passes with
+probability $p_i$. So the number of non-genuine values $R$ satisfies
+$F \le R \le k$, and
+
+$$
+\theta \in \left[\frac{F}{k},\ 1\right].
+$$
+
+No probability is involved. The upper bound is always 1, and that is the
+point. Without a model of what non-genuine values look like, passes are
+silent. Everything that narrows this interval costs an assumption.
+
+# Rungs 4–6: the random counterfactual
+
+## Rung 4: expected failures (A0, U)
+
+If every value were random on the grid, value $i$ would fail with
+probability $q_i$. The expected number of failures is
+
+$$
+E = \sum_{i=1}^{k} q_i .
+$$
+
+$E$ measures **how much information the set carries**. A paper whose means
+all come from large samples might have $k = 20$ and $E = 1.5$. Such a paper
+cannot say much in either direction, however its values behave. Report $E$
+next to every ratio below.
+
+## Rung 5: observed-to-expected ratio (A0, U)
+
+$$
+O/E = \frac{F}{E}.
+$$
+
+Expectations add whether or not the values are independent, so $O/E$ needs no
+assumption I. It is not capped at 1. Read it as follows:
+
+| $O/E$ | Reading |
+|---|---|
+| 0 | no failures |
+| $< 1$ | fewer failures than random values would produce |
+| $\approx 1$ | as many as random values |
+| $> 1$ | more failures than random values *can* produce: the uniform model misfits |
+
+The last row is diagnostic. Random values cannot beat random. So $O/E$
+well above 1 points at a systematic cause: a shared wrong $N$, a wrong rounding
+rule or number of items (which make $q_i$ wrong), or extraction errors.
+With small $E$ the ratio moves in steps of $1/E$. The package does not
+suppress it, but always read it next to $E$.
+
+## Rung 6: the distribution of F under all-random (A0, U, I)
+
+Adding independence gives the full null distribution. If every value is
+random, $F' = \sum f'_i$ with $f'_i \sim \text{Bernoulli}(q_i)$ independent,
+so
+
+$$
+F' \sim \text{PoissonBinomial}(q_1, \dots, q_k), \quad
+\mathbb{E}F' = E, \quad \operatorname{Var}F' = \sum q_i (1 - q_i).
+$$
+
+The pmf is computed exactly by dynamic programming, one value at a time.
+Start from $P^{(0)} = (1)$ and update
+
+$$
+P^{(i)}_j = P^{(i-1)}_j\,(1 - q_i) + P^{(i-1)}_{j-1}\, q_i .
+$$
+
+Two one-sided tail probabilities follow:
+
+- `p_fewer_than_random` $= P(F' \le F)$. Small values mean more passes than
+  random values would produce, which is evidence against "every value is
+  random".
+- `p_more_than_random` $= P(F' \ge F)$. Small values mean more failures than
+  random values would produce, which is a misfit diagnostic (see rung 5).
+
+These are randomisation-test statements about a *specified mechanism*, not
+inferences about a population.
+
+```{r}
+#| label: fig-null
+#| fig-cap: "Distribution of the number of GRIM failures if every informative value in the example were uniform-random (Poisson binomial). The observed F is marked. The left tail up to it is `p_fewer_than_random`."
+#| fig-height: 3.2
+qi <- res$data$q[res$data$informative]
+F_obs <- sum(res$data$f[res$data$informative])
+pmf <- data.frame(F = 0:length(qi), p = strait:::.poisbinom_pmf(qi))
+ggplot(pmf, aes(F, p, fill = F <= F_obs)) +
+  geom_col(width = 0.8) +
+  scale_fill_manual(values = c(`TRUE` = "#2c7fb8", `FALSE` = "grey75"),
+                    guide = "none") +
+  geom_vline(xintercept = F_obs, linetype = 2) +
+  labs(x = "failures F' under all-random", y = "probability")
+```
+
+# Rungs 7–8: a mixture model for the non-genuine rate (A0, U, I, M)
+
+Rung 6 asks whether *all* values could be random. A more useful model lets
+only some of them be. Suppose each value is independently non-genuine with
+probability $\lambda$, and a non-genuine value is uniform on the grid. Under
+A0, a genuine value never fails, so
+
+$$
+P(f_i = 1) = \lambda\, q_i ,
+\qquad
+\ell(\lambda) = \sum_i \Big[ f_i \log(\lambda q_i) + (1 - f_i) \log(1 - \lambda q_i) \Big].
+$$
+
+## Rung 7: estimators
+
+- **Moment estimator.** $\mathbb{E}F = \lambda E$, so $\tilde\lambda = F/E =
+  O/E$ is unbiased under M. It is also unbounded: values above 1 are the
+  misfit signal of rung 5.
+- **Maximum likelihood** on $[0, 1]$. $\hat\lambda = 0$ if $F = 0$ and
+  $\hat\lambda = 1$ if $F = k$. Otherwise, $\ell$ is concave (a sum of
+  logs of linear functions), so $\hat\lambda$ solves
+  $$
+  \ell'(\lambda) = \frac{F}{\lambda} - \sum_{i:\, f_i = 0} \frac{q_i}{1 - \lambda q_i} = 0,
+  $$
+  or equals 1 if $\ell'(1) \ge 0$. When all $q_i = q$, this gives
+  $F(1 - \lambda q) = (k - F)\lambda q$, so $\hat\lambda = \min(1, F/(kq)) =
+  \min(1, O/E)$.
+
+The cap at 1 biases $\hat\lambda$ **downward** when $kq$ is small, because
+the upper tail of $F/E$ is truncated while the lower tail is not (see
+@fig-calibration).
+
+## Rung 8: intervals
+
+The default is a **likelihood support interval** (Royall, 1997):
+
+$$
+\big\{ \lambda \in [0, 1] : \ell(\lambda) \ge \ell(\hat\lambda) - \log c \big\},
+\qquad c \in \{8, 32\}.
+$$
+
+These are the values of $\lambda$ that are no more than $c$ times less
+likely than $\hat\lambda$. When $F = 0$ the lower end is 0. Optionally
+(`ci = TRUE`), a confidence interval inverts the Poisson-binomial tails with
+rates $\lambda q_i$. The lower bound solves $P(F' \ge F \mid \lambda) =
+\alpha/2$ and the upper bound solves $P(F' \le F \mid \lambda) = \alpha/2$.
+
+```{r}
+#| label: fig-lik
+#| fig-cap: "Relative likelihood of the non-genuine rate λ for the example, with the 1/8 and 1/32 support intervals shaded."
+#| fig-height: 3.2
+fi <- res$data$f[res$data$informative]
+lam <- seq(0.001, 1, length.out = 400)
+ll <- vapply(lam, strait:::.lambda_loglik, 0, f = fi, q = qi)
+s <- res$summary
+si <- function(nm) unlist(s[s$quantity == nm, c("lower", "upper")])
+ggplot(data.frame(lam, rl = exp(ll - max(ll))), aes(lam, rl)) +
+  annotate("rect", xmin = si("lambda_support_32")[1],
+           xmax = si("lambda_support_32")[2], ymin = -Inf, ymax = Inf,
+           alpha = 0.12, fill = "#2c7fb8") +
+  annotate("rect", xmin = si("lambda_support_8")[1],
+           xmax = si("lambda_support_8")[2], ymin = -Inf, ymax = Inf,
+           alpha = 0.2, fill = "#2c7fb8") +
+  geom_line() +
+  geom_hline(yintercept = c(1 / 8, 1 / 32), linetype = 3) +
+  labs(x = expression(lambda), y = "relative likelihood")
+```
+
+**$\lambda$ is a process parameter.** It describes the rate of a
+mechanism that generates values. That makes it natural for pooled analyses
+across many papers, where "what share of values in this literature are
+non-genuine?" is a meaningful question. For a single paper, the interval is
+usually wide, and the headline should be rungs 0–6. The print method says so
+whenever rung 8 is shown.
+
+# Rung 9: comparison with an authentic baseline (B)
+
+Assumption A0 is an idealisation. In real corpora, some authentic values fail
+because of rounding conventions, unreported item counts and typos. Suppose an
+external calibration supplies the probability $\varepsilon_i$ that an
+*authentic* value fails, for example from a reference corpus with verified
+raw data. Then
+
+$$
+E_A = \sum_i \varepsilon_i, \qquad
+\mathrm{SIR} = \frac{F}{E_A}, \qquad
+\texttt{p\_vs\_baseline} = P(F' \ge F), \ F' \sim \text{PoissonBinomial}(\varepsilon_1, \dots, \varepsilon_k).
+$$
+
+The standardized inconsistency ratio (SIR) is the observed-to-expected ratio
+against authentic data rather than random data. If the baseline is a fixed
+fraction of the random rate, $\varepsilon_i = \tau q_i$, then $E_A = \tau E$
+and $\mathrm{SIR} = (O/E)/\tau$.
+
+$\varepsilon$ is deliberately kept out of rungs 0–8. Those rungs are about
+what the numbers themselves imply. Rung 9 is only as good as the calibration
+corpus.
+
+```{r}
+# illustrative baseline: authentic values fail at 3% of the random rate
+grim_aggregate(paper, eps = function(q, n, d) 0.03 * q)$summary |>
+  subset(step == 9, select = c(quantity, value, assumptions))
+```
+
+# Sensitivity to the counterfactual
+
+Assumption U says that a non-genuine value is uniform on the grid. People who
+invent numbers are not uniform: they avoid or favour particular final digits
+(Mosimann et al., 1995). The `g` argument replaces the uniform distribution
+with any distribution over the grid:
+
+$$
+p_i(g) = \sum_{j} g(j)\, c\big(j / 10^{d_i};\ N_i, m_i, d_i\big),
+$$
+
+given either as a function of the final digit or as one weight per grid
+value. `grim_sensitivity()` reruns rungs 2–6 under a list of counterfactuals:
+
+```{r}
+grim_sensitivity(paper, list(
+  avoid_0_5   = function(d) ifelse(d %in% c(0, 5), 0.3, 1),
+  heap_0_5    = function(d) ifelse(d %in% c(0, 5), 4, 1),
+  heap_even   = function(d) ifelse(d %% 2 == 0, 3, 1),
+  round_tenth = c(rep(c(20, rep(1, 9)), 10))  # heaps on .x0 endings
+))
+```
+
+Preferences over the **final digit** barely move anything at $N < 100$. The
+consistent endings for a given $N$ spread almost evenly across final digits,
+so reweighting digits leaves $p_i$ nearly unchanged. Two things would move
+it. One is a counterfactual that concentrates on endings that the design
+happens to favour or disfavour. The other is a small $N$, where only a few
+endings are consistent. Either way, running the check costs nothing, and
+conclusions that survive it do not depend on U in this form.
+
+# Many papers at once
+
+`grim_aggregate_by()` runs the ladder within groups and returns one row per
+group. Across papers, the per-paper $\lambda$ intervals are best read as
+inputs to a pooled analysis rather than as verdicts.
+
+```{r}
+set.seed(1)
+make_paper <- function(id, k, lambda) {
+  n <- sample(12:95, k, replace = TRUE)
+  fake <- runif(k) < lambda
+  x_real <- vapply(n, function(nn) sample(nn:(5 * nn), 1) / nn, 0)
+  x_fake <- sample(100:599, k, replace = TRUE) / 100
+  data.frame(paper = id, n = n,
+             x = formatC(ifelse(fake, x_fake, x_real), format = "f", digits = 2))
+}
+lit <- do.call(rbind, Map(make_paper, LETTERS[1:6],
+                          k = c(8, 15, 20, 10, 25, 12),
+                          lambda = c(0, 0, 0.1, 0, 0.6, 1)))
+by_paper <- grim_aggregate_by(lit, by = "paper")
+by_paper[, c("paper", "k", "F", "theta_lower", "E", "O_E",
+             "p_fewer_than_random", "lambda_mle")]
+```
+
+These are simulated papers with true $\lambda$ = 0, 0, 0.1, 0, 0.6 and 1.
+Paper F, with every value random, shows $O/E$ near 1 and a large
+`p_fewer_than_random`. Paper E shows the intermediate signature. The genuine
+papers show $O/E = 0$. So does paper C: its one or two non-genuine values
+happened to pass. A low rate of non-genuine values is often invisible in a
+single paper, which is one reason $\lambda$ belongs to pooled analyses.
+
+# Calibration
+
+Under the mixture model, $\mathbb{E}(O/E) = \lambda$ exactly for fixed
+$q_i$, and $\hat\lambda$ is pulled down by its cap. A small simulation
+checks both, for a low-information design ($k = 6$) and a
+high-information one ($k = 30$), with all $N$ between 12 and 60 at two
+decimals.
+
+```{r}
+#| label: fig-calibration
+#| fig-cap: "Simulated O/E (unbiased, unbounded) and MLE (capped at 1) against the true non-genuine rate λ. Points are means over 300 replicates; the dashed line is identity. The MLE's downward bias at high λ shrinks as the design becomes more informative."
+#| fig-height: 3.5
+set.seed(20260927)
+sim_design <- function(k, lambda, reps = 300) {
+  n <- round(seq(12, 60, length.out = k))
+  est <- replicate(reps, {
+    fake <- runif(k) < lambda
+    x_real <- vapply(n, function(nn) sample(nn:(5 * nn), 1) / nn, 0)
+    x_fake <- sample(100:599, k, replace = TRUE) / 100
+    x <- formatC(ifelse(fake, x_fake, x_real), format = "f", digits = 2)
+    s <- grim_aggregate(data.frame(x = x, n = n))$summary
+    s$value[match(c("O_E", "lambda_mle"), s$quantity)]
+  })
+  data.frame(k = paste0("k = ", k), lambda = lambda,
+             estimator = c("O/E", "MLE"), mean = rowMeans(est))
+}
+cal <- do.call(rbind, c(
+  lapply(c(0, 0.25, 0.5, 0.75, 1), sim_design, k = 6),
+  lapply(c(0, 0.25, 0.5, 0.75, 1), sim_design, k = 30)
+))
+ggplot(cal, aes(lambda, mean, colour = estimator)) +
+  geom_abline(linetype = 2, colour = "grey60") +
+  geom_line() + geom_point() +
+  facet_wrap(~k) +
+  labs(x = expression("true " * lambda), y = "mean estimate", colour = NULL)
+```
+
+# What not to conclude
+
+- **A single failure under A0 is not proof of fabrication.** It is proof
+  that the reported numbers are inconsistent *given* the assumed rounding,
+  items and $N$. Rung 3's lower bound inherits that caveat.
+- **O/E well above 1 is not "extra-strong evidence".** It says the uniform
+  model is wrong, most often because $q_i$ is wrong (rounding, items) or
+  because failures share a cause (one wrong $N$ behind several means).
+- **Independence is assumed only where listed.** Rungs 0–5 do not use it.
+  Rungs 6–8 do, and derived or copied values break it.
+- **Per-paper $\lambda$ is not the headline.** Report rungs 0–6 for a paper,
+  and keep $\lambda$ for pooled analyses.
+
+# Function reference
+
+| Function | Returns |
+|---|---|
+| `grim_aggregate(data, items, rounding, g, eps, support_c, ci, conf_level)` | `summary` (long tibble, one row per quantity, in ladder order, with `assumptions` and `interpretation`) and `data` (input plus `consistency`, `f`, `p_pass`, `q`, `informative`, `flag_impossible`) |
+| `grim_aggregate_by(data, by, ...)` | one wide row per group |
+| `grim_sensitivity(data, g_list, ...)` | $k$, $F$, $E$, $O/E$ and both tail probabilities under each counterfactual |
+
+# References {.unnumbered}
+
+Brown, N. J. L., & Heathers, J. A. J. (2017). The GRIM test: A simple
+technique detects numerous anomalies in the reporting of results in
+psychology. *Social Psychological and Personality Science, 8*(4), 363–369.
+
+Jung, L. scrutiny: Error detection in science (version 0.6.2). R package.
+https://github.com/lhdjung/scrutiny
+
+Mosimann, J. E., Wiseman, C. V., & Edelman, R. E. (1995). Data fabrication:
+Can people generate random digits? *Accountability in Research, 4*(1), 31–55.
+
+Royall, R. (1997). *Statistical evidence: A likelihood paradigm*. Chapman &
+Hall.

@@ -1,3 +1,22 @@
+# strait 0.4.12
+
+## New features
+
+* `grim_aggregate()` pools many GRIM tests from one paper (or one group of
+  values) into an assumption ladder: counts and a partial-identification
+  bound on the non-genuine share that need no model; expected failures,
+  the observed-to-expected ratio and exact Poisson-binomial tail
+  probabilities under a uniform-random counterfactual; a mixture-model
+  non-genuine rate with likelihood support intervals; and an optional
+  comparison against a user-supplied authentic baseline. Every quantity is
+  reported with the assumptions it rests on. Pass rates are exact, from
+  enumerating the reporting grid with the same scrutiny call used for the
+  observed values, so they include the rounding ties the closed-form
+  approximation misses (at two decimals, p = 0.60 at N = 40, not 0.40).
+  `grim_aggregate_by()` gives one row per group, and `grim_sensitivity()`
+  reruns the ladder under non-uniform digit distributions. The logic and
+  mathematics are laid out in `paper/grim-aggregation/`.
+
 # strait 0.4.11
 
 ## New features
