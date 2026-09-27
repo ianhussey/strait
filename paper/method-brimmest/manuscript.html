@@ -3192,6 +3192,19 @@ Q_d(j + 1) \;\ge\; 2M - j - 3 .
 <p>We therefore record the remaining statement as a conjecture, in the form every computation in this paper supports.</p>
 <p><strong>Conjecture A11 (contiguity).</strong> There are constants <span class="math inline">\(\kappa\)</span> such that for all <span class="math inline">\((M, c, \nu)\)</span>, every parity-consistent integer <span class="math inline">\(Q\)</span> with <span class="math inline">\(q_{\min} \le Q \le q_{\max} - \kappa\,\min(M, c)^{3/2}\)</span> is attainable.</p>
 <p>The evidence: exhaustive verification for all <span class="math inline">\(c \le 8\)</span>, <span class="math inline">\(\nu \le 12\)</span> (859,672 membership checks — every gap in every spectrum lies in the fringe); corner spectra to <span class="math inline">\(M = 160\)</span>, where the observed fringe depth is <span class="math inline">\((2.8\text{–}3.4)\,M^{3/2}\)</span> against the heuristic constant <span class="math inline">\(2\sqrt 2\)</span>; and wide-scale spot checks to <span class="math inline">\(c = 517\)</span>. The conjecture is consequential for <em>complexity</em> — it is why the recursion of Theorem A6 exhausts only a thin tree when a verdict is negative — and for nothing else: Theorems A6–A7 hold without it.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Update (2026-08-26): Conjecture A11 is false as stated.</strong> It fails for <span class="math inline">\(\nu = 3\)</span> and <span class="math inline">\(\nu = 4\)</span>. Near the floor <span class="math inline">\(q_{\min}\)</span> the spectrum is governed by ternary and quaternary quadratic forms, and it has gaps that do not lie in the fringe; the missing values are characterised exactly. The corrected scope is <span class="math inline">\(\nu \ge 5\)</span>, where no exceptions appear. The rest of the picture is positive. The corner case is now a theorem in sharp form, with fringe depth exactly <span class="math inline">\(2\sqrt2\,M^{3/2}(1 + O(M^{-1/4}))\)</span>; the observed <span class="math inline">\((2.8\text{–}3.4)\,M^{3/2}\)</span> above is the <span class="math inline">\(O(M^{-1/4})\)</span> correction at these scales. The interior fringe is <span class="math inline">\(O(c^{3/2})\)</span> uniformly in the cap. None of this affects the certificate: Theorems A6–A7 never used the conjecture. The proofs are in <code>contiguity-proof-draft.qmd</code> and a self-contained statement is in <code>conjecture-a11-problem-statement.qmd</code>. This section will be rewritten to match.</p>
+</div>
+</div>
 </section>
 <section id="a.6-from-theorems-to-code" class="level2 unnumbered">
 <h2 class="unnumbered anchored" data-anchor-id="a.6-from-theorems-to-code">A.6 From theorems to code</h2>

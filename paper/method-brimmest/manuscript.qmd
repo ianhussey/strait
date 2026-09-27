@@ -1211,6 +1211,22 @@ wide-scale spot checks to $c = 517$. The conjecture is consequential for
 tree when a verdict is negative — and for nothing else: Theorems A6–A7 hold
 without it.
 
+::: {.callout-important}
+**Update (2026-08-26): Conjecture A11 is false as stated.** It fails for
+$\nu = 3$ and $\nu = 4$. Near the floor $q_{\min}$ the spectrum is governed
+by ternary and quaternary quadratic forms, and it has gaps that do not lie in
+the fringe; the missing values are characterised exactly. The corrected
+scope is $\nu \ge 5$, where no exceptions appear. The rest of the picture is
+positive. The corner case is now a theorem in sharp form, with fringe depth
+exactly $2\sqrt2\,M^{3/2}(1 + O(M^{-1/4}))$; the observed
+$(2.8\text{–}3.4)\,M^{3/2}$ above is the $O(M^{-1/4})$ correction at these
+scales. The interior fringe is $O(c^{3/2})$ uniformly in the cap. None of
+this affects the certificate: Theorems A6–A7 never used the conjecture. The
+proofs are in `contiguity-proof-draft.qmd` and a self-contained statement is
+in `conjecture-a11-problem-statement.qmd`. This section will be rewritten to
+match.
+:::
+
 ## A.6 From theorems to code {.unnumbered}
 
 | statement | implementation |
