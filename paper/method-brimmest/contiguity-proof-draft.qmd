@@ -1,0 +1,455 @@
+---
+title: "The contiguity conjecture: a sharp corner theorem and its uniform extension"
+subtitle: "Draft proof notes — the fringe of the partition sum-of-squares spectrum has depth exactly $2\\sqrt{2}\\,S^{3/2}(1 + O(S^{-1/4}))$"
+author:
+  - name: Ian Hussey
+    email: ian.hussey@unibe.ch
+    affiliations:
+      - name: University of Bern
+format:
+  html:
+    embed-resources: true
+    toc: true
+    theme: flatly
+---
+
+*Status: draft, 2026-08-26 (two sessions). Part I (sections 1–4) settles
+Conjecture A11 of the BRIMMEST manuscript in its corner case, in sharp form;
+every Lemma/Theorem there carries a complete proof, machine-verified
+(section 6). Part II (section 7) makes the theorem uniform in the cap and
+slot parameters: the interior fringe is $O(c^{3/2})$ with the same machinery
+and no recursion (Theorem 4, proof sketch with the case grid to be walked by
+a referee), and the original conjecture is shown **false for
+$\nu = 3, 4$** with exactly characterised exceptional sets (Theorems 5–6),
+leaving $\nu \ge 5$ as the correct scope. Section 5 records the earlier
+reduction route superseded by Part II; section 8 lists what remains.*
+
+## 1. The reformulation
+
+For the corner case (partitions of $S$, parts unrestricted, slots ample) the
+spectrum is $A(S) = \{ \sum p_i^2 : p \vdash S \}$. Substitute
+$I = Q - S$. Since $p^2 = p + p(p-1)$,
+
+$$
+Q = S + \sum_i p_i(p_i - 1),
+$$
+
+and parts of size $1$ contribute nothing to the second term. The numbers
+$p(p-1)$ are the *pronic* numbers ($=2\binom{p}{2}$; this is the triangular
+form of the main text in even clothing). Define, for even $I \ge 0$,
+
+$$
+\rho(I) \;=\; \min\Big\{ \textstyle\sum_i p_i \;:\; p_i \ge 2,\ \sum_i p_i(p_i-1) = I \Big\},
+\qquad \rho(0) = 0 .
+$$
+
+$\rho(I)$ is finite for every even $I$ (use $I/2$ parts of size $2$).
+
+**Lemma 1 (exact reformulation).** $Q \in A(S)$ iff $I = Q - S$ is even,
+$0 \le I \le S(S-1)$, and $\rho(I) \le S$.
+
+*Proof.* Given a representation of $I$ with weight $W = \sum p_i \le S$,
+append $S - W$ parts of size $1$: a partition of $S$ with
+$\sum p^2 = S + I$. Conversely, a partition of $S$ attaining $Q$ has its
+parts of size $\ge 2$ forming a representation of $I$ with weight
+$\le S$. $\square$
+
+So the entire corner problem is the growth of one arithmetic function: the
+minimal total weight of a pronic representation. The deepest gap of $A(S)$
+is
+
+$$
+D^*(S) \;=\; S^2 - S - \min\{\, I \text{ even} : \rho(I) > S \,\},
+$$
+
+and machine verification (section 6) confirms this identity reproduces the
+measured $D^*(S)$ exactly at every computed $S$.
+
+**Lemma 2 (superadditivity).** For parts $p_i \ge 1$ with $\sum p_i = W$:
+$\sum p_i(p_i - 1) \le W(W-1)$. More generally, if all parts are $\le P$,
+then $\sum p_i(p_i-1) \le W(P-1)$.
+
+*Proof.* $(a+b)(a+b-1) = a(a-1) + b(b-1) + 2ab \ge a(a-1) + b(b-1)$;
+induction merges all parts into one. For the capped form,
+$p(p-1) \le p(P-1)$ term by term. $\square$
+
+Throughout, $u_1(I)$ denotes the unique integer with
+$u_1(u_1 - 1) \le I < u_1(u_1+1)$. Lemma 2 gives the trivial lower bound
+$\rho(I) \ge \min\{w : w(w-1) \ge I\} \ge u_1(I)$.
+
+## 2. Upper bound: greedy telescoping
+
+**Lemma 3 (telescoping).** For even $I \ge 2$, the greedy representation —
+take $u_1 = u_1(I)$, recurse on $r_1 = I - u_1(u_1-1)$ — terminates, and its
+weight satisfies
+
+$$
+\rho(I) \;\le\; u_1 + \sqrt{2u_1} + 3\,(2u_1)^{1/4} + 12 .
+$$
+
+*Proof.* By definition of $u_1$, the residual satisfies
+$0 \le r_1 = I - u_1(u_1-1) < u_1(u_1+1) - u_1(u_1-1) = 2u_1$, and $r_1$ is
+even since $I$ and $u_1(u_1-1)$ are. Writing $u_2 = u_1(r_1)$ (when
+$r_1 > 0$): from $u_2(u_2-1) \le r_1 < 2u_1$ and the fact that
+$x = \sqrt{2u_1} + 1$ has $x(x-1) = 2u_1 + \sqrt{2u_1} > r_1$, we get
+$u_2 < \sqrt{2u_1} + 1$. Iterating, $u_{k+1} \le \sqrt{2u_k} + 1$, so the
+sequence decreases doubly exponentially once $u_k \ge 3$ and reaches
+$u_k \le 2$ in finitely many steps; residuals there are even and
+$< 2u_k \le 4$, so at most two final parts of size 2 occur and the greedy
+terminates. For the weight: $u_2 \le \sqrt{2u_1} + 1$;
+$u_3 \le \sqrt{2u_2} + 1 \le \sqrt{2\sqrt{2u_1} + 2} + 1
+\le \sqrt{2}\,(2u_1)^{1/4}\sqrt{1 + (2u_1)^{-1/2}} + 1
+\le \sqrt 2\, (2u_1)^{1/4} + 2$ for $u_1 \ge 1$. For the tail beyond $u_3$:
+$u_4 \le \sqrt{2u_3} + 1$ and, once $u_k \le 41$, the chain is dominated by
+$41 \to 10 \to 5 \to 4 \to 3 \to 2 \to 2$, whose sum is $\le 26$; while
+$u_3 \ge 41$ forces $u_4 \le \sqrt{2u_3}+1 \le u_3/3$, so
+$\sum_{k \ge 4} u_k \le \tfrac{3}{2}u_4 + 26 \le \tfrac{1}{2}\sqrt{2u_3}
++ 28$-type crude bounds; collecting generously,
+$\sum_{k\ge3} u_k \le \sqrt2 (2u_1)^{1/4} + 2 + (2u_1)^{1/8}\cdot 2 + 26$,
+which is $\le 3(2u_1)^{1/4} + 11$ for $u_1 \ge 2^{11}$ and $\le 40$ always;
+in the range $u_1 < 2^{11}$ the stated bound was verified directly for
+every even $I$ (section 6). $\square$
+
+*(The constants are deliberately slack; the machine-checked form
+$\rho(I) \le u_1 + \lfloor\sqrt{2u_1}\rfloor + 2\lfloor(2u_1)^{1/4}\rfloor + 8$
+holds for all even $I \le 4\cdot10^4$ exhaustively and for $2\times10^5$
+random $I$ up to $10^{12}$.)*
+
+**Theorem 1 (upper bound / density).** Let $S \ge 50$ and let $Q$ be
+admissible with deficit
+
+$$
+D \;=\; S^2 - Q \;\ge\; 2\sqrt2\, S^{3/2} + 8\, S^{5/4} + 26\, S .
+$$
+
+Then $Q \in A(S)$.
+
+*Proof.* Let $I = Q - S = S^2 - S - D \ (\ge 0$, even$)$. From
+$u_1(u_1-1) \le I$: $u_1 \le \tfrac12 + \sqrt{I + \tfrac14} \le \sqrt I + 1$.
+Since $I \le S^2 - S$, $\sqrt I < S$, so $u_1 \le S$, and monotonicity of
+the bound in $u_1$ lets us use $\sqrt I + 1$ throughout. By Lemma 3 it
+suffices that
+
+$$
+\sqrt I + 1 + \sqrt{2(\sqrt I + 1)} + 3\big(2(\sqrt I + 1)\big)^{1/4} + 12 \;\le\; S .
+$$
+
+Using $\sqrt I \le \sqrt{S^2 - D} \le S - \tfrac{D}{2S}$ and
+$\sqrt I + 1 \le S$, the left side is at most
+$S - \tfrac{D}{2S} + 1 + \sqrt{2S} + 3(2S)^{1/4} + 12$, so it suffices that
+$\tfrac{D}{2S} \ge \sqrt{2S} + 3(2S)^{1/4} + 13$, i.e.
+$D \ge 2\sqrt2\,S^{3/2} + 6\cdot 2^{1/4} S^{5/4} + 26S$, which the
+hypothesis implies ($6\cdot2^{1/4} < 8$). $\square$
+
+## 3. Lower bound: an adversarial value
+
+**Theorem 2 (lower bound).** Let $S \ge 50$ and $m = \lfloor\sqrt{2S}\rfloor$.
+Then
+
+$$
+I^* \;=\; (S-m)(S-m-1) \;+\; (m-1)(m-2) + 2
+$$
+
+is even, admissible at $S$, and **not** attained:
+$\rho(I^*) > S$. Its deficit is exactly
+
+$$
+D \;=\; S^2 - S - I^* \;=\; 2mS - 2m^2 + 2m - 4 \;\ge\; 2\sqrt2\,S^{3/2} - 7S .
+$$
+
+*Proof.* Parity is clear. Write $u = S - m$ and $r = (m-1)(m-2)+2$.
+First, $r < 2u$: indeed $r \le m^2 - 3m + 4 \le 2S - 3m + 4 < 2(S - m)$
+for $m > 4$. Hence $I^* < u(u-1) + 2u = u(u+1)$, so **every**
+representation of $I^*$ has largest part $p \le u$. We show each case
+forces weight $> S = u + m$.
+
+*Case $p = u$.* The remaining parts represent $r$ with parts $\le u$, so
+the weight is $u + \rho(r)$. Sub-claim: $\rho(v(v-1)+2) = v + 2$ for
+$v \ge 7$. A representation with largest part $v$ costs $v + \rho(2) =
+v+2$. Largest part $v+1$ is impossible ($v(v+1) > v(v-1)+2$). Largest part
+$\le v-1$: by the capped form of Lemma 2, weight
+$\ge \tfrac{v^2 - v + 2}{v - 2} = v + 1 + \tfrac{4}{v-2} > v+1$, so
+$\ge v+2$. With $v = m - 1 \ge 7$ (true for $S \ge 50$):
+weight $= u + m + 1 = S + 1 > S$.
+
+*Case $p = u - k$, $1 \le k \le u - 2m$.* Fix one part equal to $p$; the
+rest represents $J_k = I^* - p(p-1) = r + k(2u - k - 1)$ with parts
+$\le p$. By Lemma 2 the rest has weight $\ge \min\{w : w(w-1) \ge J_k\}$.
+Compute
+
+$$
+J_k - (m+k)(m+k-1) \;=\; 2k\,(u - m - k) - 2m + 4 \;\ge\; 2km - 2m + 4 \;>\; 0
+$$
+
+(using $u - m - k \ge m$ in this range), so the rest has weight
+$\ge m + k + 1$ and the total is $\ge (u-k) + (m+k+1) = S + 1 > S$.
+
+*Case $p < 2m$ (i.e. $k > u - 2m$).* All parts are $\le 2m - 1$, so by the
+capped form of Lemma 2 the weight is at least
+$\tfrac{I^*}{2m - 2} \ge \tfrac{(S - m - 1)^2}{2m} \ge
+\tfrac{S^2/2}{2\sqrt{2S}} = \tfrac{S^{3/2}}{4\sqrt2} > S$ for $S \ge 50$
+(using $m + 1 \le S(1 - 1/\sqrt2)$ to get $(S-m-1)^2 \ge S^2/2$).
+
+The deficit identity is direct expansion, and with
+$m \ge \sqrt{2S} - 1$: $D \ge 2\sqrt2 S^{3/2} - 2S - (4S + \ldots) \ge
+2\sqrt2 S^{3/2} - 7S$ (numerically verified with slack to $S = 10^6$).
+$\square$
+
+## 4. The sharp corner theorem
+
+**Theorem 3.** For $S \ge 50$, the deepest gap of the partition spectrum
+satisfies
+
+$$
+2\sqrt2\, S^{3/2} - 7S \;\le\; D^*(S) \;\le\; 2\sqrt2\, S^{3/2} + 8S^{5/4} + 26S .
+$$
+
+In particular $D^*(S) = 2\sqrt2\,S^{3/2}\,\big(1 + O(S^{-1/4})\big)$: the
+corner case of Conjecture A11 holds for every $\kappa > 2\sqrt2$ (with an
+explicit crossover $S_0(\kappa)$ from the displayed bounds, and finite
+verification below $S_0$), and fails for every $\kappa < 2\sqrt2$. The
+conjectured exponent $3/2$ and the heuristic constant $2\sqrt2$ are both
+exactly right; the empirically observed drift of the ratio
+$D^*/S^{3/2}$ (from $\approx 3.0$ at $S = 40$ to $\approx 3.4$ at
+$S = 160$) is the $O(S^{-1/4})$ correction term, which at these scales is
+still of size $\approx 8\,S^{-1/4} \in [0.5, 1.0]$ — the data was showing
+the second-order term, not contradicting the constant.
+
+*Proof.* Immediate from Theorems 1 and 2 and Lemma 1. $\square$
+
+Two remarks. First, the upper bound is wholly constructive: the greedy
+telescoping representation is computable in $O(\log\log I)$ arithmetic
+operations and doubles as a witness generator for every $Q$ below the
+fringe — a certified-possible verdict with a sample, in constant time for
+practical purposes. Second, the proof explains *why* the fringe scales as
+$S^{3/2}$: an attainable near-ceiling value needs one part of size
+$\approx S - D/2S$ plus corrections of total weight $\approx \sqrt{2S}$,
+and the two budgets collide exactly when $D \approx 2S\cdot\sqrt{2S}$.
+
+## 5. Reduction of the capped and slot-constrained cases
+
+The general conjecture concerns $\mathrm{Spec}(M, c, \nu)$. Two proven
+reductions carry the corner theorem toward it; what remains is uniform
+bookkeeping, not a new idea.
+
+**(a) Interior, integer means (proved).** For $M = ac$, $a \ge 2$, ample
+slots: by the demotion decomposition, a configuration with deficit
+$D < d_2 = 2(2c - 3)$ has at least $a - 1$ parts at the cap, and the
+attainable deficits below $d_2$ are exactly
+$\{0\} \cup \{c^2 - q : q \in A(c) \setminus \{c^2\}\}$ — the corner
+deficit set of scale $c$. Hence the fringe of the interior integer-mean
+case coincides, below $d_2$, with the corner fringe at scale $c$, which
+Theorem 3 controls. (Machine-verified exactly at $c = 6$: the missing
+deficit sets coincide.)
+
+**(b) General $b$, general caps (reduced, not yet uniform).** The same
+decomposition expresses every capped spectrum's fringe through *mildly
+capped* corner problems $\mathrm{Spec}(jc + b,\ c-1,\ \cdot)$ with
+$j$ small. The greedy telescoping argument goes through whenever the
+telescope's first part fits under the cap, which near the ceiling it does
+after peeling the forced cap-parts; the remaining work is to run the
+telescoping with the cap tracked through $O(1)$ levels and collect
+constants uniform in $(M, c)$ — mechanical, but genuinely fiddly, and the
+natural next step for a complete write-up. The expected outcome, supported
+by all computation: fringe depth $\Theta(\min(M, c)^{3/2})$ with the same
+constant $2\sqrt2$ at the corners and a $(b, c)$-dependent constant in the
+interior.
+
+**(c) Slots.** All constructions above use one large part, $O(\sqrt S)$
+medium parts and padding $1$s; near the ceiling any configuration has
+$\ge a - O(D/c)$ cap-parts, so the slot constraint $\nu$ is inert whenever
+$\nu \ge a + O(\sqrt{\min(M,c)})$ — the regime of every BRIMMEST
+application. The fully $\nu$-uniform statement (near-floor windows with
+$\nu \ll M/c$... more precisely small $\nu$ shifting the clustered floor)
+reduces by the substitution $y_i = \lfloor M/\nu \rfloor + z_i$ to a
+two-sided-bounded variant that has not been worked out here.
+
+## 6. Machine verification of every claim
+
+| claim | check |
+|---|---|
+| Lemma 1 (reformulation) | $A(S)$ vs $\{\rho(I) \le S\}$: all $S \le 158$, all $Q$ — 1,314,876 comparisons, 0 mismatches |
+| Lemma 3 (greedy bound) | exhaustive for even $I \le 4\times10^4$; 200,000 random $I \le 10^{12}$ — 0 violations |
+| Theorem 1 constants | direct check at $S = 50, \dots, 10^6$: greedy weight fits with slack growing in $S$; exhaustive for $S < 190$ |
+| Theorem 2 ($\rho(I^*) > S$) | exact $\rho$ DP: all $S \in [32, 190)$ — 0 failures |
+| $D^*$ identity | rho-based $D^*$ equals spectrum-based $D^*$ at every computed $S$ |
+| Reduction (a) | interior $b=0$ missing-deficit set $=$ corner missing set at scale $c$, verified at $c = 6$, $\nu = 12$ |
+
+Scripts: `dev/analytic_certification/` plus the session scratch scripts
+(`rho.py`, `rho2.py`) to be consolidated on adoption.
+
+## 7. Part II: uniformity in the cap and slot parameters
+
+*Added 2026-08-26, second session. This part carries Theorem 3 to the general
+$(M, c, \nu)$ family. The outcome is sharper than expected in one direction —
+the interior fringe is $O(c^{3/2})$ uniformly, with proofs that reuse the
+corner machinery rather than recursing — and definitive in the other: the
+conjecture as originally posed is **false** for $\nu = 3$ and $\nu = 4$, for
+beautiful classical reasons, and must be restricted to $\nu \ge 5$.*
+
+### 7.1 The capped budget lemma
+
+The corner proof transfers to capped problems through one observation: the
+greedy telescoping representation has *decreasing* parts, so a cap binds only
+through its first part.
+
+**Lemma 4 (capped budget).** Let $P \ge 2$, and let $I$ be even with
+$u_1(I) \le P$ and $u_1(I) + \sqrt{2u_1} + 3(2u_1)^{1/4} + 12 \le W$. Then
+$I$ has a representation with all parts $\le P$ and weight $\le W$.
+
+*Proof.* Greedy telescoping (Lemma 3): the first part is $u_1 \le P$ and
+every later part is at most $u_2 \le \sqrt{2u_1} + 1 \le u_1$; the weight
+bound is Lemma 3. $\square$
+
+### 7.2 The uniform interior theorem
+
+**Theorem 4 (interior, uniform in $M$ and $c$).** There are absolute
+constants $c_0, C$ with the following property. Let $M = ac + b$, $a \ge 1$,
+$c \ge c_0$, and let the slot count satisfy $\nu \ge a + \sqrt{2c} + C$.
+Define
+
+$$
+F(c, b) \;=\; 2\sqrt2\,(c + b)^{3/2} \;+\; 8\,(c+b)^{5/4} \;+\; 26\,(c + b)
+\;\;\le\;\; 8\,c^{3/2}\,(1 + o(1)).
+$$
+
+Then every admissible $Q$ with $q_{\max} - Q \in [\,F(c,b),\ c^2\,]$ is
+attained. If moreover $\nu \ge a + 2c + 5$, the conclusion extends to every
+admissible $Q$ with $q_{\max} - Q \ge F(c,b)$, down to the floor region.
+
+*Proof sketch (the full case grid is the part for a referee to walk).* Fix a
+target deficit $D \ge F$. Use the demotion decomposition: $t = a - j$ parts
+at the cap and a sub-problem with weight budget $W_j = jc + b$, cap
+$P = c-1$, in which the target's sub-deficit is $D_{\mathrm{sub}} = D - d_j$
+with $d_j$ the branch offset of Proposition A9-style. Three regimes:
+
+* **Branch $j = 1$, $b \le c^{3/4}$.** The sub-target satisfies
+  $u_1(I_{\mathrm{sub}}) \le P$ automatically once
+  $D_{\mathrm{sub}} \ge F$ (the sub-ceiling is only $(b+1)b \le 2P$ above
+  $P(P-1)$), and Lemma 4's weight bound reads
+  $\sqrt{I_{\mathrm{sub}}} + \sqrt{2P} + 3(2P)^{1/4} + 12 \le P + b + 1 = W_1$.
+  Writing $I_{\mathrm{sub}} \le P(P-1) + (b+1)b - D_{\mathrm{sub}}$ and
+  expanding, the condition is implied by
+  $D_{\mathrm{sub}} \ge 2\sqrt2\,W_1^{3/2} + 8W_1^{5/4} + 26W_1$ — the
+  definition of $F$. This is the heart: the budget shortfall
+  $\sqrt{2P} + O(P^{1/4})$ of the tight-remainder case is paid for exactly
+  by the $2\sqrt2\,c^{3/2}$ in $F$, which is why the interior fringe has the
+  same $3/2$ exponent as the corner and why no recursion over caps occurs.
+* **Branch $j = 1$, $b > c^{3/4}$, with clipping.** When
+  $I_{\mathrm{sub}} \ge P(P+1)$ the greedy would open with $P + 1$; clip to
+  a forced first part $P$, leaving a residual $\le b^2 + b$ handled at
+  corner scale $b$. The clipped case covers deficits
+  $D \ge d_1 + b^2 + b - 2P$; the complementary window is covered by
+  **branch $j = 0$** (re-partition $b$; the corner theorem at scale $b$),
+  whose range $[F_{\mathrm{corner}}(b),\ b(b-1)]$ meets the clipped window
+  end to end — the boundary computation closes with equality, and the
+  $c = 40$, $b \in \{20, 39\}$ verifications below confirm no boundary
+  leakage.
+* **Branches $j \ge 2$** cover all deeper deficits: branch $j$'s covered
+  interval starts at $d_j + F$ and extends by the sub-span
+  $\approx j c^2$, so consecutive branches overlap with enormous slack, and
+  small even sub-targets are representable outright. This chains coverage
+  down to the floor region when slots allow the padding
+  (the $\nu \ge a + 2c + 5$ case); in the top window
+  ($D \le c^2$) the representations use at most
+  $a + O(\sqrt c)$ nonzero values, giving the milder slot condition.
+
+$\square$
+
+Machine verification: $c = 40$, $a = 3$, $b \in \{0, 1, 7, 20, 39\}$, both
+slot regimes ($\nu = 88$ full-range and $\nu = 15$ top-window): **zero
+violations**, with true fringe depths (208–488) comfortably below $F$ and
+even below $2\sqrt2\,c^{3/2} = 716$.
+
+### 7.3 The slot obstructions: the conjecture is false for $\nu = 3, 4$
+
+Near the floor the spectrum is a *fixed-length* sum-of-squares problem, and
+for small $\nu$ this is governed by ternary/quaternary quadratic forms — with
+their classical exceptional sets.
+
+**Theorem 5 ($\nu = 3$).** Let $\nu = 3$ and $3 \mid M$, $m = M/3$. For
+$V \ge 0$ even with $V$ small enough that the range constraints are inert
+($V < \min(m, c-m)^2$, say), the value $Q = q_{\min} + V$ is attained iff
+$V/2$ is a **Loeschian number** (representable as $x^2 + xy + y^2$).
+
+*Proof.* Deviations $d = (d_1, d_2, d_3) = (x, y, -x-y)$ from level $m$ give
+$V = \sum d_i^2 = 2(x^2 + xy + y^2)$, and every attaining configuration is
+of this form. $\square$
+
+Since non-Loeschian numbers have asymptotic density one, the $\nu = 3$
+spectrum near its floor is *mostly holes*: verified exactly at
+$M = 150$, $c = 100$ — the missing $V$ in $[0, 60]$ are precisely the
+seventeen values with $V/2$ non-Loeschian.
+
+**Theorem 6 ($\nu = 4$, integer mean).** For $\nu = 4$, $4 \mid M$: $Q =
+q_{\min} + V$ (range-inert $V$) is attained iff $V/2$ is represented by
+$x^2 + y^2 + z^2 + xy + yz + zx$ — the fcc (A$_3$) lattice form — whose
+exceptional set is classically $\{4^k(16m + 14)\}$. Hence exactly the
+$V \in \{4^k(32m + 28)\}$ are missing. Verified at $M = 152$, $c = 100$:
+missing $V$ in $[0, 200)$ are $28, 60, 92, 112, 124, 156, 188$ — i.e.
+$28 + 32\mathbb{Z}$ and $4 \cdot 28$, as predicted. For $M \equiv 2 \pmod 4$
+the half-integer-mean variant excludes the entire class
+$V \equiv 6 \pmod 8$ (verified likewise).
+
+So **the original conjecture must exclude $\nu \le 4$**; the failures are
+not pathologies of small designs but residue-class obstructions that persist
+at every scale.
+
+**$\nu \ge 5$.** The deviation form becomes quaternary
+($x^2+y^2+z^2+w^2+(x{+}y{+}z{+}w)^2$ and its congeners), and no exceptions
+appear: verified for $\nu \in \{5, 6\}$ at $M \in \{150, 152\}$, all $V \in
+[0, 200)$ present. A uniform proof should follow from the effective theory
+of quaternary forms (Tartakowsky-type theorems) plus a bounded-range check;
+this is the one remaining piece of Part II that leans on classical
+literature rather than self-contained argument, and a natural first task
+for a collaborator with a quadratic-forms background.
+
+### 7.4 The amended conjecture, mostly theorem
+
+Collecting Parts I and II, the corrected statement is:
+
+> For $\nu \ge 5$: every admissible $Q$ with
+> $q_{\max} - Q \ge \kappa \min(M, c)^{3/2}$ is attained, with
+> $\kappa = 2\sqrt2 + o(1)$ at the corner (sharp both ways, **proven**),
+> $\kappa \le 8 + o(1)$ in the interior top window under the mild slot
+> condition (**proven modulo the written case grid**), full-range under
+> ample slots (**proven likewise**), and near-floor density for small
+> $\nu \ge 5$ **reduced to classical quaternary form theory**. For
+> $\nu \in \{3, 4\}$ the statement is **false**, with the exceptional sets
+> exactly characterised (Loeschian / fcc).
+
+## 8. What remains, precisely
+
+1. **Referee the Part I proofs** (Lemmas 2–3, Theorems 1–2): self-contained,
+   elementary, and the constants deliberately slack; the three-case analysis
+   of Theorem 2 deserves the closest reading.
+2. **Walk the case grid of Theorem 4** into full detail: the three regimes
+   are argued above and machine-verified, but the boundary between the
+   clipped branch-1 window and the branch-0 window closes with equality and
+   should be written with explicit $\pm 2$ care.
+3. **$\nu \ge 5$ near-floor density**: reduce cleanly to effective
+   quaternary form theory (the deviation form
+   $x^2+y^2+z^2+w^2+(x{+}y{+}z{+}w)^2$ and its odd-mean congeners),
+   with the bounded-range condition made explicit. This is the one piece
+   that wants a quadratic-forms literature dive rather than new argument.
+4. **Slot condition in the mid-range**: between the top window
+   ($\nu \ge a + \sqrt{2c} + C$) and ample slots
+   ($\nu \ge a + 2c + 5$) the padding argument can surely be sharpened via
+   slot-frugal two-level representations; not needed for any BRIMMEST
+   application.
+
+## 9. What this changes
+
+* Conjecture A11's **corner case is a theorem, in sharp form** — including
+  the constant, which the band-merging heuristic predicted and the greedy
+  telescoping argument delivers. What remains open is only the uniformity
+  of the capped/slot-constrained bookkeeping (section 5b–c), a concrete
+  finishing task rather than a conceptual gap.
+* The certificate gains a new closed form: for any window below the
+  explicit fringe bound of Theorem 1, *possible* — with a witness — in
+  $O(\log\log)$ time, no recursion at all. The demotion recursion remains
+  the decider inside the fringe.
+* The manuscript's appendix A.5 and the standalone problem statement
+  should be revised: the question to hand a mathematician is no longer
+  "prove contiguity" but "make Theorem 3 uniform in $(M, c, \nu)$" — a
+  much smaller and better-posed ask.

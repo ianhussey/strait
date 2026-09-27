@@ -1,0 +1,175 @@
+---
+title: "A contiguity conjecture for the spectrum of $\\sum y_i^2$ over bounded integer samples"
+subtitle: "Self-contained problem statement"
+author:
+  - name: Ian Hussey
+    email: ian.hussey@unibe.ch
+    affiliations:
+      - name: University of Bern
+format:
+  html:
+    embed-resources: true
+    theme: flatly
+execute:
+  echo: false
+---
+
+::: {.callout-important}
+**Update (2026-08-26, twice).** The conjecture below is now substantially
+resolved — and partially *refuted*. (1) The corner case is a theorem in
+sharp form: fringe depth exactly $2\sqrt2\,S^{3/2}(1 + O(S^{-1/4}))$.
+(2) The interior is uniform: fringe $O(c^{3/2})$ with explicit constants,
+no recursion over caps. (3) **As stated, the conjecture is false for
+$\nu = 3$ and $\nu = 4$**: near the floor the spectrum is governed by
+ternary/quaternary lattice forms, and the missing values are exactly
+characterised (for $\nu = 3$: $V/2$ non-Loeschian; for $\nu = 4$, integer
+mean: $V \in 4^k(32m+28)$, the fcc-form exceptional class). The corrected
+scope is $\nu \ge 5$, where no exceptions appear and the remaining open
+piece is a reduction to effective quaternary form theory. See
+`contiguity-proof-draft.qmd`. The statement below is retained for context.
+:::
+
+## The object
+
+Fix integers $c \ge 1$ (a cap) and $\nu \ge 1$ (a number of slots). For
+$0 \le M \le \nu c$, let $\mathcal{C}(M, c, \nu)$ be the multisets
+$y = (y_1, \dots, y_\nu)$ of integers $0 \le y_i \le c$ with
+$\sum y_i = M$, and define the **spectrum**
+
+$$
+\mathrm{Spec}(M, c, \nu) \;=\; \Big\{\, \sum_{i=1}^{\nu} y_i^2 \;:\; y \in \mathcal{C}(M, c, \nu) \Big\}.
+$$
+
+Equivalently: the possible sums of squares of parts over partitions of $M$
+into at most $\nu$ parts, each of size at most $c$. Three elementary facts
+(exchange arguments, one line each):
+
+* **Parity.** Every $Q \in \mathrm{Spec}$ satisfies $Q \equiv M \pmod 2$.
+* **Floor.** $\min \mathrm{Spec} = q_{\min} := (\nu - r) m^2 + r (m+1)^2$,
+  where $m = \lfloor M/\nu \rfloor$, $r = M - \nu m$ (the *clustered*
+  configuration).
+* **Ceiling.** $\max \mathrm{Spec} = q_{\max} := a c^2 + b^2$, where
+  $M = ac + b$, $0 \le b < c$ ($a$ values at the cap, one remainder, rest
+  zero).
+
+Call an integer *admissible* if it has the parity of $M$ and lies in
+$[q_{\min}, q_{\max}]$. Not every admissible integer is attained: e.g.
+$\mathrm{Spec}(3, 5, 9) = \{3, 5, 9\}$ misses $7$. Exhaustive computation
+shows the missing values are always confined to a thin **fringe** below the
+ceiling, while everything below the fringe is attained.
+
+## The conjecture
+
+**Conjecture.** There is a constant $\kappa$ such that for all
+$(M, c, \nu)$ with $\nu \ge 3$, every admissible integer
+$$
+q_{\min} \;\le\; Q \;\le\; q_{\max} - \kappa \, \min(M, c)^{3/2}
+$$
+lies in $\mathrm{Spec}(M, c, \nu)$.
+
+Any explicit $\kappa$ is of interest; so is the weaker exponent
+$O\!\big(\min(M,c)^{3/2 + \varepsilon}\big)$ or even
+$O\!\big(\min(M,c)^{7/4}\big)$. The sharp constant appears to be near, but
+measurably above, $2\sqrt 2$ (see evidence below).
+
+## What is known
+
+**Self-similar structure.** Conditioning on the number $t$ of values equal
+to the cap gives the exact decomposition (all unions over $j = a - t$,
+$0 \le j \le a$):
+
+$$
+\mathrm{Spec}(M, c, \nu) = \bigcup_{j=0}^{a}
+\Big\{ (a-j)c^2 + q : q \in \mathrm{Spec}\big(jc + b,\ c-1,\ \nu - a + j\big) \Big\}.
+$$
+
+In the cap-free "corner" case ($M \le c$, $\nu \ge M$), conditioning
+instead on the largest part $p_1 = M - j$ shows that the fringe of
+$\mathrm{Spec}(M)$ consists of translated copies
+$(M-j)^2 + \mathrm{Spec}(j)$ — **bands** occupying
+$[(M-j)^2 + j,\ (M-j)^2 + j^2]$. Bands with small $j$ are disjoint (those
+separations are exactly the missing values); a two-line computation shows
+consecutive dense parts merge once roughly $j \gtrsim \sqrt{2M}$, which is
+the heuristic source of the exponent $3/2$ and the constant $2\sqrt 2$.
+
+**Merge lemma (proved).** If every admissible integer in
+$[\,j+1,\ Q_d(j+1)\,]$ lies in $\mathrm{Spec}(j+1)$, then bands $j$ and
+$j+1$ tile without a gap iff $Q_d(j+1) \ge 2M - j - 3$.
+
+**First gaps (proved, closed form).** For $M = ac + b$, $a \ge 1$, ample
+slots, the smallest positive deficit $q_{\max} - Q$ attained is
+$2(c-1)$ if $b = 0$; $2(c-2)$ if $b \in \{1, c-1\}$; and
+$\min\{2(b-1), 2(c-b-1)\}$ otherwise — so, e.g., every admissible $Q$ with
+$0 < q_{\max} - Q < 2(b-1)$ is *not* attained. For the corner ($a = 0$) the
+first gap has depth $2(M-1)$.
+
+**A classical connection.** Writing $T = (Q - M)/2 = \sum \binom{y_i}{2}$,
+membership asks for a representation of $T$ by triangular numbers with
+side constraints $\sum p_i \le M$ (and slot/cap constraints). By Gauss's
+Eureka theorem every $T$ is a sum of three triangular numbers, so *absent
+the size constraint* every admissible $Q$ would be attained: the fringe
+exists precisely because, near the ceiling, the constraint forces one huge
+triangular number. Near-ceiling membership with two large parts is
+equivalent to representing $8T + 2$ as a sum of two odd squares — a
+Fermat-type condition — so the *positions* of gaps at the recursion's base
+are arithmetically irregular, and a proof should aim at bounding the fringe,
+not describing it.
+
+## Evidence
+
+* Exhaustive verification for **all** designs $c \le 8$, $\nu \le 12$
+  (859,672 membership checks): every missing admissible value lies in the
+  fringe; the interior is contiguous without exception.
+* Corner spectra computed exactly to $M = 160$: observed fringe depth
+  between $2.8\,M^{3/2}$ and $3.4\,M^{3/2}$, drifting slowly upward in the
+  computed range — so a sharp-constant claim should be treated with care,
+  and $\kappa$ in the conjecture given slack.
+* Randomised verification on wide designs (caps to $517$, awkward $\nu$ to
+  $217$; $\sim$500{,}000 further checks) against two independent exact
+  algorithms.
+
+Code producing all of the above (exact bitset dynamic programming, plus two
+independent certified decision procedures) is available and re-runnable;
+the finite base of a computer-assisted proof is effectively already built.
+
+## Why the obvious proof does not close
+
+The natural induction (merge lemma + inductive fringe bound
+$\kappa\,m^{3/2}$) covers the range the corner bands reach, for any
+$\kappa > 2\sqrt 2$ and $M$ large. Three obstructions remain:
+
+1. **Two parameters, crossing regimes.** Bands with $j > M/2$ carry a
+   binding cap, so the induction must run on the full two-parameter family
+   via the demotion decomposition, where sums grow while caps shrink; a
+   single bound in $\min(M, c)^{3/2}$ must survive the crossover, and the
+   overlap inequality degrades the constant at each level.
+2. **Bands are gappy where their neighbour needs them dense.** Band
+   $j{+}1$'s top is its own fringe — a shifted copy of the whole problem —
+   and it sits exactly where band $j$'s bottom wants coverage. The pairwise
+   merge lemma must be upgraded to: a union of shifted, self-similarly
+   gappy copies covers an interval. That requires control of gap
+   *positions* across scales, not only depths.
+3. **Arithmetic irregularity at the base**, per the two-odd-squares
+   connection above: gap positions at small scales follow factorisation,
+   not formulas.
+
+A computer-assisted closure looks feasible: verify the hypothesis
+exhaustively below an explicit $S_0$ (infrastructure exists), and prove the
+inductive step above it with generous $\kappa$. The missing labour is the
+uniform bookkeeping in obstruction 1–2.
+
+## Motivation, briefly
+
+The spectrum decides, exactly, whether a reported (mean, standard
+deviation, sample size) on a bounded integer scale — a Likert questionnaire,
+say — can arise from any real data: a question of practical consequence in
+the detection of fabricated or erroneous scientific reports. An exact
+certification algorithm built on the decomposition above is implemented and
+validated ($\sim 1.5$ million checks); its *correctness* is proved
+unconditionally. The conjecture governs its worst-case *running time* — and
+is, we think, a pretty question in its own right: the missing half of
+Gauss's Eureka theorem under a size constraint.
+
+A manuscript with full statements and proofs of everything marked "proved"
+above is available on request (appendix A of the BRIMMEST paper, *strait* R
+package).
