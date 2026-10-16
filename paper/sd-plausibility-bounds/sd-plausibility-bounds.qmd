@@ -1,0 +1,614 @@
+---
+title: "Plausibility bounds for the SD of bounded questionnaire scores"
+subtitle: "An analytic method, its validation, and the functions in the strait package"
+author:
+  - name: Ian Hussey
+    email: ian.hussey@unibe.ch
+    affiliations:
+      - name: University of Bern
+format:
+  html:
+    embed-resources: true
+    toc: true
+    theme: flatly
+execute:
+  warning: false
+  message: false
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+# Load the package from source, so this document always runs against the
+# code in this repository rather than an installed version.
+pkgload::load_all(here::here(), quiet = TRUE)
+library(ggplot2)
+theme_set(theme_minimal(base_size = 12))
+val <- readRDS(here::here("dev/sd-plausibility-bounds/validation.rds"))
+val$p <- round(val$p, 6)   # upper-tail p is stored as 1 - (1 - p)
+# largest relative shift of an exact bound when conditioning on the mean
+cshift <- function(mu) {
+  i <- val$mu == mu & !is.na(val$exact)
+  max(abs(val$exact_cond[i] / val$exact[i] - 1))
+}
+pct <- function(x, d = 1) paste0(formatC(100 * x, format = "f", digits = d), "%")
+```
+
+# The question
+
+A paper reports a mean of 25 and an SD of 8 on the BDI-II (0–63) for
+$N = 50$ people. Is that SD plausible?
+
+*Hard* bounds answer a narrower question: is the SD *possible*? The
+largest possible SD comes from putting as many scores as possible at the two
+scale limits (Muilwijk, 1966; Bhatia & Davis, 2000). The smallest comes from
+putting all scores on the two integers next to the mean. For this example
+the hard range is about 0 to 31. Nearly every SD a real paper reports passes.
+
+*Plausibility* bounds ask what a realistic data-generating process would
+produce: the range of sample SDs you would see at this mean and $N$ if the
+scores came from the kind of distribution that questionnaire data actually
+follow. An SD far outside that range is not impossible, but it is surprising
+enough to warrant a closer look.
+
+The previous approach was simulation. Fit beta-binomial regressions to a
+corpus of raw BDI-II data, predict the dispersion at each mean, sample from
+that beta-binomial at each $N$, and take the 1% and 0.1% quantiles of the
+sample SD. This document replaces the simulation with analytic and exact
+calculations, and validates them.
+
+# The model
+
+Scores are $X = \text{score} - L \in \{0, \dots, m\}$ with $m = U - L$
+($m = 63$ for the BDI-II). They are modelled as
+
+$$
+X \sim \text{BetaBinomial}(m, \alpha, \beta), \qquad
+\mu = \frac{\alpha}{\alpha + \beta}, \qquad
+\rho = \frac{1}{\alpha + \beta + 1},
+$$
+
+so that
+
+$$
+E[X] = m\mu, \qquad \sigma^2 = m\mu(1 - \mu)\,[1 + (m - 1)\rho].
+$$
+
+$\rho$ is the intra-class correlation of the $m$ Bernoulli trials behind the
+score. $\rho = 0$ is the binomial, the least dispersed member of the family.
+As $\rho \to 1$, all mass moves to the two endpoints. All population moments
+are computed exactly from the pmf,
+$\log p(x) = \log\binom{m}{x} + \log B(x + \alpha, m - x + \beta) - \log
+B(\alpha, \beta)$, rather than from closed forms:
+
+```{r}
+bb_cumulants(m = 63, mu = 25 / 63, rho = 0.052)
+```
+
+## Estimating the dispersion from summary statistics
+
+Given a reported $(L, U, M, SD)$, the method of moments gives
+
+$$
+\hat\mu = \frac{M - L}{m}, \qquad
+\hat\rho = \frac{1}{m - 1}\left[\frac{SD^2}{m\hat\mu(1 - \hat\mu)} - 1\right].
+$$
+
+$\hat\rho$ is linear in $S^2$, so it is unbiased for $\rho$ given $\mu$,
+and its sampling variance is $\operatorname{Var}(S^2)/[m(m - 1)\mu(1 -
+\mu)]^2$. Negative $\hat\rho$ are kept: truncating them would bias a
+corpus average upward.
+
+```{r}
+rho_from_summary(L = 0, U = 63, M = 25, SD = 8, N = 50)
+```
+
+Using a paper's own SD to set $\rho$ and then checking that same SD is
+circular, and the functions allow it only for illustration. In practice
+$\rho$ comes from a corpus (see [Estimating ρ from a corpus]).
+
+# The sampling distribution of the sample SD
+
+## Two moments
+
+For any iid process with a finite fourth moment, the unbiased sample
+variance satisfies
+
+$$
+E[S^2] = \sigma^2, \qquad
+\operatorname{Var}(S^2) = \sigma^4\left[\frac{2}{N - 1} + \frac{\gamma_2}{N}\right],
+\qquad \gamma_2 = \frac{\mu_4}{\sigma^4} - 3 .
+$$
+
+The **two-moment approximation** (Box, 1954; Satterthwaite, 1946) matches
+these with a scaled chi-square:
+
+$$
+S^2 \approx \sigma^2\,\frac{\chi^2_\nu}{\nu}, \qquad
+\nu = \frac{2}{2/(N - 1) + \gamma_2/N}, \qquad
+q_p(S) = \sigma\sqrt{\chi^2_{\nu,p}/\nu}.
+$$
+
+With normal data, $\gamma_2 = 0$ and $\nu = N - 1$, the textbook result.
+Because $\gamma_2 \ge -2$ for any distribution, the denominator is always
+positive. The approximation reproduces the reference table exactly:
+
+```{r}
+ref <- sd_plausibility(0, 63, M = 25, N = c(20, 50, 100, 500),
+                       p = c(0.01, 0.001), sd = 8)
+ref[, c("N", "p", "rho", "sigma", "hard_min", "hard_max", "lower", "upper")]
+```
+
+## Three moments
+
+The two-moment approximation gets the skewness of $S^2$ right only for
+normal-like data. The third cumulant of $S^2$, in terms of the population
+cumulants $\kappa_2, \dots, \kappa_6$, is
+
+$$
+\kappa_3(S^2) = \frac{\kappa_6}{N^2} + \frac{12\kappa_2\kappa_4}{N(N - 1)}
++ \frac{4(N - 2)\kappa_3^2}{N(N - 1)^2} + \frac{8\kappa_2^3}{(N - 1)^2}.
+$$
+
+For normal data this is $8\sigma^6/(N - 1)^2$, the third cumulant of
+$\sigma^2\chi^2_{N-1}/(N-1)$. The test suite checks the formula against the
+exact distribution below, and it agrees to machine precision. Two refinements
+use it:
+
+- **Cornish–Fisher** (`method = "cf"`): $q_p(S^2) \approx \kappa_1 +
+  \sqrt{\kappa_2}\,[z_p + \tfrac{\gamma}{6}(z_p^2 - 1)]$, with $\gamma =
+  \kappa_3/\kappa_2^{3/2}$ the skewness of $S^2$. The CDF is obtained by
+  solving the quadratic in $z$, which is needed for the mixture below.
+- **Three-moment chi-square** (`method = "chisq3"`): $S^2 \approx a +
+  b\chi^2_\nu$ with $b = \kappa_3/(4\kappa_2)$, $\nu =
+  8\kappa_2^3/\kappa_3^2$ and $a = \kappa_1 - b\nu$ (a Pearson type III
+  fit). It keeps the chi-square shape, so it behaves better than
+  Cornish–Fisher in the far tails.
+
+## Exact, by dynamic programming
+
+Because $X$ is a bounded integer, the exact distribution of $S^2 =
+[\sum X^2 - (\sum X)^2/N]/(N - 1)$ follows from the joint distribution of
+$(T, Q) = (\sum X, \sum X^2)$. That joint distribution builds up one
+observation at a time:
+
+$$
+P_{n+1}(t, q) = \sum_{x=0}^{m} p(x)\, P_n(t - x,\ q - x^2).
+$$
+
+For each sum $t$, $q$ lies between the most even split of $t$ over $n$
+values and the most extreme one, so the state is stored as one vector per
+$t$ over that range (`s2_exact()`). The cost grows roughly as $N^2 m^3$. On
+a 0–63 scale the method is practical up to about $N = 25$: $N = 20$ takes
+under a minute. Values and sums with probability below $10^{-17}$ are
+pruned, and the discarded mass is reported (below $10^{-14}$ throughout the
+validation). The exact method is the ground truth for small $N$, and it also
+gives the distribution *conditional on the sample mean*, which matters below.
+
+# Heterogeneity: mixing over ρ
+
+A corpus meta-regression predicts a mean $\rho$ at each $\mu$ and a
+between-study SD $\tau$. The plausibility bound is then a quantile of the
+**mixture** over $\rho \sim N(\rho, \tau^2)$ truncated to $[0, 1)$:
+
+$$
+F_S(s) = \int F_S(s \mid \rho)\, \mathrm{d}G(\rho), \qquad
+\text{bound} = F_S^{-1}(p).
+$$
+
+`sd_plausibility()` represents $G$ by $K$ equal-weight quantile nodes of the
+truncated normal. It averages the per-node CDFs and inverts the average.
+Averaging per-node quantiles would be wrong, because the quantile of a
+mixture is not the mixture of quantiles.
+
+```{r}
+sd_plausibility(0, 63, M = 25, N = 50, p = 0.001, rho = 0.052,
+                tau = c(0, 0.01, 0.02, 0.04))[, c("tau", "lower", "upper")]
+```
+
+# Hard bounds
+
+The plausibility bounds are reported next to the hard bounds, and clipped
+to them:
+
+- **Ceiling:** the sharp mean-conditional maximum for integer data,
+  `sd_max_structure_s()`: as many scores as possible at the two limits, with
+  at most one in between (Mestdagh et al., 2018). This is never above the
+  Bhatia–Davis bound $\sqrt{N/(N-1)\,(M - L)(U - M)}$.
+- **Floor:** the minimum variance over integer vectors of length $N$ with
+  mean $M$. It puts every score on the two integers next to $M$: with $f$ the
+  fractional part of $M - L$, $SD_{\min} = \sqrt{N/(N - 1)}\sqrt{f(1 - f)}$
+  (`sd_min_integer()`). With `digits`, the floor is the minimum over every
+  integer sum whose mean rounds to the reported $M$. When no integer sample
+  has mean $M$ exactly, the quasi-integer floor is used, which is valid at
+  every real mean.
+
+# Validation
+
+The approximations were compared with ground truth on the grid in the spec:
+$m = 63$, $\mu \in \{0.1, 0.3, 0.5\}$, $\rho \in \{0.02, 0.05, 0.15\}$,
+$N \in \{10, 20, 50, 200\}$, at the 1% and 0.1% quantiles in each tail. That
+is 144 quantiles per method. The ground truth is the exact distribution
+where $N \le 20$, and Monte Carlo with $10^6$ replicates otherwise. The
+replicates are sampled as multinomial counts, so the cost does not grow with
+$N$. The script is `dev/sd-plausibility-bounds/validate.R`.
+
+**Monte Carlo agrees with the exact method** wherever both exist. The
+median 95% half-width of a Monte Carlo quantile is
+`r pct(median(val$mc_rel_ci), 2)`. The largest difference between the two,
+`r pct(max(abs(val$rel_exact_vs_mc), na.rm = TRUE), 1)`, is one step of
+discreteness: at $\mu = 0.1$, $N = 10$, the attainable SDs next to the 0.1%
+quantile are 1.197 and 1.229, and the Monte Carlo quantile landed on the
+second. Where the ground truth is Monte Carlo ($N \ge 50$), errors below
+about 1% cannot be resolved.
+
+```{r}
+#| label: tbl-summary
+#| tbl-cap: "Relative error of each approximation against ground truth: the share of the 144 quantiles off by more than 2%, and the largest error, by tail and quantile."
+summ <- do.call(rbind, lapply(c("chisq2", "chisq3", "cf"), function(meth) {
+  e <- val[[paste0("rel_", meth)]]
+  do.call(rbind, lapply(split(seq_len(nrow(val)), list(val$tail, val$p)),
+    function(i) data.frame(
+      method = meth, tail = val$tail[i[1]], p = val$p[i[1]],
+      over_2pct = sum(abs(e[i]) > 0.02), of = length(i),
+      max_abs_error = pct(max(abs(e[i])), 1))))
+}))
+rownames(summ) <- NULL
+knitr::kable(summ)
+```
+
+```{r}
+#| label: fig-validation
+#| fig-cap: "Relative error of each approximation against ground truth, by N, tail and quantile. Each point is one (μ, ρ) cell; the band marks ±2%. Truth is exact for N ≤ 20 and Monte Carlo (10^6 replicates) above."
+#| fig-height: 5.5
+long <- do.call(rbind, lapply(c("chisq2", "chisq3", "cf"), function(meth) {
+  data.frame(val[c("mu", "rho", "N", "tail", "p")], method = meth,
+             err = val[[paste0("rel_", meth)]])
+}))
+long$quantile <- paste0(long$tail, " ", long$p * 100, "%")
+ggplot(long, aes(factor(N), err, colour = method)) +
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -0.02, ymax = 0.02,
+           alpha = 0.1) +
+  geom_hline(yintercept = 0, colour = "grey50") +
+  geom_point(position = position_dodge(width = 0.6), size = 1.3, alpha = 0.8) +
+  facet_wrap(~quantile, nrow = 1) +
+  scale_y_continuous(labels = function(x) paste0(100 * x, "%")) +
+  labs(x = "N", y = "relative error", colour = NULL) +
+  theme(legend.position = "bottom")
+```
+
+```{r}
+#| label: tbl-worst
+#| tbl-cap: "The cells where the default two-moment method is off by more than 2%, with the three-moment and Cornish–Fisher errors for comparison."
+worst <- val[abs(val$rel_chisq2) > 0.02,
+             c("mu", "rho", "N", "tail", "p", "truth",
+               "rel_chisq2", "rel_chisq3", "rel_cf")]
+worst <- worst[order(-abs(worst$rel_chisq2)), ]
+worst$truth <- round(worst$truth, 2)
+for (v in c("rel_chisq2", "rel_chisq3", "rel_cf")) worst[[v]] <- pct(worst[[v]])
+rownames(worst) <- NULL
+knitr::kable(worst)
+```
+
+Three results stand out.
+
+**The two-moment method is reliable at large N and in the upper tail.**
+All 36 of its quantiles at $N = 200$ are within 2% of the truth. In the
+upper tail its largest error at any $N$ is
+`r pct(max(abs(val$rel_chisq2[val$tail == "upper"])))`. Its failures are
+concentrated where the plan expected them: small $N$, extreme tails, and
+specifically the **lower** tail of a **skewed** score distribution. At
+$\mu = 0.1$, $N = 10$, it puts the 0.1% lower bound 29% too low.
+
+**The moment refinements fix the upper tail but not the lower one.** The
+three-moment chi-square and Cornish–Fisher bring every upper-tail quantile
+within 2%. In the lower tail at $N \le 20$ they are no better than the
+two-moment method, and in several cells worse. The three-moment fit returns
+0 in one cell because its fitted shift is negative, and Cornish–Fisher
+overshoots by up to 64%. This is not a matter of adding another cumulant.
+At small $N$ the lower tail of $S$ is lumpy (a few attainable values carry
+all the mass) and bounded below, which no smooth moment-matched curve
+represents well.
+
+**For $N \le 20$, the exact method is the answer.** It takes seconds at
+$N = 10$ and about a minute at $N = 20$ on a 0–63 scale, and it has no
+approximation error to validate.
+
+# Review of the plan
+
+The plan is sound: a two-moment approximation with exact moments from the
+pmf, a mixture over $\rho$ done on the CDF scale, and exact small-$N$
+ground truth. Working it through raised six points. Two of them change
+results.
+
+## 1. Condition on the reported mean
+
+**This is the most consequential point.** A reported SD comes with a
+reported mean. The bounds above describe samples of size $N$ *in general*,
+whose means scatter around $m\mu$. For a skewed distribution, $S^2$ and
+$\bar X$ are correlated: exactly, $\operatorname{Cov}(\bar X, S^2) =
+\kappa_3/N$. Samples whose mean happens to land at $M$ have a narrower SD
+distribution than samples in general. The question a forensic check asks is
+the conditional one: *given that this sample's mean is $M$*, how surprising
+is its SD?
+
+Removing the part of $\operatorname{Var}(S^2)$ explained by $\bar X$ gives,
+to leading order,
+
+$$
+\operatorname{Var}(S^2 \mid \bar X = \mu) \approx
+\operatorname{Var}(S^2) - \frac{\kappa_3^2}{N\sigma^2}
+= \sigma^4\left[\frac{2}{N - 1} + \frac{\gamma_2 - \gamma_1^2}{N}\right],
+$$
+
+which is the unconditional formula with $\gamma_2$ replaced by $\gamma_2 -
+\gamma_1^2$. Pearson's inequality ($\gamma_2 \ge \gamma_1^2 - 2$) keeps it
+positive. The two-moment method uses this with `condition_on_mean = TRUE`.
+The exact method conditions directly, on the sums whose mean rounds to the
+reported $M$.
+
+The exact distribution shows how large the effect is. Let the shift be the
+relative change in a bound when conditioning on the mean. At $\mu = 0.5$ the
+score distribution is symmetric, $\gamma_1 = 0$, and the leading-order
+correction vanishes. The exact shift is still up to
+`r pct(cshift(0.5), 0)`, a second-order effect at $N \le 20$. At $\mu =
+0.3$ the shift is up to `r pct(cshift(0.3), 0)`. At $\mu = 0.1$, the regime
+of depression scales in community samples, it is up to
+`r pct(cshift(0.1), 0)`. For $\rho = 0.15$ and $N = 10$ the conditional 0.1% lower bound
+is 3.13 against 1.25 unconditionally, and the conditional upper bound is
+14.1 against 16.8. Measured against the conditional truth, the
+unconditional two-moment bounds are off by up to
+`r pct(max(abs(val$rel_chisq2_vs_cond), na.rm = TRUE), 0)`.
+
+The conditional two-moment correction recovers most of this: its largest
+error against the exact conditional distribution is
+`r pct(max(abs(val$rel_chisq2_cond), na.rm = TRUE), 0)`. What remains is
+the small-$N$ lower-tail problem from the validation. The conditional
+correction has only been checked against exact results up to $N = 20$,
+where exact is available anyway. Its error shrinks with $N$ (the
+correction is exact to leading order as $N \to \infty$), but its accuracy
+at $N = 50$ is not yet verified.
+
+```{r}
+#| label: fig-conditional
+#| fig-cap: "Width of the 0.1%–99.9% plausibility interval for the SD, unconditional and conditional on the sample mean, from the exact distribution (N = 10 and 20). The gap grows with the skew of the score distribution, which is largest at μ = 0.1."
+#| fig-height: 3.4
+w <- val[val$N <= 20 & val$p == 0.001, ]
+wid <- do.call(rbind, lapply(split(w, list(w$mu, w$rho, w$N), drop = TRUE), function(d) {
+  lo <- d[d$tail == "lower", ]; hi <- d[d$tail == "upper", ]
+  data.frame(mu = lo$mu, rho = lo$rho, N = lo$N,
+             unconditional = hi$exact - lo$exact,
+             conditional = hi$exact_cond - lo$exact_cond)
+}))
+wid$ratio <- wid$conditional / wid$unconditional
+ggplot(wid, aes(factor(rho), ratio, colour = factor(mu), group = mu)) +
+  geom_hline(yintercept = 1, colour = "grey60") +
+  geom_line() + geom_point() +
+  facet_wrap(~ paste0("N = ", N)) +
+  labs(x = expression(rho), y = "conditional / unconditional width",
+       colour = expression(mu))
+```
+
+## 2. The binomial floor is not a floor for the sample SD
+
+The plan lists as a defect that at small $N$ the lower quantile can fall
+below $\sigma_{\text{binom}} = \sqrt{m\mu(1 - \mu)}$, "impossible under the
+model". It is not impossible. $\sigma_{\text{binom}}$ is a floor on the
+*population* SD across the family ($\rho \ge 0$). A *sample* SD
+fluctuates around its population value, and it falls below
+$\sigma_{\text{binom}}$ often. The exact distribution shows this directly.
+Across the validation grid at $N = 10$, the exact probability that
+$S < \sigma_{\text{binom}}$ ranges from
+`r pct(min(val$p_below_binom_exact[val$N == 10], na.rm = TRUE), 2)` to
+`r pct(max(val$p_below_binom_exact[val$N == 10], na.rm = TRUE))`. Whenever
+it exceeds $p$, the true lower quantile lies below
+$\sigma_{\text{binom}}$: this holds for
+`r sum(val$exact < val$sigma_binom & val$tail == "lower", na.rm = TRUE)` of
+the `r sum(!is.na(val$exact) & val$tail == "lower")` exact lower quantiles.
+Clipping to $\sigma_{\text{binom}}$ would make those lower bounds wrong.
+
+The real constraint is the **hard integer floor** (item 6 of the plan), and
+that is what the functions clip to. They also report when clipping happened
+(`clipped`, `note`). With a 64-point scale the floor is rarely binding,
+because it never exceeds $0.5\sqrt{N/(N-1)}$. It binds on short scales at
+tiny $N$:
+
+```{r}
+sd_plausibility(0, 2, M = 0.5, N = 4, rho = 0, p = 0.01, method = "chisq2")[
+  , c("sigma", "hard_min", "lower", "upper", "clipped")]
+```
+
+## 3. Truncate the ρ distribution, do not clamp it
+
+The starting implementation clamped the $\rho$ nodes with `pmin(pmax(...))`.
+That puts a point mass at 0 (and near 1) rather than truncating. When
+$\rho$ is small relative to $\tau$, which is common, a large share of the
+nodes collapse onto the binomial. The implementation now places the nodes at
+the quantiles of the truncated normal, as the plan describes.
+
+```{r}
+old_nodes <- function(rho, tau, K = 41)
+  pmin(pmax(qnorm((seq_len(K) - 0.5) / K, rho, tau), 0), 1 - 1e-6)
+c(clamped_share_at_zero = mean(old_nodes(0.02, 0.03) == 0),
+  truncated_share_at_zero = mean(strait:::.rho_nodes(0.02, 0.03, 41) == 0))
+```
+
+## 4. Include the prediction's own uncertainty
+
+$\tau$ from a meta-regression is the *residual* between-study SD around the
+fitted curve. The fitted $\rho$ at a given $\mu$ is itself estimated, and its
+standard error is not part of $\tau$. For a new study, the relevant spread
+is the prediction interval's: $\tau_{\text{total}} = \sqrt{\tau^2 +
+\mathrm{SE}^2}$. `predict()` on a corpus fit returns both, and
+`tau_total` is the one to pass to `sd_plausibility()`. In the simulated
+corpus below, SE is small next to $\tau$ in the middle of the $\mu$
+range. It grows towards the ends, where the spline has less data.
+
+## 5. The variance of ρ̂ treats μ as known
+
+$\operatorname{Var}(\hat\rho)$ uses $\operatorname{Var}(S^2)$ only.
+$\hat\mu$ is estimated too, and $\hat\rho$ depends on it through
+$\mu(1 - \mu)$. The extra delta-method term is of order $1/N$ and is small
+next to $\operatorname{Var}(S^2)$, except near the scale limits, where
+$\mu(1 - \mu)$ is small and changes quickly. This only affects the weights
+in the meta-regression. The implementation leaves it out and documents the
+omission.
+
+## 6. The kurtosis cannot be checked from summary statistics
+
+This caveat is the plan's own, and it is the one that matters most for
+interpretation. The bounds depend on the data-generating process mainly
+through $\gamma_2$ (and, conditionally, through $\gamma_2 - \gamma_1^2$). The
+beta-binomial fixes both once $\mu$ and $\rho$ are fixed. A corpus of means
+and SDs identifies $\rho$ but says nothing about whether real scores have
+beta-binomial tails. Floor effects, zero inflation and bimodality all
+change the kurtosis at a given $(\mu, \rho)$, and so change the bounds.
+Checking this needs raw data: a corpus of raw scores, or at least
+published histograms. Until then, the bounds are plausibility bounds *under
+the beta-binomial*, and should be described that way.
+
+```{r}
+#| label: fig-kurtosis
+#| fig-cap: "The 0.1% plausibility interval for the SD (N = 50, M = 25 on 0–63, σ fixed at 8) when γ₂ departs from the beta-binomial's value. The two-moment method takes σ and γ₂ directly. Excess kurtosis widens the interval; a flatter distribution narrows it."
+#| fig-height: 3.2
+cu <- strait:::.cumulants_from_pmf(strait:::.bb_pmf(63, 25 / 63, 0.052))
+g2s <- seq(-1.2, 3, by = 0.1)
+kb <- do.call(rbind, lapply(g2s, function(g2) {
+  sc <- strait:::.s2_cumulants(modifyList(cu, list(g2 = g2)), 50)
+  nu <- 2 * sc$k1^2 / sc$k2
+  data.frame(g2 = g2,
+             lower = sqrt(sc$k1 * qchisq(0.001, nu) / nu),
+             upper = sqrt(sc$k1 * qchisq(0.999, nu) / nu))
+}))
+ggplot(kb, aes(g2)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, fill = "#2c7fb8") +
+  geom_line(aes(y = lower)) + geom_line(aes(y = upper)) +
+  geom_vline(xintercept = cu$g2, linetype = 2) +
+  annotate("text", x = cu$g2, y = max(kb$upper), label = " beta-binomial",
+           hjust = 0, vjust = 1, size = 3.5) +
+  labs(x = expression("population excess kurtosis " * gamma[2]),
+       y = "plausible SD")
+```
+
+# Estimating ρ from a corpus
+
+`rho_corpus_fit()` needs only summary statistics: one row per study with
+$(L, U, M, SD, N)$. It computes each study's $(\hat\mu_i, \hat\rho_i,
+\operatorname{Var}(\hat\rho_i))$ and fits a random-effects meta-regression
+of $\hat\rho_i$ on a natural spline in $\hat\mu_i$ with `metafor::rma()`
+(Viechtbauer, 2010). $\operatorname{Var}(\hat\rho_i)$ depends on the
+kurtosis at $(\mu_i, \rho_i)$. It is first evaluated at $\max(0,
+\hat\rho_i)$, then once more at the fitted curve, and the model is refitted.
+The second pass matters because a noisy $\hat\rho_i$ gives a noisy weight.
+
+The corpus below is **simulated**. It has 150 studies on a 0–63 scale with
+a true $\rho(\mu)$ that rises towards the floor, as depression scales do,
+between-study SD $\tau = 0.015$, and sample SDs drawn from the model.
+
+```{r}
+set.seed(11)
+true_rho <- function(mu) 0.03 + 0.06 * exp(-8 * mu)
+k <- 150
+mu_i <- runif(k, 0.08, 0.7)
+N_i <- sample(30:400, k, replace = TRUE)
+rho_i <- pmax(0, true_rho(mu_i) + rnorm(k, 0, 0.015))
+SD_i <- vapply(seq_len(k), function(i) {
+  pr <- strait:::.bb_pmf(63, mu_i[i], rho_i[i])
+  x <- sample(0:63, N_i[i], replace = TRUE, prob = pr)
+  sd(x)
+}, 0)
+corpus <- data.frame(L = 0, U = 63, M = 63 * mu_i, SD = SD_i, N = N_i)
+fit <- rho_corpus_fit(corpus)
+fit
+```
+
+```{r}
+#| label: fig-corpus
+#| fig-cap: "Simulated corpus: per-study method-of-moments ρ̂ (point size ∝ weight), the fitted spline with its prediction band (±1.96 τ_total), and the true curve (dashed)."
+#| fig-height: 3.5
+grid_mu <- seq(0.08, 0.7, length.out = 100)
+pr <- predict(fit, grid_mu)
+ggplot() +
+  geom_point(data = fit$data, aes(mu_hat, rho_hat, size = 1 / var_rho),
+             alpha = 0.35, show.legend = FALSE) +
+  geom_ribbon(data = pr, aes(mu, ymin = rho - 1.96 * tau_total,
+                             ymax = rho + 1.96 * tau_total),
+              alpha = 0.2, fill = "#2c7fb8") +
+  geom_line(data = pr, aes(mu, rho), colour = "#2c7fb8") +
+  geom_line(aes(grid_mu, true_rho(grid_mu)), linetype = 2) +
+  scale_size_area(max_size = 3) +
+  labs(x = expression(hat(mu)), y = expression(hat(rho)))
+```
+
+The corpus prediction then feeds `sd_plausibility()`. Here is the check for
+the example report (M = 25, SD = 8, N = 50):
+
+```{r}
+p25 <- predict(fit, 25 / 63)
+p25
+sd_plausibility(0, 63, M = 25, N = 50, p = c(0.01, 0.001),
+                rho = p25$rho, tau = p25$tau_total,
+                condition_on_mean = TRUE)[
+  , c("p", "rho", "tau", "sigma", "lower", "upper")]
+```
+
+# Recommendations
+
+- Condition on the reported mean (`condition_on_mean = TRUE`). This
+  matters more than the choice of approximation whenever the score
+  distribution is skewed.
+- For $N \le 20$ on scales of this length, use `method = "exact"`. It is
+  exact, conditions on the reported mean at its reported precision
+  (`digits`), and costs seconds to a minute.
+- Above that, use `method = "chisq2"` with `condition_on_mean = TRUE`. Its
+  upper bound is reliable. Treat its lower bound with caution at
+  moderate $N$. For skewed distributions ($\mu$ near 0 or 1) it runs too
+  low, which is conservative for flagging a small SD. For symmetric,
+  strongly dispersed ones ($\mu = 0.5$, $\rho = 0.15$) it runs too high,
+  which is not.
+- A three-moment conditional approximation would need the conditional
+  third cumulant of $S^2$. That derivation is the natural next step, and it
+  could be validated with a faster exact DP (for example, in C++) at
+  $N = 50$.
+- Take $\rho$ and $\tau$ from a corpus, pass `tau_total`, and never set
+  $\rho$ from the SD being checked.
+- Report the bounds as plausible *under the beta-binomial*, and treat a
+  report outside them as a prompt for a closer look, not as a verdict.
+
+# Function reference
+
+| Function | Purpose |
+|---|---|
+| `sd_plausibility(L, U, M, N, p, rho, tau, sd, method, condition_on_mean, digits, K)` | Plausibility bounds, with hard bounds, clipping and notes. Vectorised over `M`, `N`, `rho`, `tau`, `sd` (recycled together) and `p` (crossed). |
+| `s2_exact(m, mu, rho, N, sums)` | Exact distribution of $S^2$ by dynamic programming, optionally conditional on the sum. |
+| `bb_cumulants(m, mu, rho)` | Mean, cumulants $\kappa_2$–$\kappa_6$, $\gamma_1$ and $\gamma_2$ from the pmf. |
+| `rho_from_summary(L, U, M, SD, N)` | Method-of-moments $\hat\mu$, $\hat\rho$ and $\operatorname{Var}(\hat\rho)$. |
+| `rho_corpus_fit(corpus, df)` / `predict(fit, mu)` | Corpus meta-regression of $\hat\rho$ on $\hat\mu$; predicted $\rho$, SE, $\tau$ and $\tau_{\text{total}}$. |
+
+Edge cases: a mean at a scale limit returns zero bounds with a note. A mean
+outside the scale, $N < 2$, or a missing input returns `NA` with a note.
+$\rho < 0$ (under-dispersed) is computed at the binomial, with a note.
+$\rho \ge 1$ uses the endpoint-only limit. `U - L` must be a whole number,
+so a mean-scored scale must be converted to sum scores first.
+
+# References {.unnumbered}
+
+Bhatia, R., & Davis, C. (2000). A better bound on the variance. *The
+American Mathematical Monthly, 107*(4), 353–357.
+
+Box, G. E. P. (1954). Some theorems on quadratic forms applied in the study
+of analysis of variance problems, I. *The Annals of Mathematical
+Statistics, 25*(2), 290–302.
+
+Mestdagh, M., Pe, M., Pestman, W., Verdonck, S., Kuppens, P., &
+Tuerlinckx, F. (2018). Sidelining the mean: The relative variability index
+as a generic mean-corrected variability measure for bounded variables.
+*Psychological Methods, 23*(4), 690–707.
+
+Muilwijk, J. (1966). Note on a theorem of M. N. Murthy and V. K. Sethi.
+*Sankhyā, Series B, 28*, 183.
+
+Satterthwaite, F. E. (1946). An approximate distribution of estimates of
+variance components. *Biometrics Bulletin, 2*(6), 110–114.
+
+Viechtbauer, W. (2010). Conducting meta-analyses in R with the metafor
+package. *Journal of Statistical Software, 36*(3), 1–48.

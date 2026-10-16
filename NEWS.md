@@ -1,3 +1,25 @@
+# strait 0.4.13
+
+## New features
+
+* `sd_plausibility()` gives plausibility bounds for a reported SD on a
+  bounded integer scale: quantiles of the sample SD's sampling distribution
+  under a beta-binomial data-generating process, next to the hard integer
+  bounds (to which they are clipped, with a note). Four methods: a
+  two-moment scaled chi-square (default), a three-moment shifted
+  chi-square, Cornish-Fisher, and the exact distribution by dynamic
+  programming over (sum X, sum X^2) for small N. `condition_on_mean = TRUE`
+  conditions on the sample mean -- which is what checking a reported
+  (M, SD) pair asks -- using Var(S^2 | mean) = sigma^4 [2/(N-1) +
+  (gamma_2 - gamma_1^2)/N], or exactly. Between-study heterogeneity in rho
+  enters as a mixture over a truncated normal, averaged on the CDF scale.
+* Supporting functions: `bb_cumulants()`, `s2_exact()`,
+  `rho_from_summary()` (method-of-moments rho and its sampling variance),
+  and `rho_corpus_fit()` with a `predict()` method (a metafor
+  meta-regression of rho on mu from summary statistics alone, returning
+  rho, its SE, tau and tau_total). Method, validation and caveats are in
+  `paper/sd-plausibility-bounds/`.
+
 # strait 0.4.12
 
 ## New features
