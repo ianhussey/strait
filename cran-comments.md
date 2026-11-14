@@ -28,7 +28,7 @@ either name.
   package rather than reimplemented. `scrutiny` and `ggplot2` are the only
   dependencies.
 * All exported functions have running examples. Two examples in
-  `plot_sd_region()` that enumerate the attainable (mean, SD) lattice are
+  `sd_region_plot()` that enumerate the attainable (mean, SD) lattice are
   wrapped in `\donttest{}`; they complete in a few seconds and pass under
   `--run-donttest`.
 * `Language` is `en-GB`. Domain terms, cited author surnames and possessive

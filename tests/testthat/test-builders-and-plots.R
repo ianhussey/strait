@@ -31,18 +31,18 @@ test_that("the plot functions return ggplot objects", {
   pts <- brimmer_multiple(
     data.frame(mean = c(3, 4, 5), sd = c(2.5, 0.2, 1.8)),
     l = 1, u = 7, n = 30, mean_digits = 1, sd_digits = 1, Z = "quasiinteger")
-  expect_s3_class(plot_sd_bounds(cv, reports = pts), "ggplot")
-  expect_s3_class(plot_sd_bounds(sd_region_data(1, 7, 30), reports = pts), "ggplot")
-  expect_s3_class(plot_sd_bounds_pomp(cv, reports = pts, reference = "parity"), "ggplot")
-  expect_s3_class(plot_sd_bounds_pomp(cv, reports = pts, reference = "sharp"), "ggplot")
+  expect_s3_class(sd_bounds_plot(cv, reports = pts), "ggplot")
+  expect_s3_class(sd_bounds_plot(sd_region_data(1, 7, 30), reports = pts), "ggplot")
+  expect_s3_class(sd_bounds_pomp_plot(cv, reports = pts, reference = "parity"), "ggplot")
+  expect_s3_class(sd_bounds_pomp_plot(cv, reports = pts, reference = "sharp"), "ggplot")
   um <- umbrella_data(n = 12, l = 1, u = 7, digits = 2)
-  expect_s3_class(plot_umbrella(um, bounds = sd_bounds_curve(l = 1, u = 7, n = 12,
+  expect_s3_class(umbrella_plot(um, bounds = sd_bounds_curve(l = 1, u = 7, n = 12,
                                                              Z = "quasiinteger")), "ggplot")
 })
 
-test_that("plot_umbrella() fills a band", {
+test_that("umbrella_plot() fills a band", {
   cv <- sd_bounds_curve(l = 1, u = 5, n = 12)
-  p <- plot_umbrella(cv, fill = "red")
+  p <- umbrella_plot(cv, fill = "red")
   expect_s3_class(p, "ggplot")
   band <- ggplot2::layer_data(p, 2)
   expect_equal(band$ymin, cv$min_sd[cv$feasible])
@@ -66,29 +66,29 @@ test_that("plot_umbrella() fills a band", {
   expect_true(all(ok$sd >= lo - h - 1e-9 & ok$sd <= hi + h + 1e-9))
   # a band from sd_region_data() works the same way
   sm <- sd_region_data(l = 1, u = 5, n = 12, rule = "mean_naive_floor")
-  band <- ggplot2::layer_data(plot_umbrella(sm), 2)
+  band <- ggplot2::layer_data(umbrella_plot(sm), 2)
   expect_equal(band$ymin, sm$min_sd)
   expect_equal(band$ymax, sm$max_sd)
   # bounds are dashed lines on top, for a band as for a lattice
-  dashed <- ggplot2::layer_data(plot_umbrella(sm, bounds = cv), 3)
+  dashed <- ggplot2::layer_data(umbrella_plot(sm, bounds = cv), 3)
   expect_true(all(dashed$linetype == "dashed"))
-  expect_error(plot_umbrella(cv, style = "tiles"), "needs a lattice")
-  expect_error(plot_umbrella(data.frame(mean = 1, max_sd = 1)), "needs `mean` and `sd`")
+  expect_error(umbrella_plot(cv, style = "tiles"), "needs a lattice")
+  expect_error(umbrella_plot(data.frame(mean = 1, max_sd = 1)), "needs `mean` and `sd`")
   lat <- sd_region_data(1, 5, 12, rule = "integer", digits = 1)
-  expect_error(plot_umbrella(lat, style = "tiles"), "full umbrella_data")
+  expect_error(umbrella_plot(lat, style = "tiles"), "full umbrella_data")
 })
 
-# Regression: plot_sd_bounds() used to infer the mean-grid spacing from
+# Regression: sd_bounds_plot() used to infer the mean-grid spacing from
 # median(diff(curve$mean)). sd_bounds_curve()'s grid is deliberately not
 # uniform - it adds every kink of the 1/(n * n_items) lattice plus a pair of
 # neighbours 1e-9 away - so once the kinks outnumber the uniform grid (about
 # n * (u - l) > 333 at the default `by`) the median fell BELOW the plain grid
 # spacing. band_polygon() then read every ordinary interval as a gap and the
 # feasible region was drawn as thousands of one-column slivers instead of one
-# band. sd_bounds_curve() now records the spacing it used and plot_sd_bounds()
+# band. sd_bounds_curve() now records the spacing it used and sd_bounds_plot()
 # reads it.
 
-# the white knock-out rings plot_sd_bounds() builds under shade = "outside"
+# the white knock-out rings sd_bounds_plot() builds under shade = "outside"
 n_rings <- function(p) {
   for (ly in p$layers) {
     if (inherits(ly$geom, "GeomPolygon") &&
@@ -108,12 +108,12 @@ test_that("a hole-free band is one ring, however dense the kink lattice", {
   # at 921 and 2001 rings respectively
   for (n in c(30, 60, 200)) {
     cv <- sd_bounds_curve(l = 1, u = 7, n = n, Z = "quasiinteger")
-    expect_equal(n_rings(plot_sd_bounds(cv)), 1L,
+    expect_equal(n_rings(sd_bounds_plot(cv)), 1L,
                  info = sprintf("l = 1, u = 7, n = %d", n))
   }
   # and on a wider scale, where the threshold is crossed sooner
   cv <- sd_bounds_curve(l = 0, u = 10, n = 80, Z = "quasiinteger")
-  expect_equal(n_rings(plot_sd_bounds(cv)), 1L)
+  expect_equal(n_rings(sd_bounds_plot(cv)), 1L)
 })
 
 test_that("genuine gaps in the band still split it into separate rings", {
@@ -122,7 +122,7 @@ test_that("genuine gaps in the band still split it into separate rings", {
   # means between the teeth as feasible, the error band_polygon() exists to
   # prevent. The fix must not over-merge.
   cv <- sd_bounds_curve(l = 1, u = 7, n = 30, Z = "integer")
-  expect_gt(n_rings(plot_sd_bounds(cv)), 50L)
+  expect_gt(n_rings(sd_bounds_plot(cv)), 50L)
 })
 
 test_that("a hand-built uniform curve still works without the attribute", {
@@ -134,5 +134,5 @@ test_that("a hand-built uniform curve still works without the attribute", {
   flat$max_sd <- bd$max_sd
   flat$feasible <- bd$feasible
   expect_null(attr(flat, "step"))
-  expect_equal(n_rings(plot_sd_bounds(flat)), 1L)
+  expect_equal(n_rings(sd_bounds_plot(flat)), 1L)
 })

@@ -27,7 +27,7 @@ alpha there are stretches near each scale limit where no composite satisfies
 the constraints at all, and \code{sd_region_data()} returns \code{NA} there. A ribbon
 simply draws nothing across such a gap. If the plot shades the \emph{feasible}
 region the gap is merely invisible; if it shades the \emph{infeasible} region — as
-\code{\link[=plot_sd_bounds]{plot_sd_bounds()}} and \code{\link[=plot_sd_region]{plot_sd_region()}} do by default — the gap becomes an
+\code{\link[=sd_bounds_plot]{sd_bounds_plot()}} and \code{\link[=sd_region_plot]{sd_region_plot()}} do by default — the gap becomes an
 unshaded bar, which asserts that any SD whatsoever is possible at those
 means. That is the one thing such a figure must not say.
 
@@ -54,5 +54,5 @@ rings <- band_polygon(d, by = 0.001)
 length(unique(rings$ring))
 }
 \seealso{
-\code{\link[=sd_region_data]{sd_region_data()}}, \code{\link[=plot_sd_region]{plot_sd_region()}}.
+\code{\link[=sd_region_data]{sd_region_data()}}, \code{\link[=sd_region_plot]{sd_region_plot()}}.
 }

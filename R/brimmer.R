@@ -334,7 +334,7 @@ brimmer_multiple <- function(data, ..., include_inputs = TRUE) {
 #'   neighbourhoods are sampled far more densely than `by` - so the spacing
 #'   cannot be recovered from the returned means, and a consumer that needs to
 #'   tell a sampling gap from a genuine gap in the band (as [band_polygon()]
-#'   and hence [plot_sd_bounds()] must) has to be told. See [plot_sd_bounds()].
+#'   and hence [sd_bounds_plot()] must) has to be told. See [sd_bounds_plot()].
 #' @examples
 #' curve <- sd_bounds_curve(l = 1, u = 7, n = 30, by = 0.1)
 #' head(curve[, c("mean", "min_sd", "max_sd")])

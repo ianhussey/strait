@@ -15,7 +15,7 @@ land <- "white"
 # The dome takes the two points to be the scale limits (the Bhatia-Davis
 # inequality), each arch the whole numbers on either side of the mean. Here for
 # n = 200 responses on a 1-5 scale.
-plot <- strait::plot_umbrella(
+plot <- strait::umbrella_plot(
   strait::sd_region_data(
     l = 1,
     u = 5,

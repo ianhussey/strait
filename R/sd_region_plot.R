@@ -148,8 +148,8 @@
 #' Feasible-region data for one constraint set
 #'
 #' The `(mean, min_sd, max_sd)` band, or the lattice of attainable reported
-#' `(mean, sd)` tuples, for a chosen constraint set. [plot_sd_region()] draws
-#' it, and [plot_umbrella()] draws the bands of the umbrella-shaped rules.
+#' `(mean, sd)` tuples, for a chosen constraint set. [sd_region_plot()] draws
+#' it, and [umbrella_plot()] draws the bands of the umbrella-shaped rules.
 #'
 #' Rules, in the order they enter the framework (`n_items > 1` puts every rule in
 #' mean-score units for a composite of that many integer items):
@@ -174,7 +174,7 @@
 #'   \item{`"mestdagh"`}{the sharp integer maximum, no floor (Mestdagh et al.
 #'     2018): `"mean"` with the count-parity correction, hence never above it.}
 #'   \item{`"quasi"`}{both bounds sharp and GRIM-free (this package's default).
-#'     This is the umbrella, which [plot_umbrella()] fills when given this
+#'     This is the umbrella, which [umbrella_plot()] fills when given this
 #'     band.}
 #'   \item{`"alpha"`}{additionally conditioning on a reported Cronbach's `alpha`;
 #'     needs `n_items >= 2`.}
@@ -359,7 +359,7 @@ sd_region_data <- function(l, u, n,
 #'   [sd_bounds_curve()] output works too.
 #' @param title Optional plot title.
 #' @param shade For a band, `"outside"` (default) shades the infeasible region
-#'   and leaves the feasible one clear, matching [plot_sd_bounds()]; `"inside"`
+#'   and leaves the feasible one clear, matching [sd_bounds_plot()]; `"inside"`
 #'   fills the band. The outside form is drawn with [band_polygon()], so a band
 #'   that is undefined at some means — the alpha rules near each limit — leaves
 #'   those means shaded rather than blank.
@@ -371,22 +371,22 @@ sd_region_data <- function(l, u, n,
 #' @return A ggplot object.
 #' @examples
 #' quasi <- sd_region_data(l = 1, u = 5, n = 7, rule = "quasi")
-#' plot_sd_region(quasi)                                   # sharp, GRIM-free
-#' plot_sd_region(sd_region_data(l = 1, u = 5, n = 7, rule = "mean"),
+#' sd_region_plot(quasi)                                   # sharp, GRIM-free
+#' sd_region_plot(sd_region_data(l = 1, u = 5, n = 7, rule = "mean"),
 #'                reference = quasi)                       # Bhatia-Davis
 #' \donttest{
 #' # digits = 1 keeps the reporting grid small: the lattice rules screen every
 #' # cell with GRIMMER
-#' plot_sd_region(sd_region_data(l = 1, u = 5, n = 7, rule = "integer",
+#' sd_region_plot(sd_region_data(l = 1, u = 5, n = 7, rule = "integer",
 #'                               digits = 1),
 #'                reference = quasi)                       # attainable tuples
-#' plot_sd_region(sd_region_data(l = 1, u = 5, n = 7, rule = "alpha",
+#' sd_region_plot(sd_region_data(l = 1, u = 5, n = 7, rule = "alpha",
 #'                               n_items = 2, alpha = 0.7),
 #'                reference = sd_region_data(l = 1, u = 5, n = 7,
 #'                                           rule = "quasi", n_items = 2))
 #' }
 #' @export
-plot_sd_region <- function(data, reference = NULL, title = NULL,
+sd_region_plot <- function(data, reference = NULL, title = NULL,
                            shade = c("outside", "inside"), expand = 0.03,
                            fill = "grey85", line_colour = "black",
                            reference_colour = "grey45",

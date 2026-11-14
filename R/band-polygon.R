@@ -35,7 +35,7 @@
 #' the constraints at all, and `sd_region_data()` returns `NA` there. A ribbon
 #' simply draws nothing across such a gap. If the plot shades the *feasible*
 #' region the gap is merely invisible; if it shades the *infeasible* region — as
-#' [plot_sd_bounds()] and [plot_sd_region()] do by default — the gap becomes an
+#' [sd_bounds_plot()] and [sd_region_plot()] do by default — the gap becomes an
 #' unshaded bar, which asserts that any SD whatsoever is possible at those
 #' means. That is the one thing such a figure must not say.
 #'
@@ -56,7 +56,7 @@
 #' @param by The mean-grid spacing of `d`, used to tell a gap from jitter.
 #' @return A long-format data frame with `mean`, `y` and a `ring` id, ready for
 #'   `geom_polygon(aes(group = ring))`, or `NULL` if no row is finite.
-#' @seealso [sd_region_data()], [plot_sd_region()].
+#' @seealso [sd_region_data()], [sd_region_plot()].
 #' @examples
 #' # a reported alpha leaves stretches near each limit where no composite exists
 #' d <- sd_region_data(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70,

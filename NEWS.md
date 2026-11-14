@@ -2,20 +2,26 @@
 
 ## Breaking changes
 
-* `plot_sd_region()` takes the output of `sd_region_data()` instead of computing
+* The plotting functions are named after the data they draw, as the data
+  builders are: `plot_sd_bounds()` is now `sd_bounds_plot()`,
+  `plot_sd_bounds_pomp()` is `sd_bounds_pomp_plot()`, `plot_sd_region()` is
+  `sd_region_plot()`, and `plot_umbrella()` is `umbrella_plot()`. Each takes
+  what it draws as its first argument, `data`.
+
+* `sd_region_plot()` takes the output of `sd_region_data()` instead of computing
   it from `l`, `u`, `n`, and `rule`. The dashed reference band, which it used to
   add by default, is now explicit: `reference = sd_region_data(l, u, n, rule =
   "quasi")`.
 
-* `plot_umbrella()` takes `data` and `bounds` instead of `umbrella` and
+* `umbrella_plot()` takes `data` and `bounds` instead of `umbrella` and
   `curve`. Given a band, with `min_sd` and `max_sd` (such as
   `sd_bounds_curve()` output), instead of a lattice, it fills the umbrella
   itself, in the new `fill` colour; `sd_region_data(rule = "mean_naive_floor")`
   gives a smooth one. `bounds` are drawn as dashed lines in `reference_colour`
   under both lattice styles.
 
-* `plot_sd_bounds()` and `plot_sd_bounds_pomp()` take the reported values as
-  `reports` instead of `points`. `plot_sd_bounds()` also takes a band from
+* `sd_bounds_plot()` and `sd_bounds_pomp_plot()` take the reported values as
+  `reports` instead of `points`. `sd_bounds_plot()` also takes a band from
   `sd_region_data()`.
 
 * Bands from `sd_region_data()`, and the input of `band_polygon()`, name their
