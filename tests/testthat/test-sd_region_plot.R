@@ -76,24 +76,24 @@ test_that("lattice rules return attainable tuples, and alpha is a strict subset"
 test_that("every rule returns a ggplot", {
   for (r in c("range", "range_n", "mean", "mean_naive_floor", "mestdagh",
               "pesant_regin", "quasi")) {
-    expect_s3_class(plot_sd_region(sd_region_data(l, u, n, rule = r)), "ggplot")
+    expect_s3_class(sd_region_plot(sd_region_data(l, u, n, rule = r)), "ggplot")
   }
   quasi2 <- sd_region_data(l, u, n, rule = "quasi", n_items = 2)
-  expect_s3_class(plot_sd_region(sd_region_data(l, u, n, rule = "alpha",
+  expect_s3_class(sd_region_plot(sd_region_data(l, u, n, rule = "alpha",
                                                 n_items = 2, alpha = 0.7),
                                  reference = quasi2), "ggplot")
-  expect_s3_class(plot_sd_region(sd_region_data(l, u, n, rule = "integer",
+  expect_s3_class(sd_region_plot(sd_region_data(l, u, n, rule = "integer",
                                                 digits = 1),
                                  reference = sd_region_data(l, u, n)), "ggplot")
-  expect_s3_class(plot_sd_region(sd_region_data(l, u, n, rule = "integer_alpha",
+  expect_s3_class(sd_region_plot(sd_region_data(l, u, n, rule = "integer_alpha",
                                                 n_items = 2, alpha = 0.7,
                                                 digits = 1)), "ggplot")
 })
 
-test_that("plot_sd_region() draws its data and the reference band", {
+test_that("sd_region_plot() draws its data and the reference band", {
   mean_band <- sd_region_data(l, u, n, rule = "mean")
   quasi <- sd_region_data(l, u, n, rule = "quasi")
-  p <- plot_sd_region(mean_band, reference = quasi, shade = "inside")
+  p <- sd_region_plot(mean_band, reference = quasi, shade = "inside")
   ribbon <- ggplot2::layer_data(p, 1)
   expect_equal(ribbon$ymax, mean_band$max_sd)
   dashed <- ggplot2::layer_data(p, 2)

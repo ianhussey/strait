@@ -65,25 +65,25 @@ test_that("the muilwijk alias is the mean rule", {
   expect_equal(round(max(a$max_sd - b$max_sd), 2), 0.64)
 })
 
-test_that("plot_umbrella() supports both styles", {
+test_that("umbrella_plot() supports both styles", {
   um <- suppressWarnings(umbrella_data(n = 12, l = 1, u = 3, digits = 1))
   cur <- sd_bounds_curve(l = 1, u = 3, n = 12, by = 0.1)
-  expect_s3_class(plot_umbrella(um), "ggplot")
-  expect_s3_class(plot_umbrella(um, style = "tiles"), "ggplot")
-  expect_s3_class(plot_umbrella(um, bounds = cur), "ggplot")
-  expect_error(plot_umbrella(um, style = "blobs"))
+  expect_s3_class(umbrella_plot(um), "ggplot")
+  expect_s3_class(umbrella_plot(um, style = "tiles"), "ggplot")
+  expect_s3_class(umbrella_plot(um, bounds = cur), "ggplot")
+  expect_error(umbrella_plot(um, style = "blobs"))
   # points style accepts an already-filtered lattice with no `consistent` column
   lat <- sd_region_data(1, 3, 12, rule = "integer", digits = 1)
   expect_false("consistent" %in% names(lat))
-  expect_s3_class(plot_umbrella(lat), "ggplot")
+  expect_s3_class(umbrella_plot(lat), "ggplot")
 })
 
-test_that("plot_sd_region() supports both shading conventions", {
+test_that("sd_region_plot() supports both shading conventions", {
   quasi <- sd_region_data(1, 5, 7, rule = "quasi")
-  expect_s3_class(plot_sd_region(quasi), "ggplot")
-  expect_s3_class(plot_sd_region(quasi, shade = "inside"), "ggplot")
+  expect_s3_class(sd_region_plot(quasi), "ggplot")
+  expect_s3_class(sd_region_plot(quasi, shade = "inside"), "ggplot")
   # the gapped rule is the one shade = "outside" must not misdraw
-  expect_s3_class(plot_sd_region(sd_region_data(0, 3, 7, rule = "alpha",
+  expect_s3_class(sd_region_plot(sd_region_data(0, 3, 7, rule = "alpha",
                                                 n_items = 2, alpha = 0.70)),
                   "ggplot")
 })

@@ -19,7 +19,7 @@
 #' reported points coloured by consistency (green/red outlined dots).
 #'
 #' `shade = "outside"` (default) shades the infeasible region and leaves the
-#' feasible one clear, matching [plot_sd_bounds_pomp()] with
+#' feasible one clear, matching [sd_bounds_pomp_plot()] with
 #' `reference = "sharp"`, so the two scales read the same way: shaded means
 #' unreachable. `shade = "inside"` fills the feasible band instead, which was
 #' the behaviour before this argument existed.
@@ -44,19 +44,19 @@
 #' @return A ggplot object.
 #' @examples
 #' curve <- sd_bounds_curve(l = 1, u = 7, n = 30, by = 0.1)
-#' plot_sd_bounds(curve, title = "Feasible SDs, 1-7 scale, n = 30")
+#' sd_bounds_plot(curve, title = "Feasible SDs, 1-7 scale, n = 30")
 #'
 #' # overlay reported values, coloured by consistency (the second is
 #' # above the ceiling, so it plots as inconsistent)
 #' reports <- data.frame(mean = c(2.97, 3.51), sd = c(2.83, 3.50))
 #' checked <- brimmer_multiple(reports, l = 1, u = 7, n = 30,
 #'                             mean_digits = 2, sd_digits = 2)
-#' plot_sd_bounds(curve, reports = checked)
+#' sd_bounds_plot(curve, reports = checked)
 #'
 #' # the previous look, with the feasible band filled
-#' plot_sd_bounds(curve, reports = checked, shade = "inside")
+#' sd_bounds_plot(curve, reports = checked, shade = "inside")
 #' @export
-plot_sd_bounds <- function(data, reports = NULL, title = NULL,
+sd_bounds_plot <- function(data, reports = NULL, title = NULL,
                            fill = "grey85", line_colour = "grey30",
                            shade = c("outside", "inside"), expand = 0.03) {
   stopifnot(requireNamespace("ggplot2", quietly = TRUE))
@@ -128,12 +128,12 @@ plot_sd_bounds <- function(data, reports = NULL, title = NULL,
 #' curve <- sd_bounds_curve(l = 1, u = 7, n = 30, by = 0.1)
 #'
 #' # "sharp" makes the feasible region exactly the unit square
-#' plot_sd_bounds_pomp(curve)
+#' sd_bounds_pomp_plot(curve)
 #'
 #' # "parity" is a linear rescaling, so the umbrella keeps its shape
-#' plot_sd_bounds_pomp(curve, reference = "parity")
+#' sd_bounds_pomp_plot(curve, reference = "parity")
 #' @export
-plot_sd_bounds_pomp <- function(data, reports = NULL,
+sd_bounds_pomp_plot <- function(data, reports = NULL,
                                 reference = c("sharp", "parity"),
                                 title = NULL) {
   stopifnot(requireNamespace("ggplot2", quietly = TRUE))
@@ -177,7 +177,7 @@ plot_sd_bounds_pomp <- function(data, reports = NULL,
 #' styles. `style = "points"` (default) greys the whole panel and draws only the
 #' consistent tuples. Nothing else is drawn, because nothing else exists: every
 #' other cell of the grid is a value that cannot be reported. This matches the
-#' convention of [plot_sd_bounds()] and [plot_sd_region()], where shading marks
+#' convention of [sd_bounds_plot()] and [sd_region_plot()], where shading marks
 #' what is ruled out, and it makes the real structure legible — the vertical
 #' striping at means an integer sum can round to.
 #'
@@ -230,22 +230,22 @@ plot_sd_bounds_pomp <- function(data, reports = NULL,
 #'   few hundred is a solid mass at twenty thousand.
 #' @param reference_colour Colour of the `bounds` lines.
 #' @param expand Padding as a proportion of the scale width, as in
-#'   [plot_sd_bounds()].
+#'   [sd_bounds_plot()].
 #' @return A ggplot object.
 #' @examples
 #' grid <- umbrella_data(n = 12, l = 1, u = 3, digits = 1)
-#' plot_umbrella(grid, title = "n = 12, 1-3 scale")
+#' umbrella_plot(grid, title = "n = 12, 1-3 scale")
 #'
 #' # the previous look, separating the two ways a tuple can be ruled out
-#' plot_umbrella(grid, style = "tiles")
+#' umbrella_plot(grid, style = "tiles")
 #'
 #' # the continuous umbrella that the tuples are drawn from
-#' plot_umbrella(sd_bounds_curve(l = 1, u = 3, n = 12))
+#' umbrella_plot(sd_bounds_curve(l = 1, u = 3, n = 12))
 #'
 #' # the same without kinks: its edges are smooth arcs
-#' plot_umbrella(sd_region_data(l = 1, u = 3, n = 12, rule = "mean_naive_floor"))
+#' umbrella_plot(sd_region_data(l = 1, u = 3, n = 12, rule = "mean_naive_floor"))
 #' @export
-plot_umbrella <- function(data, bounds = NULL, title = NULL,
+umbrella_plot <- function(data, bounds = NULL, title = NULL,
                           style = c("points", "tiles"), fill = "grey30",
                           point_colour = "black", point_size = NULL,
                           reference_colour = "grey35", expand = 0.03) {
