@@ -169,20 +169,6 @@ The single-purpose bound primitives (e.g. `sd_max_structure_s()`, `sd_min_quasi_
 
 ## TODO
 
-- **Do not submit to CRAN until `scrutiny` 0.6.2 is released. The current CRAN release returns wrong GRIMMER verdicts.** This is a correctness problem, not merely a slow one. Note the direction throughout: it is CRAN's **0.6.1** that is affected, not the GitHub main branch.
-
-    **The defect.** scrutiny 0.6.1's GRIMMER test 3 flags attainable values as inconsistent ([scrutiny#80](https://github.com/lhdjung/scrutiny/issues/80); it warns about this on every call). Because CRAN builds against 0.6.1, a CRAN release of `strait` would ship those false flags. On a 0–6 scale at *n* = 12 and one decimal place, 24 of 1497 grid cells differ between the two scrutiny versions — **all in the same direction**, 0.6.1 rejecting what 0.6.2 accepts, and all of them `in_bounds`, so GRIMMER alone is responsible. That is roughly a **2% false-flag rate** on legitimate reports. For a tool used to question published work, a false impossibility is the costly error.
-
-    **`brimmest()` proves 0.6.1 is the wrong one.** This is no longer an inference from two versions disagreeing. `brimmest()` enumerates the attainable lattice constructively, and at *n* = 12 on 1–5 it proves 16 tuples attainable that 0.6.1 rejects. One of them, mean 1.2 / SD 0.5, has the explicit witness `c(rep(1, 9), 2, 2, 2)` — twelve integers in range, exact mean 1.25 → "1.2", exact SD 0.4523 → "0.5" — which `unsum::closure_generate()` independently confirms with one solution.
-
-    **Three tests already detect it**, and none should be marked `skip_on_cran()`, since they are the only thing catching the upstream bug: `test-plot_sd_region.R:226` (forward-rounded attainable tuples must be a subset of the GRIMMER lattice), `test-plot_sd_region.R:237` (grid consistency count), and `test-brimmest.R:30` (the screen must never reject what `brimmest()` proves attainable). The last is the sharpest, being a contradiction of a constructive proof rather than a disagreement between heuristics.
-
-    **If a release cannot wait**, the defensive option is for `.grimmer_compat()` to detect the affected scrutiny and return `NA` rather than propagate a wrong `FALSE` — GRIMMER simply unavailable on old scrutiny, which is honest, leaving the bounds tests and `brimmest()` fully functional. That is a deliberate design decision, not a workaround to apply silently.
-
-    **Timing, secondarily.** GRIMMER on 0.6.1 also evaluates roughly **25x slower** than on 0.6.2 — 200 evaluations take 1.78s vs 0.31s, and `umbrella_data(n = 12, l = 1, u = 7, digits = 2)` takes 113s vs 4s. GRIM, the `round_*` helpers and `brimmest()` are unaffected. Examples have been sized against 0.6.1 and total ~3.5s, and both vignettes rebuild in ~142s, but the test suite runs ~520s there and emits ~39,000 warnings. The remaining hotspots are the `umbrella_data(n = 12, l = 1, u = 7, digits = 2)` call in `tests/testthat/test-builders-and-plots.R` and the `"integer"` / `"integer_alpha"` rules at `digits = 2` in `tests/testthat/test-plot_sd_region.R`.
-
-    **Exit condition.** `R/scrutiny-compat.R` dispatches between the two argument interfaces at run time, so both versions run. Once 0.6.2 reaches CRAN, the shim, the timing problem and the correctness problem all retire together in favour of `Imports: scrutiny (>= 0.6.2)`. Worth asking the `scrutiny` maintainer for that timeline.
-
 - **Revisit the phrasing of the inconsistency decisions.** `consistent` is a single Boolean over tests with very different epistemic status, and the wording should probably reflect that:
     - `in_scale_range` and `bounds` failures are *arithmetic proofs of impossibility* — no dataset with those summary statistics exists.
     - `grim` and `grimmer` are deferred third-party verdicts with documented false-positive cases, which is why a GRIMMER-only failure already earns a caveat in `note`.

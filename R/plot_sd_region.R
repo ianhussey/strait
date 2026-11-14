@@ -37,18 +37,18 @@
 
 .gcd2 <- function(a, b) { while (b) { t <- b; b <- a %% b; a <- t }; a }
 
-# Internal: apply one reporting-rounding convention, using scrutiny's
-# implementations so that the vocabulary matches the rest of the error-detection
-# ecosystem. "native" is base R's round(), which rounds halves to even.
+# Internal: apply one reporting-rounding convention, using roundwork's
+# implementations (formerly scrutiny's) so that the vocabulary matches the rest
+# of the error-detection ecosystem. "native" is base R's round(), which rounds halves to even.
 .round_reported <- function(x, digits, rounding) {
   switch(rounding,
-    half_up    = scrutiny::round_up(x, digits),
-    half_down  = scrutiny::round_down(x, digits),
+    half_up    = roundwork::round_up(x, digits),
+    half_down  = roundwork::round_down(x, digits),
     native     = round(x, digits),
-    ceiling    = scrutiny::round_ceiling(x, digits),
-    floor      = scrutiny::round_floor(x, digits),
-    trunc      = scrutiny::round_trunc(x, digits),
-    anti_trunc = scrutiny::round_anti_trunc(x, digits),
+    ceiling    = roundwork::round_ceiling(x, digits),
+    floor      = roundwork::round_floor(x, digits),
+    trunc      = roundwork::round_trunc(x, digits),
+    anti_trunc = roundwork::round_anti_trunc(x, digits),
     stop("unknown rounding rule: ", rounding)
   )
 }
@@ -341,7 +341,7 @@ sd_region_data <- function(l, u, n,
 #'   exactly. Band rules are unaffected: rounding a bound can turn it
 #'   anti-conservative, so bounds are always returned at full precision.
 #' @param rounding How to round when `round_digits` is given. `"half_up"`
-#'   (default) and the other named rules use scrutiny's implementations, so the
+#'   (default) and the other named rules use roundwork's implementations, so the
 #'   vocabulary matches GRIM and GRIMMER; `"native"` is base R's `round()`,
 #'   which rounds halves to even.
 #' @param reference Draw the alpha-free sharp quasi-integer band as a dashed
@@ -364,8 +364,7 @@ sd_region_data <- function(l, u, n,
 #' plot_sd_region(l = 1, u = 5, n = 7, rule = "quasi")           # sharp, GRIM-free
 #' \donttest{
 #' # digits = 1 keeps the reporting grid small: the lattice rules screen every
-#' # cell with GRIMMER, which is ~25x slower on CRAN scrutiny (0.6.1) than on
-#' # later versions
+#' # cell with GRIMMER
 #' plot_sd_region(l = 1, u = 5, n = 7, rule = "integer",         # attainable tuples
 #'                digits = 1)
 #' plot_sd_region(l = 1, u = 5, n = 7, rule = "alpha",

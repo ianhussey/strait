@@ -57,7 +57,7 @@ exactly. Band rules are unaffected: rounding a bound can turn it
 anti-conservative, so bounds are always returned at full precision.}
 
 \item{rounding}{How to round when \code{round_digits} is given. \code{"half_up"}
-(default) and the other named rules use scrutiny's implementations, so the
+(default) and the other named rules use roundwork's implementations, so the
 vocabulary matches GRIM and GRIMMER; \code{"native"} is base R's \code{round()},
 which rounds halves to even.}
 
@@ -151,8 +151,7 @@ plot_sd_region(l = 1, u = 5, n = 7, rule = "mean")            # Bhatia-Davis
 plot_sd_region(l = 1, u = 5, n = 7, rule = "quasi")           # sharp, GRIM-free
 \donttest{
 # digits = 1 keeps the reporting grid small: the lattice rules screen every
-# cell with GRIMMER, which is ~25x slower on CRAN scrutiny (0.6.1) than on
-# later versions
+# cell with GRIMMER
 plot_sd_region(l = 1, u = 5, n = 7, rule = "integer",         # attainable tuples
                digits = 1)
 plot_sd_region(l = 1, u = 5, n = 7, rule = "alpha",

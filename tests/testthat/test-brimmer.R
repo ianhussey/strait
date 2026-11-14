@@ -170,9 +170,11 @@ test_that("brim() requires a mean and brimmer() requires mean or sd", {
 test_that("feasibility is a residual, fired only when no named test explains it", {
   # a 5-item composite on [5, 10] at n = 6 with alpha = 0.90: the
   # alpha-amplified floor exceeds the alpha-conditional ceiling, so no sample
-  # exists for a reason that is neither an out-of-range mean nor a GRIM failure
+  # exists for a reason that is neither an out-of-range mean nor a GRIM failure.
+  # SD 1.1 rather than 1.0: integer sums with mean 6.0 and SD 1.0 at n = 6 fail
+  # GRIMMER's parity test (sum 36, sum of squares 221).
   r <- brimmer(l = 5, u = 10, n = 6, mean = 6.0, mean_digits = 1,
-               sd = 1.0, sd_digits = 1, Z = "integer",
+               sd = 1.1, sd_digits = 1, Z = "integer",
                scoring = "sumscored", n_items = 5, alpha = 0.90)
   expect_false(r$consistent)
   expect_identical(r$failed_tests, "feasibility")

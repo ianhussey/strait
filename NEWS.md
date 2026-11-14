@@ -1,5 +1,18 @@
 # strait 0.4.13
 
+## Breaking changes
+
+* strait requires scrutiny 1.0.0 or later, and imports roundwork, to which
+  scrutiny's rounding functions moved. The run-time switch between scrutiny's
+  old and new interfaces is gone.
+
+## Bug fixes
+
+* Under `scoring = "sumscored"`, the GRIM and GRIMMER verdicts of `sd_bounds()`,
+  `brimmer()`, and `umbrella_data()` treated each sum score as the average of
+  `n_items` items, which made them too lenient. A sum score is one whole number
+  per person.
+
 ## New features
 
 * `sd_plausibility()` gives plausibility bounds for a reported SD on a
