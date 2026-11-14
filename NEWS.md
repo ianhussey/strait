@@ -2,6 +2,27 @@
 
 ## Breaking changes
 
+* `plot_sd_region()` takes the output of `sd_region_data()` instead of computing
+  it from `l`, `u`, `n`, and `rule`. The dashed reference band, which it used to
+  add by default, is now explicit: `reference = sd_region_data(l, u, n, rule =
+  "quasi")`.
+
+* `plot_umbrella()` takes `data` and `bounds` instead of `umbrella` and
+  `curve`. Given a band, with `min_sd` and `max_sd` (such as
+  `sd_bounds_curve()` output), instead of a lattice, it fills the umbrella
+  itself, in the new `fill` colour; `sd_region_data(rule = "mean_naive_floor")`
+  gives a smooth one. `bounds` are drawn as dashed lines in `reference_colour`
+  under both lattice styles.
+
+* `plot_sd_bounds()` and `plot_sd_bounds_pomp()` take the reported values as
+  `reports` instead of `points`. `plot_sd_bounds()` also takes a band from
+  `sd_region_data()`.
+
+* Bands from `sd_region_data()`, and the input of `band_polygon()`, name their
+  columns `min_sd` and `max_sd` instead of `lo` and `hi`, as in
+  `sd_bounds_curve()` and `umbrella_data()`. `sd_region_data()` records its grid
+  spacing in a `"step"` attribute.
+
 * strait requires scrutiny 1.0.0 or later, and imports roundwork, to which
   scrutiny's rounding functions moved. The run-time switch between scrutiny's
   old and new interfaces is gone.

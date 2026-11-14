@@ -700,7 +700,7 @@ lat  <- sd_region_data(l = 0, u = 3, n = 7, rule = "attainable")
 band <- sd_region_data(l = 0, u = 3, n = 7, rule = "quasi")
 
 ggplot() +
-  geom_ribbon(data = band, aes(x = mean, ymin = lo, ymax = hi),
+  geom_ribbon(data = band, aes(x = mean, ymin = min_sd, ymax = max_sd),
               fill = "grey88") +
   geom_point(data = lat, aes(mean, sd), size = 0.7, colour = "#1d4ed8") +
   labs(x = "mean", y = "SD") +

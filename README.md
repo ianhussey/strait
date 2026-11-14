@@ -135,10 +135,10 @@ curve  <- sd_bounds_curve(l = 1, u = 7, n = 15, Z = "quasiinteger")
 points <- brimmer_multiple(
   data.frame(mean = 5.07, sd = 2.92),
   l = 1, u = 7, n = 15, mean_digits = 2, sd_digits = 2, Z = "quasiinteger")
-plot_sd_bounds(curve, points = points)
+plot_sd_bounds(curve, reports = points)
 
 # The same on a standardised POMP scale so different designs can be pooled
-plot_sd_bounds_pomp(curve, points = points, reference = "sharp")
+plot_sd_bounds_pomp(curve, reports = points, reference = "sharp")
 
 # The umbrella of all jointly GRIM + GRIMMER + bounds consistent values
 umbrella_data(n = 14, l = 1, u = 7, digits = 2) |>
@@ -157,9 +157,9 @@ umbrella_data(n = 14, l = 1, u = 7, digits = 2) |>
 | `brimmest_multiple(data, ...)` | the same certificate across a data frame, grouping rows by design so one lattice serves them all |
 | `sd_bounds_curve(l, u, n, ...)` | trace the floor and ceiling of the SD across the mean (hole-free under `"quasiinteger"`) |
 | `umbrella_data(n, l, u, ...)` | build the grid of reported (mean, SD) pairs with their consistency verdicts |
-| `plot_sd_bounds(curve, ...)` | plot the SD-bounds envelope on the native scale, with reported points |
-| `plot_sd_bounds_pomp(curve, ...)` | plot on a POMP scale (`reference = "parity"` or `"sharp"`) so designs can be pooled |
-| `plot_umbrella(umbrella, ...)` | plot the feasible (mean, SD) umbrella |
+| `plot_sd_bounds(data, ...)` | plot the SD-bounds envelope on the native scale, with reported values |
+| `plot_sd_bounds_pomp(data, ...)` | plot on a POMP scale (`reference = "parity"` or `"sharp"`) so designs can be pooled |
+| `plot_umbrella(data, ...)` | plot the feasible (mean, SD) umbrella: its reportable values, or, given a band, the continuous region they are drawn from |
 
 The single-purpose bound primitives (e.g. `sd_max_structure_s()`, `sd_min_quasi_integer()`, `unround_interval()`) are also exported.
 

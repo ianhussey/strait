@@ -5,17 +5,18 @@
 \title{Plot SD bounds on a percent-of-maximum-possible (POMP) scale}
 \usage{
 plot_sd_bounds_pomp(
-  curve,
-  points = NULL,
+  data,
+  reports = NULL,
   reference = c("sharp", "parity"),
   title = NULL
 )
 }
 \arguments{
-\item{curve}{Output of \code{\link[=sd_bounds_curve]{sd_bounds_curve()}} (used for the parity band).}
+\item{data}{Output of \code{\link[=sd_bounds_curve]{sd_bounds_curve()}} (used for the parity band).}
 
-\item{points}{Optional data.frame with \code{pomp_mean} and \code{pomp_sd_parity} /
-\code{pomp_sd_sharp} and \code{consistent} (e.g. from \code{\link[=brimmer_multiple]{brimmer_multiple()}}).}
+\item{reports}{Optional data frame of reported values, with \code{pomp_mean} and
+\code{pomp_sd_parity} / \code{pomp_sd_sharp} and \code{consistent} (e.g. from
+\code{\link[=brimmer_multiple]{brimmer_multiple()}}).}
 
 \item{reference}{\code{"sharp"} (default) or \code{"parity"}.}
 

@@ -141,7 +141,7 @@ points <- brimmer_multiple(
   data.frame(mean = c(3.0, 4.0, 2.5), sd = c(2.5, 0.2, 3.6)),
   l = 1, u = 7, n = 30, mean_digits = 1, sd_digits = 1, Z = "quasiinteger")
 
-plot_sd_bounds(curve, points = points)
+plot_sd_bounds(curve, reports = points)
 ```
 
 Shading marks what is *ruled out*, so the clear region is the answer to the
@@ -151,7 +151,7 @@ rather than a fixed number of SD units, so a 1–7 scale and a 0–100 one are
 padded alike.
 
 ```{r}
-plot_sd_bounds(curve, points = points, shade = "inside", expand = 0.06)
+plot_sd_bounds(curve, reports = points, shade = "inside", expand = 0.06)
 ```
 
 On the POMP scale, `reference = "parity"` keeps the geometry undistorted (a
@@ -159,19 +159,21 @@ linear rescaling), while `reference = "sharp"` maps the feasible region to the
 unit square so a point's height is its position within the band.
 
 ```{r}
-plot_sd_bounds_pomp(curve, points = points, reference = "sharp")
+plot_sd_bounds_pomp(curve, reports = points, reference = "sharp")
 ```
 
 ## The nested constraints, drawn
 
-Each constraint set in the framework is a `rule` that `plot_sd_region()` can
-draw on its own, which is the quickest way to see what adding a constraint buys.
+Each constraint set in the framework is a `rule` of `sd_region_data()`, and
+`plot_sd_region()` draws it on its own, optionally against another as a dashed
+reference. That is the quickest way to see what adding a constraint buys.
 
 ```{r}
-plot_sd_region(l = 1, u = 5, n = 7, rule = "muilwijk",
+quasi <- sd_region_data(l = 1, u = 5, n = 7, rule = "quasi")
+plot_sd_region(sd_region_data(l = 1, u = 5, n = 7, rule = "muilwijk"),
+               reference = quasi,
                title = "Muilwijk's ceiling, as originally stated")
-plot_sd_region(l = 1, u = 5, n = 7, rule = "quasi",
-               title = "Both bounds sharp, and GRIM-free")
+plot_sd_region(quasi, title = "Both bounds sharp, and GRIM-free")
 ```
 
 `"muilwijk"` (an alias for `"mean"`) lets the counts at each limit be
@@ -195,11 +197,10 @@ becoming blank, which would wrongly suggest any SD were possible there.
 
 ```{r}
 d <- sd_region_data(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70)
-c(means = nrow(d), undefined = sum(is.na(d$lo)),
+c(means = nrow(d), undefined = sum(is.na(d$min_sd)),
   rings = length(unique(band_polygon(d, by = 3 / 1000)$ring)))
 
-plot_sd_region(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70,
-               title = "A reported alpha: three rings, not one band")
+plot_sd_region(d, title = "A reported alpha: three rings, not one band")
 ```
 
 ## The umbrella
@@ -212,7 +213,7 @@ other cell is a value that cannot be reported.
 ```{r}
 um  <- umbrella_data(n = 14, l = 1, u = 7, digits = 2)
 cur <- sd_bounds_curve(l = 1, u = 7, n = 14, Z = "quasiinteger")
-plot_umbrella(um, curve = cur)
+plot_umbrella(um, bounds = cur)
 ```
 
 The vertical striping is the real structure: the means an integer sum can round
@@ -221,7 +222,19 @@ bounds rule out from what GRIMMER additionally rules out — useful for expositi
 though it spends most of its ink on impossible values.
 
 ```{r}
-plot_umbrella(um, curve = cur, style = "tiles")
+plot_umbrella(um, bounds = cur, style = "tiles")
+```
+
+Given a band instead, `plot_umbrella()` draws the umbrella itself: the
+continuous region that the reportable values are drawn from. The sharp band of
+`sd_bounds_curve()` has a kink at every multiple of `1 / n`; the band of
+`rule = "mean_naive_floor"` is smooth, since both of its edges are variances of
+two-point distributions (the Bhatia-Davis ceiling, and an arch between each
+pair of neighbouring whole numbers).
+
+```{r}
+plot_umbrella(cur)
+plot_umbrella(sd_region_data(l = 1, u = 7, n = 14, rule = "mean_naive_floor"))
 ```
 
 ## Settling what survives

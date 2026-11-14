@@ -31,12 +31,51 @@ test_that("the plot functions return ggplot objects", {
   pts <- brimmer_multiple(
     data.frame(mean = c(3, 4, 5), sd = c(2.5, 0.2, 1.8)),
     l = 1, u = 7, n = 30, mean_digits = 1, sd_digits = 1, Z = "quasiinteger")
-  expect_s3_class(plot_sd_bounds(cv, points = pts), "ggplot")
-  expect_s3_class(plot_sd_bounds_pomp(cv, points = pts, reference = "parity"), "ggplot")
-  expect_s3_class(plot_sd_bounds_pomp(cv, points = pts, reference = "sharp"), "ggplot")
+  expect_s3_class(plot_sd_bounds(cv, reports = pts), "ggplot")
+  expect_s3_class(plot_sd_bounds(sd_region_data(1, 7, 30), reports = pts), "ggplot")
+  expect_s3_class(plot_sd_bounds_pomp(cv, reports = pts, reference = "parity"), "ggplot")
+  expect_s3_class(plot_sd_bounds_pomp(cv, reports = pts, reference = "sharp"), "ggplot")
   um <- umbrella_data(n = 12, l = 1, u = 7, digits = 2)
-  expect_s3_class(plot_umbrella(um, curve = sd_bounds_curve(l = 1, u = 7, n = 12,
-                                                            Z = "quasiinteger")), "ggplot")
+  expect_s3_class(plot_umbrella(um, bounds = sd_bounds_curve(l = 1, u = 7, n = 12,
+                                                             Z = "quasiinteger")), "ggplot")
+})
+
+test_that("plot_umbrella() fills a band", {
+  cv <- sd_bounds_curve(l = 1, u = 5, n = 12)
+  p <- plot_umbrella(cv, fill = "red")
+  expect_s3_class(p, "ggplot")
+  band <- ggplot2::layer_data(p, 2)
+  expect_equal(band$ymin, cv$min_sd[cv$feasible])
+  expect_equal(band$ymax, cv$max_sd[cv$feasible])
+  expect_equal(unique(band$fill), "red")
+  # the region is the outline of the points: every consistent tuple lies in it
+  # once rounding is undone. A reported mean stands for the interval of half a
+  # step around it (1.08 at n = 12 is 13 / 12, where the SD reaches 0.2887 but
+  # is at most 0.277 at 1.08 itself), and so does a reported SD.
+  um <- umbrella_data(n = 12, l = 1, u = 5, digits = 2)
+  ok <- um[um$consistent, ]
+  cv <- cv[cv$feasible, ]
+  h <- 0.005
+  around <- function(m, col, f) vapply(m, function(x) {
+    inside <- cv$mean >= x - h & cv$mean <= x + h
+    f(c(stats::approx(cv$mean, cv[[col]], c(x - h, x + h), rule = 2)$y,
+        cv[[col]][inside]))
+  }, numeric(1))
+  lo <- around(ok$mean, "min_sd", min)
+  hi <- around(ok$mean, "max_sd", max)
+  expect_true(all(ok$sd >= lo - h - 1e-9 & ok$sd <= hi + h + 1e-9))
+  # a band from sd_region_data() works the same way
+  sm <- sd_region_data(l = 1, u = 5, n = 12, rule = "mean_naive_floor")
+  band <- ggplot2::layer_data(plot_umbrella(sm), 2)
+  expect_equal(band$ymin, sm$min_sd)
+  expect_equal(band$ymax, sm$max_sd)
+  # bounds are dashed lines on top, for a band as for a lattice
+  dashed <- ggplot2::layer_data(plot_umbrella(sm, bounds = cv), 3)
+  expect_true(all(dashed$linetype == "dashed"))
+  expect_error(plot_umbrella(cv, style = "tiles"), "needs a lattice")
+  expect_error(plot_umbrella(data.frame(mean = 1, max_sd = 1)), "needs `mean` and `sd`")
+  lat <- sd_region_data(1, 5, 12, rule = "integer", digits = 1)
+  expect_error(plot_umbrella(lat, style = "tiles"), "full umbrella_data")
 })
 
 # Regression: plot_sd_bounds() used to infer the mean-grid spacing from

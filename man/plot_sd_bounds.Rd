@@ -5,8 +5,8 @@
 \title{Plot SD bounds on the native scale}
 \usage{
 plot_sd_bounds(
-  curve,
-  points = NULL,
+  data,
+  reports = NULL,
   title = NULL,
   fill = "grey85",
   line_colour = "grey30",
@@ -15,13 +15,13 @@ plot_sd_bounds(
 )
 }
 \arguments{
-\item{curve}{Output of \code{\link[=sd_bounds_curve]{sd_bounds_curve()}}. Its \code{"step"} attribute, when
-present, is the mean-grid spacing used to tell a sampling gap from a
-genuine one under \code{shade = "outside"}; a curve built by hand, without that
-attribute, should be on a uniform grid, from which the spacing is inferred.}
+\item{data}{Output of \code{\link[=sd_bounds_curve]{sd_bounds_curve()}}, or a band from
+\code{\link[=sd_region_data]{sd_region_data()}}. Its \code{"step"} attribute, when present, is the mean-grid
+spacing used to tell a sampling gap from a genuine one under \code{shade = "outside"}; a band built by hand, without that attribute, should be on a
+uniform grid, from which the spacing is inferred.}
 
-\item{points}{Optional data.frame with \code{mean}, \code{sd}, and (optionally)
-\code{consistent}; e.g. the output of \code{\link[=brimmer_multiple]{brimmer_multiple()}}.}
+\item{reports}{Optional data frame of reported values, with \code{mean}, \code{sd},
+and (optionally) \code{consistent}; e.g. the output of \code{\link[=brimmer_multiple]{brimmer_multiple()}}.}
 
 \item{title}{Optional plot title.}
 
@@ -34,7 +34,7 @@ by \code{shade = "inside"}; the infeasible shading has its own fixed grey.}
 \item{expand}{Padding around the plotted region, as a proportion of the
 scale width \code{u - l} rather than a fixed number of SD units, so that the
 margin looks the same on a 1-5 scale and a 0-100 one. Applied to both
-axes. The limits always stretch to include \code{points}, so an out-of-bounds
+axes. The limits always stretch to include \code{reports}, so an out-of-bounds
 report is never clipped out of view.}
 }
 \value{
@@ -60,8 +60,8 @@ plot_sd_bounds(curve, title = "Feasible SDs, 1-7 scale, n = 30")
 reports <- data.frame(mean = c(2.97, 3.51), sd = c(2.83, 3.50))
 checked <- brimmer_multiple(reports, l = 1, u = 7, n = 30,
                             mean_digits = 2, sd_digits = 2)
-plot_sd_bounds(curve, points = checked)
+plot_sd_bounds(curve, reports = checked)
 
 # the previous look, with the feasible band filled
-plot_sd_bounds(curve, points = checked, shade = "inside")
+plot_sd_bounds(curve, reports = checked, shade = "inside")
 }
