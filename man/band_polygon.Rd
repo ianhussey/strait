@@ -7,7 +7,7 @@
 band_polygon(d, by)
 }
 \arguments{
-\item{d}{A data frame with \code{mean}, \code{lo} and \code{hi}, e.g. from
+\item{d}{A data frame with \code{mean}, \code{min_sd} and \code{max_sd}, e.g. from
 \code{\link[=sd_region_data]{sd_region_data()}} under a band rule.}
 
 \item{by}{The mean-grid spacing of \code{d}, used to tell a gap from jitter.}
@@ -17,7 +17,7 @@ A long-format data frame with \code{mean}, \code{y} and a \code{ring} id, ready 
 \code{geom_polygon(aes(group = ring))}, or \code{NULL} if no row is finite.
 }
 \description{
-Converts a \verb{(mean, lo, hi)} band into one or more closed polygons, so that a
+Converts a \verb{(mean, min_sd, max_sd)} band into one or more closed polygons, so that a
 region can be drawn as a ring rather than as the area between two curves.
 }
 \details{
@@ -47,7 +47,7 @@ point should be shown is the caller's decision.
 # a reported alpha leaves stretches near each limit where no composite exists
 d <- sd_region_data(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70,
                     by = 0.001)
-sum(is.na(d$lo))
+sum(is.na(d$min_sd))
 
 # the feasible region is therefore three rings, not one band
 rings <- band_polygon(d, by = 0.001)

@@ -2,24 +2,12 @@
 % Please edit documentation in R/plot_sd_region.R
 \name{plot_sd_region}
 \alias{plot_sd_region}
-\title{Plot the feasible SD region for a chosen constraint set}
+\title{Plot the feasible SD region for a constraint set}
 \usage{
 plot_sd_region(
-  l,
-  u,
-  n,
-  rule = c("quasi", "range", "range_n", "mean", "muilwijk", "mean_naive_floor",
-    "mestdagh", "pesant_regin", "alpha", "integer", "integer_alpha", "attainable",
-    "attainable_alpha"),
-  scoring = NULL,
-  n_items = 1,
-  alpha = NULL,
-  digits = 2,
-  round_digits = NULL,
-  rounding = "half_up",
-  reference = TRUE,
+  data,
+  reference = NULL,
   title = NULL,
-  by = NULL,
   shade = c("outside", "inside"),
   expand = 0.03,
   fill = "grey85",
@@ -30,54 +18,25 @@ plot_sd_region(
 )
 }
 \arguments{
-\item{l, u}{Numeric scalars, the scale limits (mean-score units when
-\code{n_items > 1} and \code{scoring} is left at its default).}
+\item{data}{Output of \code{\link[=sd_region_data]{sd_region_data()}}: a band, with \code{mean}, \code{min_sd}, and
+\code{max_sd}, or a lattice, with \code{mean} and \code{sd}.}
 
-\item{n}{Integer scalar, sample size.}
-
-\item{rule}{Which constraint set to draw; see Details.}
-
-\item{scoring}{One of \code{"singleitem"}, \code{"sumscored"}, \code{"meanscored"}, as in
-\code{\link[=sd_bounds]{sd_bounds()}}. Defaults to \code{"meanscored"} when \code{n_items > 1} and
-\code{"singleitem"} otherwise. Under \code{"sumscored"}, \code{l} and \code{u} are the
-composite's limits and the reported values live on the unit grid, so
-\code{n_items} enters only as Cronbach's alpha's \code{k}.}
-
-\item{n_items}{Integer, number of items in the composite (default 1).}
-
-\item{alpha}{Reported Cronbach's alpha; required by the alpha rules.}
-
-\item{digits}{Reported decimal places, used by the rounded lattice rules
-(default 2); ignored by the exact \code{"attainable"} rules.}
-
-\item{round_digits}{Optionally round the returned \verb{(mean, sd)} lattice to
-this many decimal places, collapsing pairs that round together. \code{NULL}
-(default) returns them unrounded, which for the \code{"attainable"} rules means
-exactly. Band rules are unaffected: rounding a bound can turn it
-anti-conservative, so bounds are always returned at full precision.}
-
-\item{rounding}{How to round when \code{round_digits} is given. \code{"half_up"}
-(default) and the other named rules use roundwork's implementations, so the
-vocabulary matches GRIM and GRIMMER; \code{"native"} is base R's \code{round()},
-which rounds halves to even.}
-
-\item{reference}{Draw the alpha-free sharp quasi-integer band as a dashed
-reference (default \code{TRUE}; skipped for \code{rule = "quasi"}, which is that band).}
+\item{reference}{Optional band to draw as a dashed reference, such as
+\code{sd_region_data(l, u, n, rule = "quasi")} for the same design.
+\code{\link[=sd_bounds_curve]{sd_bounds_curve()}} output works too.}
 
 \item{title}{Optional plot title.}
 
-\item{by}{Optional mean-grid spacing (default \code{(u - l) / 1000}); ignored by
-the lattice rules, which step by \code{10^-digits}.}
-
-\item{shade}{\code{"outside"} (default) shades the infeasible region and leaves
-the feasible one clear, matching \code{\link[=plot_sd_bounds]{plot_sd_bounds()}}; \code{"inside"} fills the
-band. The outside form is drawn with \code{\link[=band_polygon]{band_polygon()}}, so a rule whose
-band is undefined at some means — the alpha rules near each limit — leaves
+\item{shade}{For a band, \code{"outside"} (default) shades the infeasible region
+and leaves the feasible one clear, matching \code{\link[=plot_sd_bounds]{plot_sd_bounds()}}; \code{"inside"}
+fills the band. The outside form is drawn with \code{\link[=band_polygon]{band_polygon()}}, so a band
+that is undefined at some means — the alpha rules near each limit — leaves
 those means shaded rather than blank.}
 
 \item{expand}{Padding around the plotted region, as a proportion of the
-scale width \code{u - l} rather than a fixed number of SD units, so the margin
-looks the same on a 1-5 scale and a 0-100 one. Applied to both axes.}
+range of the means (the scale width) rather than a fixed number of SD
+units, so the margin looks the same on a 1-5 scale and a 0-100 one.
+Applied to both axes.}
 
 \item{fill, line_colour, reference_colour, point_colour, point_size}{Appearance.}
 }
@@ -85,76 +44,27 @@ looks the same on a 1-5 scale and a 0-100 one. Applied to both axes.}
 A ggplot object.
 }
 \description{
-Draws the region of sample SDs a constraint set asserts to be possible, as a
-function of the mean, with the sharp quasi-integer band optionally repeated as
-a dashed reference. This reproduces the panels of the nested-constraints
-figure in the STRAIT article from a single entry point.
-}
-\details{
-Rules, in the order they enter the framework (\code{n_items > 1} puts every rule in
-mean-score units for a composite of that many integer items):
-
-\describe{
-\item{\code{"range"}}{\code{(u - l)/sqrt(2)}, no floor; ignores \code{n} and the mean
-(Popoviciu 1935, range only).}
-\item{\code{"range_n"}}{the parity ceiling, no floor (Popoviciu, as restored by
-Petocz 2005).}
-\item{\code{"mean"}, \code{"muilwijk"}}{Muilwijk's mean-conditional ceiling as
-originally stated, over a floor of zero (Muilwijk 1966; Bhatia-Davis
-2000). A valid ceiling at every mean, but attained only where the counts
-at each limit come out whole, so it is conservative elsewhere: see
-\code{"mestdagh"} for the same constraint set with the count-parity
-correction applied, and \code{\link[=sd_delta]{sd_delta()}} for the correction itself. At
-\code{n = 7} on a 1-7 scale the two differ by up to 0.64 SD units. The two
-names are aliases.}
-\item{\code{"mean_naive_floor"}}{that arch plus the naive Bernoulli floor
-(Fuenderich et al. 2025).}
-\item{\code{"pesant_regin"}}{integer minimum with a loose (parity) ceiling
-(Pesant and Regin 2005).}
-\item{\code{"mestdagh"}}{the sharp integer maximum, no floor (Mestdagh et al.
-2018): \code{"mean"} with the count-parity correction, hence never above it.}
-\item{\code{"quasi"}}{both bounds sharp and GRIM-free (this package's default).}
-\item{\code{"alpha"}}{additionally conditioning on a reported Cronbach's \code{alpha};
-needs \code{n_items >= 2}.}
-\item{\code{"integer"}}{strictly integer data: the lattice of reported
-\verb{(mean, sd)} tuples passing GRIM, GRIMMER and the bounds — that is,
-exactly what \code{\link[=brimmer]{brimmer()}} admits. Built via \code{\link[=umbrella_data]{umbrella_data()}}, so the
-pairs are rounded to \code{digits}. Drawn as points, because no band is
-defined at means and SDs integer data cannot produce.}
-\item{\code{"integer_alpha"}}{that lattice, additionally inside the
-alpha-conditional bounds.}
-\item{\code{"attainable"}}{the EXACT attainable \verb{(mean, sd)} tuples of strictly
-integer data, with no reporting grid and so no \code{digits}. Unlike
-\code{"integer"} this shows the true interior holes, which rounding to a
-reporting grid smears shut; it is enumerated by dynamic programming and
-errors if the lattice is too large.}
-\item{\code{"attainable_alpha"}}{those exact tuples, additionally inside the
-alpha-conditional bounds.}
-}
-
-The two lattice rules are easy to confuse and the difference is not small.
-GRIMMER is necessary but not sufficient for an integer sample to exist, so
-the attainable set is a strict subset of the GRIMMER-consistent one. At
-\verb{l = 1, u = 5, n = 10, digits = 2} there are 491 GRIMMER-consistent reported
-pairs against 447 attainable ones rounded to the same grid: 9 percent pass
-\code{"integer"} without being attainable, and none go the other way. At
-\verb{l = 0, u = 6, n = 23} with two items the gap is 23,738 against 8,634. Use
-\code{\link[=brimmest]{brimmest()}} to certify a single tuple rather than rounding a lattice to
-compare against.
-
-Note also that \code{"integer"} returns pairs already rounded to \code{digits}, so
-testing membership means rounding the candidate first: an exact sample SD of
-0.5270463 matches nothing until it becomes 0.53.
+Draws what one constraint set from \code{\link[=sd_region_data]{sd_region_data()}} asserts to be
+possible: a band of sample SDs as a function of the mean, or a lattice of
+attainable \verb{(mean, sd)} tuples. A second band can be drawn as a dashed
+reference, such as the sharp \code{"quasi"} band that the other rules are judged
+against. Together these reproduce the panels of the nested-constraints
+figure in the STRAIT article.
 }
 \examples{
-plot_sd_region(l = 1, u = 5, n = 7, rule = "mean")            # Bhatia-Davis
-plot_sd_region(l = 1, u = 5, n = 7, rule = "quasi")           # sharp, GRIM-free
+quasi <- sd_region_data(l = 1, u = 5, n = 7, rule = "quasi")
+plot_sd_region(quasi)                                   # sharp, GRIM-free
+plot_sd_region(sd_region_data(l = 1, u = 5, n = 7, rule = "mean"),
+               reference = quasi)                       # Bhatia-Davis
 \donttest{
 # digits = 1 keeps the reporting grid small: the lattice rules screen every
 # cell with GRIMMER
-plot_sd_region(l = 1, u = 5, n = 7, rule = "integer",         # attainable tuples
-               digits = 1)
-plot_sd_region(l = 1, u = 5, n = 7, rule = "alpha",
-               n_items = 2, alpha = 0.7)
+plot_sd_region(sd_region_data(l = 1, u = 5, n = 7, rule = "integer",
+                              digits = 1),
+               reference = quasi)                       # attainable tuples
+plot_sd_region(sd_region_data(l = 1, u = 5, n = 7, rule = "alpha",
+                              n_items = 2, alpha = 0.7),
+               reference = sd_region_data(l = 1, u = 5, n = 7,
+                                          rule = "quasi", n_items = 2))
 }
 }

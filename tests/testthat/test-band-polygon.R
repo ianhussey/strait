@@ -4,7 +4,7 @@ test_that("band_polygon() splits a gapped band into separate rings", {
   d <- sd_region_data(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70,
                       by = 0.001)
   expect_equal(nrow(d), 3001L)
-  expect_equal(sum(is.na(d$lo)), 174L)
+  expect_equal(sum(is.na(d$min_sd)), 174L)
 
   rings <- band_polygon(d, by = 0.001)
   expect_equal(length(unique(rings$ring)), 3L)
@@ -26,9 +26,9 @@ test_that("band_polygon() leaves an ungapped band as one ring", {
 })
 
 test_that("band_polygon() handles degenerate input", {
-  expect_null(band_polygon(data.frame(mean = 1, lo = NA, hi = NA), by = 0.1))
-  expect_null(band_polygon(data.frame(mean = numeric(0), lo = numeric(0),
-                                      hi = numeric(0)), by = 0.1))
+  expect_null(band_polygon(data.frame(mean = 1, min_sd = NA, max_sd = NA), by = 0.1))
+  expect_null(band_polygon(data.frame(mean = numeric(0), min_sd = numeric(0),
+                                      max_sd = numeric(0)), by = 0.1))
 })
 
 test_that("sd_delta() is exactly the gap between the two ceilings", {
@@ -61,8 +61,8 @@ test_that("the muilwijk alias is the mean rule", {
   # and it is genuinely the uncorrected form: mestdagh never exceeds it
   a <- sd_region_data(1, 7, 7, rule = "mean")
   b <- sd_region_data(1, 7, 7, rule = "mestdagh")
-  expect_true(all(b$hi <= a$hi + 1e-9))
-  expect_equal(round(max(a$hi - b$hi), 2), 0.64)
+  expect_true(all(b$max_sd <= a$max_sd + 1e-9))
+  expect_equal(round(max(a$max_sd - b$max_sd), 2), 0.64)
 })
 
 test_that("plot_umbrella() supports both styles", {
@@ -70,7 +70,7 @@ test_that("plot_umbrella() supports both styles", {
   cur <- sd_bounds_curve(l = 1, u = 3, n = 12, by = 0.1)
   expect_s3_class(plot_umbrella(um), "ggplot")
   expect_s3_class(plot_umbrella(um, style = "tiles"), "ggplot")
-  expect_s3_class(plot_umbrella(um, curve = cur), "ggplot")
+  expect_s3_class(plot_umbrella(um, bounds = cur), "ggplot")
   expect_error(plot_umbrella(um, style = "blobs"))
   # points style accepts an already-filtered lattice with no `consistent` column
   lat <- sd_region_data(1, 3, 12, rule = "integer", digits = 1)
@@ -79,10 +79,11 @@ test_that("plot_umbrella() supports both styles", {
 })
 
 test_that("plot_sd_region() supports both shading conventions", {
-  expect_s3_class(plot_sd_region(1, 5, 7, rule = "quasi"), "ggplot")
-  expect_s3_class(plot_sd_region(1, 5, 7, rule = "quasi", shade = "inside"),
-                  "ggplot")
+  quasi <- sd_region_data(1, 5, 7, rule = "quasi")
+  expect_s3_class(plot_sd_region(quasi), "ggplot")
+  expect_s3_class(plot_sd_region(quasi, shade = "inside"), "ggplot")
   # the gapped rule is the one shade = "outside" must not misdraw
-  expect_s3_class(plot_sd_region(0, 3, 7, rule = "alpha", n_items = 2,
-                                 alpha = 0.70), "ggplot")
+  expect_s3_class(plot_sd_region(sd_region_data(0, 3, 7, rule = "alpha",
+                                                n_items = 2, alpha = 0.70)),
+                  "ggplot")
 })

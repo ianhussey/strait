@@ -1,9 +1,32 @@
 # Geometry helpers shared by the plotting layer: feasible regions as closed
 # rings, and the count-parity correction factor as a quantity in its own right.
 
+# Internal: the rows of a band (sd_bounds_curve() or sd_region_data() output)
+# where some SD is possible.
+.band_rows <- function(d) {
+  ok <- is.finite(d$min_sd) & is.finite(d$max_sd)
+  if (!is.null(d$feasible)) ok <- ok & d$feasible
+  d[ok, , drop = FALSE]
+}
+
+# Internal: the mean-grid spacing of a band, which band_polygon() needs to tell
+# a sampling gap from a genuine one. sd_bounds_curve() and sd_region_data()
+# record it, because a grid can be non-uniform: sd_bounds_curve() adds each
+# kink of the 1/(n * n_items) lattice plus a pair of neighbours 1e-9 away.
+# Guessing it from the means fails once the kinks outnumber the uniform grid
+# (about n * (u - l) > 333 at the default `by`): the median then falls BELOW
+# the plain spacing, every ordinary interval reads as a gap, and the band is
+# drawn as thousands of slivers. The median remains the fallback for a band
+# built by hand, whose uniform grid makes it right.
+.band_step <- function(d) {
+  step <- attr(d, "step")
+  if (!is.null(step)) step
+  else if (nrow(d) > 1) stats::median(diff(d$mean)) else 1
+}
+
 #' A feasible region as closed rings
 #'
-#' Converts a `(mean, lo, hi)` band into one or more closed polygons, so that a
+#' Converts a `(mean, min_sd, max_sd)` band into one or more closed polygons, so that a
 #' region can be drawn as a ring rather than as the area between two curves.
 #'
 #' Drawing a band with `ggplot2::geom_ribbon()` assumes the band exists at every
@@ -28,7 +51,7 @@
 #' these are left in rather than dropped, since whether an isolated feasible
 #' point should be shown is the caller's decision.
 #'
-#' @param d A data frame with `mean`, `lo` and `hi`, e.g. from
+#' @param d A data frame with `mean`, `min_sd` and `max_sd`, e.g. from
 #'   [sd_region_data()] under a band rule.
 #' @param by The mean-grid spacing of `d`, used to tell a gap from jitter.
 #' @return A long-format data frame with `mean`, `y` and a `ring` id, ready for
@@ -38,21 +61,21 @@
 #' # a reported alpha leaves stretches near each limit where no composite exists
 #' d <- sd_region_data(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70,
 #'                     by = 0.001)
-#' sum(is.na(d$lo))
+#' sum(is.na(d$min_sd))
 #'
 #' # the feasible region is therefore three rings, not one band
 #' rings <- band_polygon(d, by = 0.001)
 #' length(unique(rings$ring))
 #' @export
 band_polygon <- function(d, by) {
-  d <- d[is.finite(d$lo) & is.finite(d$hi), , drop = FALSE]
+  d <- d[is.finite(d$min_sd) & is.finite(d$max_sd), , drop = FALSE]
   if (!nrow(d)) return(NULL)
   d <- d[order(d$mean), , drop = FALSE]
   run <- c(0, cumsum(diff(d$mean) > by * 1.5))
   out <- do.call(rbind, lapply(unique(run), function(k) {
     g <- d[run == k, , drop = FALSE]
     data.frame(mean = c(g$mean, rev(g$mean), g$mean[1]),
-               y    = c(g$hi,   rev(g$lo),   g$hi[1]),
+               y    = c(g$max_sd,   rev(g$min_sd),   g$max_sd[1]),
                ring = k)
   }))
   rownames(out) <- NULL

@@ -2,13 +2,14 @@
 % Please edit documentation in R/plots.R
 \name{plot_umbrella}
 \alias{plot_umbrella}
-\title{Plot the umbrella grid}
+\title{Plot the umbrella}
 \usage{
 plot_umbrella(
-  umbrella,
-  curve = NULL,
+  data,
+  bounds = NULL,
   title = NULL,
   style = c("points", "tiles"),
+  fill = "grey30",
   point_colour = "black",
   point_size = NULL,
   reference_colour = "grey35",
@@ -16,21 +17,25 @@ plot_umbrella(
 )
 }
 \arguments{
-\item{umbrella}{Output of \code{\link[=umbrella_data]{umbrella_data()}}, or an already-filtered lattice
-from \code{sd_region_data(rule = "integer")} — anything with \code{mean} and \code{sd},
-filtered by \code{consistent} when that column is present.}
+\item{data}{What to draw: a lattice with \code{mean} and \code{sd}, such as
+\code{\link[=umbrella_data]{umbrella_data()}} output or \code{sd_region_data(rule = "integer")}, filtered by
+\code{consistent} when that column is present; or a band with \code{mean}, \code{min_sd},
+and \code{max_sd}, such as \code{\link[=sd_bounds_curve]{sd_bounds_curve()}} output.}
 
-\item{curve}{Optional \code{\link[=sd_bounds_curve]{sd_bounds_curve()}} output to overlay as bound lines.}
+\item{bounds}{Optional band, such as \code{\link[=sd_bounds_curve]{sd_bounds_curve()}} output, drawn as
+dashed lines on top of \code{data}.}
 
 \item{title}{Optional plot title.}
 
-\item{style}{\code{"points"} (default) or \code{"tiles"}; see Details.}
+\item{style}{For a lattice, \code{"points"} (default) or \code{"tiles"}; see Details.}
+
+\item{fill}{Fill colour of a band.}
 
 \item{point_colour, point_size}{Point appearance. \code{point_size} defaults to a
 value chosen from the number of points, since a size that reads well for a
 few hundred is a solid mass at twenty thousand.}
 
-\item{reference_colour}{Colour of the overlaid bound curves.}
+\item{reference_colour}{Colour of the \code{bounds} lines.}
 
 \item{expand}{Padding as a proportion of the scale width, as in
 \code{\link[=plot_sd_bounds]{plot_sd_bounds()}}.}
@@ -39,11 +44,12 @@ few hundred is a solid mass at twenty thousand.}
 A ggplot object.
 }
 \description{
-Renders the reportable \verb{(mean, sd)} tuples of a design, in either of two
-styles. Optionally overlays the bound curves from \code{\link[=sd_bounds_curve]{sd_bounds_curve()}}.
+Draws the umbrella of a design: its reportable \verb{(mean, sd)} tuples, or the
+continuous region they are drawn from. What is drawn follows from \code{data}.
 }
 \details{
-\code{style = "points"} (default) greys the whole panel and draws only the
+A lattice of tuples, such as \code{\link[=umbrella_data]{umbrella_data()}} output, is drawn in one of two
+styles. \code{style = "points"} (default) greys the whole panel and draws only the
 consistent tuples. Nothing else is drawn, because nothing else exists: every
 other cell of the grid is a value that cannot be reported. This matches the
 convention of \code{\link[=plot_sd_bounds]{plot_sd_bounds()}} and \code{\link[=plot_sd_region]{plot_sd_region()}}, where shading marks
@@ -51,14 +57,34 @@ what is ruled out, and it makes the real structure legible — the vertical
 striping at means an integer sum can round to.
 
 \code{style = "tiles"} draws every cell of the reporting grid, coloured as
-consistent, GRIMMER-inconsistent, or out of bounds. That is useful for
-methods exposition, since it separates what the bounds rule out from what
-GRIMMER additionally rules out, but it inverts the emphasis: at
-\code{n = 14} on a 1-7 scale at two decimal places it spends two thirds of its ink, in the most
-saturated colour, on impossible tuples, and GRIMMER's verdict alternating
-between adjacent SDs produces interference banding that obscures the striping.
+consistent, GRIMMER-inconsistent, or out of bounds, so it needs the full
+\code{\link[=umbrella_data]{umbrella_data()}} output. That is useful for methods exposition, since it
+separates what the bounds rule out from what GRIMMER additionally rules out,
+but it inverts the emphasis: at \code{n = 14} on a 1-7 scale at two decimal places
+it spends two thirds of its ink, in the most saturated colour, on impossible
+tuples, and GRIMMER's verdict alternating between adjacent SDs produces
+interference banding that obscures the striping.
 
-Note what the points represent. The consistent set is the GRIM- and
+A band, with \code{min_sd} and \code{max_sd} instead of \code{sd}, is the umbrella itself,
+filled in \code{fill}. \code{\link[=sd_bounds_curve]{sd_bounds_curve()}} gives the sharp one: under its default
+\code{Z = "quasiinteger"}, every \verb{(mean, SD)} of \code{n} values in \verb{[l, u]} that are
+whole numbers, except possibly one, which lets the mean take any value. The
+tuples of a lattice are this region rounded to the reporting grid and
+thinned by GRIM and GRIMMER, so the region is their outline, free of the
+grid. Its edges are smooth between kinks at multiples of \code{1 / n}, which
+\code{sd_bounds_curve()} evaluates exactly.
+
+For an umbrella without the kinks, use the band of
+\code{sd_region_data(l, u, n, rule = "mean_naive_floor")}. Both of its edges are
+variances of two-point distributions, \code{(mean - a) * (b - mean)} times
+\code{n / (n - 1)}: the ceiling takes \code{a} and \code{b} to be the scale limits (the
+Bhatia-Davis inequality), and each arch of the floor takes them to be the
+whole numbers on either side of the mean. They meet the sharp bounds
+wherever these can be attained: the floor at every mean that integer data
+can have, the ceiling at every multiple of \code{(u - l) / n} above \code{l}. For data
+of only 0s and 1s, the two coincide in DEBIT's curve.
+
+Note what the tuples represent. The consistent set is the GRIM- and
 GRIMMER-consistent one, which is what \code{\link[=brimmer]{brimmer()}} applies. It is strictly
 larger than the set of attainable tuples, so an umbrella plot shows what the
 test admits rather than what exists; use \code{\link[=brimmest]{brimmest()}} to certify a tuple.
@@ -71,4 +97,10 @@ plot_umbrella(grid, title = "n = 12, 1-3 scale")
 
 # the previous look, separating the two ways a tuple can be ruled out
 plot_umbrella(grid, style = "tiles")
+
+# the continuous umbrella that the tuples are drawn from
+plot_umbrella(sd_bounds_curve(l = 1, u = 3, n = 12))
+
+# the same without kinks: its edges are smooth arcs
+plot_umbrella(sd_region_data(l = 1, u = 3, n = 12, rule = "mean_naive_floor"))
 }

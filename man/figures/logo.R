@@ -15,18 +15,18 @@ land <- "white"
 # The dome takes the two points to be the scale limits (the Bhatia-Davis
 # inequality), each arch the whole numbers on either side of the mean. Here for
 # n = 200 responses on a 1-5 scale.
-plot <- strait::plot_sd_region(
-  l = 1,
-  u = 5,
-  n = 200,
-  rule = "mean_naive_floor",
-  by = 0.0005,
-  reference = FALSE,
-  shade = "inside",
+plot <- strait::plot_umbrella(
+  strait::sd_region_data(
+    l = 1,
+    u = 5,
+    n = 200,
+    rule = "mean_naive_floor",
+    by = 0.0005
+  ),
   fill = land,
-  line_colour = NA, # no outline: the fill alone is the region
   expand = 0
 )
+plot$layers[[1]] <- NULL # the grey panel shading
 plot <- plot +
   ggplot2::theme_void() +
   ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
