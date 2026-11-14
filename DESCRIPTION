@@ -15,7 +15,8 @@ Depends:
     R (>= 4.1)
 Imports:
     ggplot2,
-    scrutiny,
+    roundwork (>= 0.2.0),
+    scrutiny (>= 1.0.0),
     splines,
     tibble
 Suggests:

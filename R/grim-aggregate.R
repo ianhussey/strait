@@ -23,20 +23,13 @@
 # design, not of the reported value.
 .grim_grid_cache <- new.env(parent = emptyenv())
 
-# Internal: scrutiny::grim_map() consistency across both interfaces, for
-# means given as character strings that all share `digits` decimal places.
-#
-# scrutiny <= 0.6.1 reads the decimal places off a character x. Later builds
-# reject a character x outright and take a numeric x with a scalar digits_x
-# argument (see R/scrutiny-compat.R). Returns a logical vector in row order.
+# Internal: scrutiny::grim_map() consistency for means given as character
+# strings that all share `digits` decimal places. Returns a logical vector in
+# row order.
 .grim_map_consistency <- function(x, n, items, digits, rounding) {
-  df <- tibble::tibble(x = x, n = n, items = items)
-  if (.takes_digits(scrutiny::grim_map)) {
-    df$x <- as.numeric(df$x)
-    out <- scrutiny::grim_map(df, digits_x = digits, rounding = rounding)
-  } else {
-    out <- scrutiny::grim_map(df, rounding = rounding)
-  }
+  df <- tibble::tibble(x = as.numeric(x), n = n, items_averaged = items)
+  out <- scrutiny::grim_map(df, digits_x = digits, data_type = "integer",
+                            rounding = rounding)
   as.logical(out$consistency)
 }
 

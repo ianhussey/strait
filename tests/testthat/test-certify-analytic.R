@@ -109,23 +109,23 @@ test_that("lattice boundary bug is fixed: trunc-rounded reports on exact rationa
   expect_true(r$possible)
 })
 
-test_that(".round_scaled matches scrutiny's forward rounding away from boundaries", {
+test_that(".round_scaled matches roundwork's forward rounding away from boundaries", {
   set.seed(11)
   x <- runif(400, -8, 8)                       # generic values: no boundaries
   for (d in 0:2) {
     expect_identical(.round_scaled(x, d, "half_up"),
-                     round(scrutiny::round_up_from(x, d, 5, symmetric = FALSE) * 10^d))
+                     round(roundwork::round_up_from(x, d, 5, symmetric = FALSE) * 10^d))
     expect_identical(.round_scaled(x, d, "native"), round(round(x, d) * 10^d))
     expect_identical(.round_scaled(x, d, "floor"),
-                     round(scrutiny::round_floor(x, d) * 10^d))
+                     round(roundwork::round_floor(x, d) * 10^d))
     expect_identical(.round_scaled(x, d, "trunc"),
-                     round(scrutiny::round_trunc(x, d) * 10^d))
+                     round(roundwork::round_trunc(x, d) * 10^d))
   }
 })
 
-test_that(".round_scaled is exact on the boundary values scrutiny misfiles", {
-  # 113/25 = 4.52 exactly; its scaled double 451.99999999999994 makes
-  # scrutiny::round_trunc(113/25, 2) return 4.51. The snapped scaled rounding
+test_that(".round_scaled is exact on boundary values that naive scaling misfiles", {
+  # 113/25 = 4.52 exactly; its scaled double 451.99999999999994 made scrutiny
+  # 0.6.1's round_trunc(113/25, 2) return 4.51. The snapped scaled rounding
   # must file every rule's boundary case where the exact rational belongs.
   expect_identical(.round_scaled(113/25, 2, "trunc"), 452)
   expect_identical(.round_scaled(113/25, 2, "floor"), 452)

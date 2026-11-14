@@ -52,7 +52,7 @@ exactly. Band rules are unaffected: rounding a bound can turn it
 anti-conservative, so bounds are always returned at full precision.}
 
 \item{rounding}{How to round when \code{round_digits} is given. \code{"half_up"}
-(default) and the other named rules use scrutiny's implementations, so the
+(default) and the other named rules use roundwork's implementations, so the
 vocabulary matches GRIM and GRIMMER; \code{"native"} is base R's \code{round()},
 which rounds halves to even.}
 }

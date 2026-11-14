@@ -7,8 +7,6 @@ test_that("sd_bounds_curve() is hole-free under quasi-integer", {
 })
 
 test_that("umbrella_data() passing set matches an independent GRIMMER + bounds screen", {
-  # kept small deliberately: CRAN scrutiny (0.6.1) evaluates GRIMMER about 25x
-  # slower than 0.6.2, so a wide grid here costs minutes on the CRAN path
   um <- umbrella_data(n = 12, l = 1, u = 3, digits = 1)
   expect_true(all(c("mean", "sd", "min_sd", "max_sd", "in_bounds",
                     "grimmer", "consistent") %in% names(um)))
@@ -17,10 +15,11 @@ test_that("umbrella_data() passing set matches an independent GRIMMER + bounds s
   expect_true(any(um$in_bounds & !is.na(um$grimmer) & !um$grimmer))
   expect_true(any(!um$in_bounds))
   indep <- with(um, {
-    gm <- as.logical(strait:::.grimmer_compat(x = mean, sd = sd, n = 12,
-                                              digits_x = 1, digits_sd = 1,
-                                              items = 1,
-                                              rounding = "up_or_down"))
+    gm <- as.logical(scrutiny::grimmer(x = mean, sd = sd, n = 12,
+                                       digits_x = 1, digits_sd = 1,
+                                       items_averaged = 1,
+                                       data_type = "integer",
+                                       rounding = "up_or_down"))
     ib <- (sd + 0.05) >= min_sd - 1e-9 & (sd - 0.05) <= max_sd + 1e-9
     gm & ib
   })
