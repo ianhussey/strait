@@ -1,4 +1,4 @@
-# strait 0.4.13
+# strait 0.5.0
 
 ## Breaking changes
 
@@ -39,6 +39,8 @@
   `brimmer()`, and `umbrella_data()` treated each sum score as the average of
   `n_items` items, which made them too lenient. A sum score is one whole number
   per person.
+
+# strait 0.4.13
 
 ## New features
 
