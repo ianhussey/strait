@@ -353,7 +353,8 @@ sd_region_data <- function(l, u, n,
 #' figure in the STRAIT article.
 #'
 #' @param data Output of [sd_region_data()]: a band, with `mean`, `min_sd`, and
-#'   `max_sd`, or a lattice, with `mean` and `sd`.
+#'   `max_sd`, or a lattice, with `mean` and `sd`, filtered by `consistent`
+#'   when that column is present, as in [umbrella_data()] output.
 #' @param reference Optional band to draw as a dashed reference, such as
 #'   `sd_region_data(l, u, n, rule = "quasi")` for the same design.
 #'   [sd_bounds_curve()] output works too.
@@ -394,6 +395,13 @@ sd_region_plot <- function(data, reference = NULL, title = NULL,
   shade <- match.arg(shade)
   stopifnot(requireNamespace("ggplot2", quietly = TRUE))
   is_band <- !"sd" %in% names(data)
+  if (is_band) {
+    data <- .band_mask(data)
+  } else if ("consistent" %in% names(data)) {
+    # full umbrella_data() output: only the consistent tuples exist
+    data <- data[!is.na(data$consistent) & data$consistent, , drop = FALSE]
+  }
+  ref <- if (!is.null(reference)) .band_mask(reference)
 
   p <- ggplot2::ggplot()
   # the region itself first, so the dashed reference stays visible on top of it
@@ -420,15 +428,14 @@ sd_region_plot <- function(data, reference = NULL, title = NULL,
     }
   }
 
-  if (!is.null(reference)) {
-    ref <- .band_rows(reference)
+  if (!is.null(ref)) {
     p <- p +
       ggplot2::geom_line(data = ref, ggplot2::aes(.data$mean, .data$max_sd),
                          colour = reference_colour, linetype = "dashed",
-                         linewidth = 0.25) +
+                         linewidth = 0.25, na.rm = TRUE) +
       ggplot2::geom_line(data = ref, ggplot2::aes(.data$mean, .data$min_sd),
                          colour = reference_colour, linetype = "dashed",
-                         linewidth = 0.25)
+                         linewidth = 0.25, na.rm = TRUE)
   }
 
   if (is_band) {
@@ -448,7 +455,7 @@ sd_region_plot <- function(data, reference = NULL, title = NULL,
   # width so the margin is constant across scales of very different widths.
   means <- range(c(data$mean, reference$mean), na.rm = TRUE)
   pad <- expand * diff(means)
-  y_hi <- max(c(if (is_band) data$max_sd else data$sd, reference$max_sd),
+  y_hi <- max(c(if (is_band) data$max_sd else data$sd, ref$max_sd),
               na.rm = TRUE)
 
   p +

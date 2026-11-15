@@ -45,8 +45,8 @@ test_that("umbrella_plot() fills a band", {
   p <- umbrella_plot(cv, fill = "red")
   expect_s3_class(p, "ggplot")
   band <- ggplot2::layer_data(p, 2)
-  expect_equal(band$ymin, cv$min_sd[cv$feasible])
-  expect_equal(band$ymax, cv$max_sd[cv$feasible])
+  expect_equal(band$ymin, ifelse(cv$feasible, cv$min_sd, NA))
+  expect_equal(band$ymax, ifelse(cv$feasible, cv$max_sd, NA))
   expect_equal(unique(band$fill), "red")
   # the region is the outline of the points: every consistent tuple lies in it
   # once rounding is undone. A reported mean stands for the interval of half a
@@ -76,6 +76,34 @@ test_that("umbrella_plot() fills a band", {
   expect_error(umbrella_plot(data.frame(mean = 1, max_sd = 1)), "needs `mean` and `sd`")
   lat <- sd_region_data(1, 5, 12, rule = "integer", digits = 1)
   expect_error(umbrella_plot(lat, style = "tiles"), "full umbrella_data")
+})
+
+# Regression: the plot functions used to drop the rows of a band where no SD
+# is possible, and ggplot2 joins the rows on either side of a missing one, so a
+# ribbon filled in the gap and a line crossed it. ggplot2 breaks a ribbon or
+# line at an NA row instead, so the rows must still be there, as NA.
+test_that("bands are not drawn across a gap", {
+  # a reported alpha leaves 87 means next to each limit with no feasible SD
+  d <- sd_region_data(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70,
+                      by = 0.001)
+  gap <- d$mean[is.na(d$max_sd)]
+  breaks_at_gap <- function(p, i, col) {
+    ld <- ggplot2::layer_data(p, i)
+    in_gap <- ld$x %in% gap
+    sum(in_gap) == length(gap) && all(is.na(ld[[col]][in_gap]))
+  }
+  expect_true(breaks_at_gap(umbrella_plot(d), 2, "ymax"))
+  expect_true(breaks_at_gap(umbrella_plot(d, bounds = d), 3, "y"))
+  expect_true(breaks_at_gap(sd_bounds_plot(d, shade = "inside"), 1, "ymax"))
+  expect_true(breaks_at_gap(sd_bounds_plot(d, shade = "inside"), 2, "y"))
+  quasi <- sd_region_data(0, 3, 7, rule = "quasi", n_items = 2)
+  expect_true(breaks_at_gap(sd_region_plot(quasi, reference = d), 3, "y"))
+})
+
+test_that("sd_region_plot() draws only the consistent tuples of a lattice", {
+  um <- umbrella_data(n = 12, l = 1, u = 3, digits = 1)
+  pts <- ggplot2::layer_data(sd_region_plot(um), 1)
+  expect_equal(nrow(pts), sum(um$consistent))
 })
 
 # Regression: sd_bounds_plot() used to infer the mean-grid spacing from

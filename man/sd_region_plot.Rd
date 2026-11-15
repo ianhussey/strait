@@ -19,7 +19,8 @@ sd_region_plot(
 }
 \arguments{
 \item{data}{Output of \code{\link[=sd_region_data]{sd_region_data()}}: a band, with \code{mean}, \code{min_sd}, and
-\code{max_sd}, or a lattice, with \code{mean} and \code{sd}.}
+\code{max_sd}, or a lattice, with \code{mean} and \code{sd}, filtered by \code{consistent}
+when that column is present, as in \code{\link[=umbrella_data]{umbrella_data()}} output.}
 
 \item{reference}{Optional band to draw as a dashed reference, such as
 \code{sd_region_data(l, u, n, rule = "quasi")} for the same design.
