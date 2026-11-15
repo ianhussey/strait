@@ -307,8 +307,6 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
   grim_v <- NA
   grimmer_v <- NA
   if (Z == "integer" && !is.null(rounding) && !is.null(mean)) {
-    if (!requireNamespace("scrutiny", quietly = TRUE))
-      stop("the scrutiny package is required for GRIM/GRIMMER verdicts under Z = 'integer' with rounding")
     # items_averaged is m, not n_items: a sum score is a whole number per
     # person, so only mean-scored data are averages of several items.
     grim_v <- isTRUE(as.logical(unname(scrutiny::grim(

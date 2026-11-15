@@ -412,7 +412,7 @@ umbrella_data <- function(n, l, u, digits = 2, Z = "integer",
   means <- round(seq(l, u, by = step), digits)
   # items averaged per observation, as in sd_bounds()
   m <- if (scoring == "meanscored") n_items else 1L
-  use_grimmer <- Z == "integer" && requireNamespace("scrutiny", quietly = TRUE)
+  use_grimmer <- Z == "integer"
   rows <- list()
   for (mu in means) {
     # sd_bounds() embeds the rounding-aware GRIM prefilter: a mean whose
