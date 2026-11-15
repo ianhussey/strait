@@ -61,12 +61,13 @@ sd_bounds_plot <- function(data, reports = NULL, title = NULL,
                            shade = c("outside", "inside"), expand = 0.03) {
   stopifnot(requireNamespace("ggplot2", quietly = TRUE))
   shade <- match.arg(shade)
-  cur <- .band_rows(data)
+  cur <- .band_mask(data)
 
   # Padding is a proportion of the scale width, not a fixed SD amount, so the
   # margin is visually constant across scales of very different widths.
-  lo_m <- min(cur$mean)
-  hi_m <- max(cur$mean)
+  drawn <- cur$mean[!is.na(cur$max_sd)]
+  lo_m <- min(drawn)
+  hi_m <- max(drawn)
   pad <- expand * (hi_m - lo_m)
   # Shading the outside needs finite limits, and finite limits will silently
   # clip an out-of-bounds point - exactly the case the plot exists to show -
@@ -97,8 +98,10 @@ sd_bounds_plot <- function(data, reports = NULL, title = NULL,
         inherit.aes = FALSE, fill = "white")
   }
   p <- p +
-    ggplot2::geom_line(ggplot2::aes(y = .data$max_sd), colour = line_colour) +
-    ggplot2::geom_line(ggplot2::aes(y = .data$min_sd), colour = line_colour) +
+    ggplot2::geom_line(ggplot2::aes(y = .data$max_sd), colour = line_colour,
+                       na.rm = TRUE) +
+    ggplot2::geom_line(ggplot2::aes(y = .data$min_sd), colour = line_colour,
+                       na.rm = TRUE) +
     ggplot2::coord_cartesian(xlim = c(lo_m - pad, hi_m + pad),
                              ylim = c(-pad, y_hi + pad), expand = FALSE) +
     ggplot2::labs(x = "Mean", y = "SD", title = title) +
@@ -139,12 +142,14 @@ sd_bounds_pomp_plot <- function(data, reports = NULL,
   stopifnot(requireNamespace("ggplot2", quietly = TRUE))
   reference <- match.arg(reference)
   if (reference == "parity") {
-    cur <- .band_rows(data)
+    cur <- .band_mask(data)
     p <- ggplot2::ggplot(cur, ggplot2::aes(x = .data$pomp_mean)) +
       ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$floor_parity,
                                         ymax = .data$ceil_parity), fill = "grey85") +
-      ggplot2::geom_line(ggplot2::aes(y = .data$ceil_parity), colour = "grey30") +
-      ggplot2::geom_line(ggplot2::aes(y = .data$floor_parity), colour = "grey30") +
+      ggplot2::geom_line(ggplot2::aes(y = .data$ceil_parity), colour = "grey30",
+                         na.rm = TRUE) +
+      ggplot2::geom_line(ggplot2::aes(y = .data$floor_parity), colour = "grey30",
+                         na.rm = TRUE) +
       ggplot2::labs(x = "Relative location (POMP mean)",
                     y = "Relative dispersion (parity-normalised SD)", title = title)
     if (!is.null(reports)) p <- p + .bounds_point_layer(reports, "pomp_mean", "pomp_sd_parity")
@@ -257,12 +262,12 @@ umbrella_plot <- function(data, bounds = NULL, title = NULL,
   if (is_band && style == "tiles")
     stop("style = 'tiles' needs a lattice from umbrella_data(), not a band")
 
-  bounds_layers <- if (!is.null(bounds)) {
-    cur <- .band_rows(bounds)
+  bnd <- if (!is.null(bounds)) .band_mask(bounds)
+  bounds_layers <- if (!is.null(bnd)) {
     lapply(c("max_sd", "min_sd"), function(col)
-      ggplot2::geom_line(data = cur, ggplot2::aes(.data$mean, .data[[col]]),
+      ggplot2::geom_line(data = bnd, ggplot2::aes(.data$mean, .data[[col]]),
                          inherit.aes = FALSE, colour = reference_colour,
-                         linetype = "dashed", linewidth = 0.35))
+                         linetype = "dashed", linewidth = 0.35, na.rm = TRUE))
   }
 
   if (style == "tiles") {
@@ -283,12 +288,12 @@ umbrella_plot <- function(data, bounds = NULL, title = NULL,
   }
 
   if (is_band) {
-    cur <- .band_rows(data)
+    cur <- .band_mask(data)
     region <- ggplot2::geom_ribbon(data = cur,
       ggplot2::aes(x = .data$mean, ymin = .data$min_sd, ymax = .data$max_sd),
       fill = fill)
-    means <- range(cur$mean)
-    y_hi <- max(c(cur$max_sd, bounds$max_sd), na.rm = TRUE)
+    means <- range(cur$mean[!is.na(cur$max_sd)])
+    y_hi <- max(c(cur$max_sd, bnd$max_sd), na.rm = TRUE)
   } else {
     pts <- if ("consistent" %in% names(data)) {
       data[!is.na(data$consistent) & data$consistent, c("mean", "sd"),
@@ -303,7 +308,7 @@ umbrella_plot <- function(data, bounds = NULL, title = NULL,
       ggplot2::aes(.data$mean, .data$sd), colour = point_colour,
       size = point_size, shape = 16, na.rm = TRUE)
     means <- range(data$mean)
-    y_hi <- max(c(pts$sd, bounds$max_sd), na.rm = TRUE)
+    y_hi <- max(c(pts$sd, bnd$max_sd), na.rm = TRUE)
   }
   pad <- expand * diff(means)
 

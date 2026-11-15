@@ -1,12 +1,18 @@
 # Geometry helpers shared by the plotting layer: feasible regions as closed
 # rings, and the count-parity correction factor as a quantity in its own right.
 
-# Internal: the rows of a band (sd_bounds_curve() or sd_region_data() output)
-# where some SD is possible.
-.band_rows <- function(d) {
+# Internal: a band (sd_bounds_curve() or sd_region_data() output) with its SD
+# columns set to NA at every mean where no SD is possible. Those rows are kept,
+# not dropped: ggplot2 breaks a ribbon or a line at an NA row, but draws
+# straight across a row that is missing, which would fill in or outline a gap
+# where the band does not exist.
+.band_mask <- function(d) {
   ok <- is.finite(d$min_sd) & is.finite(d$max_sd)
   if (!is.null(d$feasible)) ok <- ok & d$feasible
-  d[ok, , drop = FALSE]
+  for (col in intersect(c("min_sd", "max_sd", "floor_parity", "ceil_parity"),
+                        names(d)))
+    d[[col]][!ok] <- NA_real_
+  d
 }
 
 # Internal: the mean-grid spacing of a band, which band_polygon() needs to tell

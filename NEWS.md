@@ -40,6 +40,16 @@
   `n_items` items, which made them too lenient. A sum score is one whole number
   per person.
 
+* The plot functions no longer draw across a gap in a band, at means where no
+  SD is possible. `sd_bounds_plot(shade = "inside")` and the parity band of
+  `sd_bounds_pomp_plot()` filled it in, and their outlines, like the dashed
+  reference lines of `sd_region_plot()` and `umbrella_plot()`, joined its two
+  sides with a straight line.
+
+* `sd_region_plot()` draws only the consistent tuples of a lattice with a
+  `consistent` column, such as `umbrella_data()` output, as `umbrella_plot()`
+  does, rather than every cell of the grid.
+
 # strait 0.4.13
 
 ## New features

@@ -26,7 +26,8 @@ plot <- strait::umbrella_plot(
   fill = land,
   expand = 0
 )
-plot$layers[[1]] <- NULL # the grey panel shading
+# drop the grey panel shading, the plot's one rectangle
+plot$layers <- Filter(function(l) !inherits(l$geom, "GeomRect"), plot$layers)
 plot <- plot +
   ggplot2::theme_void() +
   ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
