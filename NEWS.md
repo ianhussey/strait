@@ -46,6 +46,12 @@
   reference lines of `sd_region_plot()` and `umbrella_plot()`, joined its two
   sides with a straight line.
 
+* `sd_max_structure_s()` lost precision next to a scale limit, where it
+  computed a tiny sum of squares as the difference of large ones. Within about
+  1e-8 of a limit it returned 0, below the quasi-integer floor, so `sd_bounds()`
+  called such a mean infeasible; `sd_bounds_curve()` samples two of them, next
+  to the kinks at `l` and `u`.
+
 * `sd_region_plot()` draws only the consistent tuples of a lattice with a
   `consistent` column, such as `umbrella_data()` output, as `umbrella_plot()`
   does, rather than every cell of the grid.

@@ -177,9 +177,12 @@ sd_max_structure_s <- function(mean, n, lower, upper) {
   R <- upper - lower
   S_excess <- n * (mean - lower)
   n_u <- pmin(floor(S_excess / R + 1e-9), n - 1)
-  x_r <- lower + (S_excess - n_u * R)
   n_l <- n - n_u - 1
-  ss <- n_l * lower^2 + x_r^2 + n_u * upper^2 - n * mean^2
+  # deviations from the mean, each found from e = mean - lower: the sum of
+  # squares is tiny next to a wall, and as a difference of squared raw values,
+  # n_l * lower^2 + x_r^2 + n_u * upper^2 - n * mean^2, it cancels to 0
+  e <- mean - lower
+  ss <- n_l * e^2 + (S_excess - n_u * R - e)^2 + n_u * (R - e)^2
   sd_from_ss(ss, n)
 }
 

@@ -25,6 +25,23 @@ test_that("the floor never exceeds the ceiling on feasible cells", {
   expect_lte(b$min_sd, b$max_sd + 1e-9)
 })
 
+test_that("the sharp ceiling keeps its precision next to a wall", {
+  # its sum of squares was a difference of squared raw values, which cancelled
+  # to 0 within ~1e-8 of a limit: below the quasi-integer floor, so sd_bounds()
+  # called those means infeasible, and sd_bounds_curve() samples them. Next to
+  # a wall the maximum puts every observation but one on it, so at distance e
+  # it is sqrt(n) * e.
+  for (e in c(1e-9, 1e-7, 1e-5)) {
+    expect_equal(sd_max_structure_s(1 + e, 12, 1, 5), sqrt(12) * e,
+                 tolerance = 1e-5)
+    expect_equal(sd_max_structure_s(5 - e, 12, 1, 5), sqrt(12) * e,
+                 tolerance = 1e-5)
+    expect_true(sd_bounds(l = 1, u = 5, n = 12, mean = 1 + e,
+                          Z = "quasiinteger")$feasible)
+  }
+  expect_true(all(sd_bounds_curve(l = 1, u = 5, n = 12)$feasible))
+})
+
 test_that("bounds match exhaustive integer enumeration (walls)", {
   bad <- 0L
   for (n in 3:5) {
