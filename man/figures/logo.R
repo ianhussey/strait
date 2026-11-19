@@ -1,278 +1,147 @@
-args <- commandArgs(TRUE)
-out <- if (length(args)) args[1] else "man/figures/logo.png"
-env <- function(name, default) Sys.getenv(name, default)
+# The hex logo: the umbrella plot of a 1-7 scale, drawn as the arches it is made
+# of (after Heathers 2017), and mirrored. A sample that uses only the values a
+# and b has population SD sqrt((M - a) * (b - M)), a semicircle from a to b when
+# mean and SD share units. The floor is the arches between neighbouring values,
+# the ceiling the arch between the extremes, and the arches between all other
+# pairs lie inside.
+#
+# Being circles, they take their size from the hex: each ceiling is tangent to
+# the two edges that make the hex's point above (or below) it, less a small
+# margin. The two umbrellas stand apart across the hex's waist, so that each
+# floor arch faces its mirror image across a narrow channel, the strait, and
+# each such open pair holds one letter of the name.
+#
+# Heathers 2017:
+# https://jamesheathers.medium.com/sprite-interlude-the-umbrella-graph-connecting-grim-and-sprite-also-brunch-sucks-1266c629c974
+#
+# Run from the package root: Rscript man/figures/logo.R
+out <- "man/figures/logo.png"
 
-water <- "#1d5a8e"
-border <- "#0f3a5f"
-land <- env("LAND", "white")
-coast <- "#8dbfe2"
-grid_col <- "#8dbfe2"
-ink <- env("INK", "#a9d0ec")
+navy <- "#173d63"
+border <- "#0d2740"
+paper <- "#f6f1e7"
+family <- "Space Grotesk"
 
-# Change to adjust the size of the compass roses
-rose_fill_value <- 0.65
+# rsvg falls back to another font without a word, so check it is installed
+stopifnot(family %in% systemfonts::system_fonts()$family)
 
-reg <- strait::sd_region_data(
-  l = 1,
-  u = 5,
-  n = 200,
-  rule = "mean_naive_floor",
-  by = 0.0005
-)
-reg <- reg[!is.na(reg$max_sd), ]
+# Draw the faint arches inside each canopy?
+inner_arches <- TRUE
 
-# The water inside the border is a hex with apothem A; its corner is R from
-# the center. Each umbrella's x-axis lies d from the center, parallel to the
-# upper left or lower right edge, and spans that edge's full length, so that
-# the grid lines at means 1 and 5 run into the corners at its ends.
-A <- 251.1 - 8
-R <- A / cos(pi / 6)
-d <- 205
-h <- 160
-w <- 2 * A * tan(pi / 6)
-line <- 2.5 # the light-blue coastline, outside the land
+# Scale points
+k <- 7
 
-ux <- (reg$mean - 1) / 4 * w - w / 2
-top_y <- -reg$max_sd / max(reg$max_sd) * h
-low_y <- -reg$min_sd / max(reg$max_sd) * h
-path <- function(x, y) {
-  paste0("M", paste(sprintf("%.2f,%.2f", x, y), collapse = "L"), "Z")
-}
-umbrella <- path(c(ux, rev(ux)), c(top_y, rev(low_y)))
+cx <- 260
+cy <- 300 # the hex's centre, on the waist
+gap <- 24 # half the width of the channel between the umbrellas
+base <- cy - gap # the upper umbrella's rib tips
 
-# A small compass rose in the middle of each umbrella, north toward the
-# dome's peak: an eight-pointed two-tone star on one ring, in the coast's
-# light blue.
-rose_ink <- env("ROSE_INK", coast)
-edge_x <- c(ux, ux)
-edge_y <- c(top_y, low_y)
-cys <- seq(-h + 10, -10, by = 0.5)
-room <- vapply(cys, function(cy) min(sqrt(edge_x^2 + (edge_y - cy)^2)), 0)
-rose_y <- cys[which.max(room)]
-rose_r <- max(room) / 1.42 * as.numeric(env("ROSE_FILL", rose_fill_value))
-polar <- function(r, deg) {
-  cbind(r * sin(deg * pi / 180), -r * cos(deg * pi / 180))
-}
-poly <- function(p, fill, stroke = "none", sw = 0) {
+# Distance from the centre of the ceiling, (cx, base), to the upper edges
+# (which meet at (260, 10) at 30 degrees to the horizontal), less the half
+# border and a margin.
+R <- (base - 10) * cos(pi / 6) - 8 - 9
+x <- cx - R + (seq_len(k) - 1) * 2 * R / (k - 1)
+
+# An upper semicircle from scale point a to b; sweep 1 runs left to right over
+# the top, sweep 0 right to left.
+arc <- function(a, b, sweep = 1) {
   sprintf(
-    '<polygon points="%s" fill="%s" stroke="%s" stroke-width="%.2f" stroke-linejoin="round"/>',
-    paste(sprintf("%.2f,%.2f", p[, 1], p[, 2]), collapse = " "),
-    fill,
-    stroke,
-    sw
-  )
-}
-circle <- function(r, sw) {
-  sprintf(
-    '<circle r="%.2f" fill="none" stroke="%s" stroke-width="%.2f"/>',
-    r,
-    rose_ink,
-    sw
-  )
-}
-star_point <- function(deg, tip, base, half) {
-  o <- c(0, 0)
-  t <- polar(tip, deg)
-  l <- polar(base, deg - half)
-  r <- polar(base, deg + half)
-  c(
-    poly(rbind(o, t, l), land, rose_ink, 0.6),
-    poly(rbind(o, t, r), rose_ink)
-  )
-}
-rose <- function(r) {
-  c(
-    sprintf('<g transform="translate(0,%.2f)">', rose_y),
-    circle(0.72 * r, 1.1),
-    unlist(lapply(
-      c(45, 135, 225, 315),
-      star_point,
-      tip = 0.75 * r,
-      base = 0.2 * r,
-      half = 45
-    )),
-    unlist(lapply(
-      c(0, 90, 180, 270),
-      star_point,
-      tip = 1.1 * r,
-      base = 0.2 * r,
-      half = 45
-    )),
-    "</g>"
-  )
-}
-shore <- function(x, y, angle) {
-  c(
-    sprintf('<g transform="translate(%.1f,%.1f) rotate(%g)">', x, y, angle),
-    sprintf(
-      '<path d="%s" fill="%s" stroke="%s" stroke-width="%g" stroke-linejoin="round"/>',
-      umbrella,
-      coast,
-      coast,
-      2 * line
-    ),
-    sprintf('<path d="%s" fill="%s"/>', umbrella, land),
-    if (Sys.getenv("ROSE", "1") == "1") rose(rose_r),
-    "</g>"
+    "A%.2f,%.2f 0 0 %d %.2f,%g",
+    abs(x[b] - x[a]) / 2,
+    abs(x[b] - x[a]) / 2,
+    sweep,
+    x[b],
+    base
   )
 }
 
-# The strait's frame: centered on the hex, x along the channel, y across it
-# (down). The lower dome is at y = d + top_y, the upper one its point mirror.
-# gl(x) is how far below the middle line a letter may reach at x: clear of the
-# coastline by a gap, and inside the hex.
-gap <- 7
-reach <- line + gap
-xs <- seq(-300, 300, by = 0.5)
-near <- outer(xs, ux, function(x, px) reach^2 - (px - x)^2)
-below <- matrix(d + top_y, length(xs), length(ux), byrow = TRUE) -
-  sqrt(pmax(near, 0))
-below[near < 0] <- Inf
-ap <- A - 10
-gl <- pmin(
-  apply(below, 1, min),
-  ap,
-  (ap / cos(pi / 6) - abs(xs)) * tan(pi / 3)
+canopy <- paste(
+  sprintf("M%.2f,%g", x[1], base),
+  arc(1, k),
+  paste(vapply(k:2, function(i) arc(i, i - 1, sweep = 0), ""), collapse = " "),
+  "Z"
 )
 
-# The chart's grid, which is also the plots' grid: a line across the channel
-# at each whole-number mean, and lines along it at SD 0, 1 and 2 of either
-# plot. Each runs from edge to edge of the water, its dashes stretched a
-# little so that it starts and ends on a full dash.
-dashed <- function(x1, y1, x2, y2, on = 7, off = 5) {
-  len <- sqrt((x2 - x1)^2 + (y2 - y1)^2)
-  k <- len / (round((len - on) / (on + off)) * (on + off) + on)
-  sprintf(
-    '<line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f" stroke-dasharray="%.3f %.3f"/>',
-    x1,
-    y1,
-    x2,
-    y2,
-    on * k,
-    off * k
-  )
-}
-across <- (0:4) / 4 * w - w / 2
-across_end <- pmin(A, (R - abs(across)) * tan(pi / 3))
-along <- c(-1, 1) %o% (d - c(0, 0.5, 1) * h)
-along_end <- R - abs(along) / tan(pi / 3)
-graticule <- c(
-  sprintf(
-    paste(
-      '<g transform="translate(260,300) rotate(-30)" stroke="%s"',
-      'stroke-width="1.3" opacity="0.45">'
-    ),
-    grid_col
-  ),
-  dashed(across, -across_end, across, across_end),
-  dashed(-along_end, along, along_end, along),
-  "</g>"
+pairs <- t(combn(k, 2))
+inner <- pairs[pairs[, 2] - pairs[, 1] > 1 & pairs[, 2] - pairs[, 1] < k - 1, ]
+
+arches <- sprintf(
+  '<path d="M%.2f,%g %s"/>',
+  x[inner[, 1]],
+  base,
+  apply(inner, 1, function(p) arc(p[1], p[2]))
 )
 
-# The word, in the italic that sea charts use for the names of waters. The
-# letters come in pairs about the middle, "ra", then "ti", then "st"; each pair
-# takes the largest size at which it clears both shores and the hex, at most
-# `jump` times the size of the pair inside it. The middle of the x-height sits
-# on the middle line of the channel, so the word widens evenly toward both
-# ends. The whole word is then set at `scale` of that size, to leave water
-# around it.
-family <- env("FONT", "STIX Two Text")
-jump <- 1.35
-scale <- 0.72
-track <- 14
-font <- systemfonts::match_fonts(family, italic = TRUE)
+# Drawn in line: the inner arches faint, the outline of the canopy (ceiling
+# and floor) bold, so the umbrella stands out from the arches inside it.
+half <- c(
+  if (inner_arches) {
+    c(
+      sprintf(
+        '<g fill="none" stroke="%s" stroke-width="2" opacity="0.55">',
+        paper
+      ),
+      arches,
+      "</g>"
+    )
+  },
+  sprintf(
+    '<path d="%s" fill="none" stroke="%s" stroke-width="3.5" stroke-linejoin="round"/>',
+    canopy,
+    paper
+  )
+)
+
+# One letter between each pair of facing floor arches, on a common baseline
+# that puts the middle of the x-height on the waist. Each letter is centred on
+# its arches by its ink, not its advance.
+size <- 68
+font <- systemfonts::match_fonts(family, weight = "medium")
 chars <- strsplit("strait", "")[[1]]
-ls <- lapply(chars, function(ch) {
-  gi <- systemfonts::glyph_info(
-    ch,
-    path = font$path,
-    index = font$index,
-    size = 100
-  )
-  list(
-    o = systemfonts::glyph_outline(gi$index, font$path, font$index, size = 100),
-    adv = gi$x_advance
-  )
-})
-glyphs <- do.call(
-  rbind,
-  lapply(seq_along(ls), function(i) {
-    cbind(ls[[i]]$o[c("contour", "x", "y")], glyph = i)
-  })
-)
-ink_lo <- vapply(ls, function(l) min(l$o$x), 0)
-ink_hi <- vapply(ls, function(l) max(l$o$x), 0)
-adv <- vapply(ls, function(l) l$adv, 0)
-xmid <- max(ls[[3]]$o$y, ls[[4]]$o$y) / 2 # middle of the x-height
 
-ring <- c(3, 2, 1, 1, 2, 3)
-place <- function(size) {
-  step <- (adv + track) * size
-  left <- cumsum(step) - step
-  left <- left -
-    (left[3] + ink_hi[3] * size[3] + left[4] + ink_lo[4] * size[4]) / 2
-  list(
-    x = left[glyphs$glyph] + glyphs$x * size[glyphs$glyph],
-    y = -(glyphs$y - xmid) * size[glyphs$glyph]
-  )
-}
-fits <- function(size) {
-  p <- place(size)
-  all(p$y <= approx(xs, gl, p$x)$y & -p$y <= approx(xs, gl, -p$x)$y)
-}
-size <- rep(0, 6)
-for (k in 1:3) {
-  lo <- if (k == 1) 0.1 else max(size)
-  hi <- if (k == 1) 5 else jump * max(size)
-  for (it in 1:40) {
-    m <- (lo + hi) / 2
-    size[ring >= k] <- m
-    if (fits(size)) lo <- m else hi <- m
-  }
-  size[ring >= k] <- lo
-}
-word <- place(scale * size)
-letters <- vapply(
-  split(seq_along(word$x), list(glyphs$glyph, glyphs$contour), drop = TRUE),
-  function(i) path(word$x[i], word$y[i]),
-  ""
+g <- systemfonts::glyph_info(
+  chars,
+  path = font$path,
+  index = font$index,
+  size = size
 )
 
-dx <- d * sin(pi / 6)
-dy <- d * cos(pi / 6)
-pts <- function(x, y) paste(sprintf("%.1f,%.1f", x, y), collapse = " ")
-hexs <- pts(
-  c(260, 511.1, 511.1, 260, 8.9, 8.9),
-  c(10, 155, 445, 590, 445, 155)
+ink_mid <- g$x_bearing + g$width / 2
+x_mid <- g$y_bearing[g$glyph == "s"] / 2
+centres <- (x[-1] + x[-k]) / 2
+
+letters <- sprintf(
+  '<text x="%.2f" y="%.2f">%s</text>',
+  centres - ink_mid,
+  cy + x_mid,
+  chars
 )
+
+hex <- "260,10 511.1,155 511.1,445 260,590 8.9,445 8.9,155"
 
 svg <- c(
-  paste(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 600"',
-    'width="520" height="600">'
-  ),
-  sprintf('<clipPath id="hex"><polygon points="%s"/></clipPath>', hexs),
-  '<g clip-path="url(#hex)">',
-  sprintf('<rect width="520" height="600" fill="%s"/>', water),
-  graticule,
-  shore(260 + dx, 300 + dy, -30),
-  shore(260 - dx, 300 - dy, 150),
-  sprintf(
-    '<path transform="translate(260,300) rotate(-30)" fill="%s" d="%s"/>',
-    ink,
-    paste(letters, collapse = "")
-  ),
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 600" width="520" height="600">',
+  sprintf('<polygon points="%s" fill="%s"/>', hex, navy),
+  half,
+  sprintf('<g transform="matrix(1 0 0 -1 0 %g)">', 2 * cy),
+  half,
   "</g>",
   sprintf(
-    paste(
-      '<polygon points="%s" fill="none" stroke="%s" stroke-width="16"',
-      'stroke-linejoin="round"/>'
-    ),
-    hexs,
+    '<g font-family="%s" font-weight="500" font-size="%g" fill="%s">',
+    family,
+    size,
+    paper
+  ),
+  letters,
+  "</g>",
+  sprintf(
+    '<polygon points="%s" fill="none" stroke="%s" stroke-width="16" stroke-linejoin="round"/>',
+    hex,
     border
   ),
   "</svg>"
 )
+
 svg_path <- tempfile(fileext = ".svg")
 writeLines(svg, svg_path)
-rsvg::rsvg_png(svg_path, out, width = as.numeric(env("PX", 520)))
+rsvg::rsvg_png(svg_path, out, width = 520)
