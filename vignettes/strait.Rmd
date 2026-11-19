@@ -237,6 +237,20 @@ umbrella_plot(cur)
 umbrella_plot(sd_region_data(l = 1, u = 7, n = 14, rule = "mean_naive_floor"))
 ```
 
+Those two edges are members of one family. A sample on just two values, `x`
+and `y`, has an SD that traces an arch from `x` to `y` as its mean moves between
+them: `sd_max_muilwijk(mean, n, lower = x, upper = y)`, a semicircle when the
+population SD is drawn in the same units as the mean. The ceiling is the arch
+between the scale limits, the integer floor (`sd_min_integer()`) the arches
+between neighbouring whole numbers, and every other pair of values spans an
+arch in between. (In the
+[earliest umbrella plot](https://jamesheathers.medium.com/sprite-interlude-the-umbrella-graph-connecting-grim-and-sprite-also-brunch-sucks-1266c629c974),
+Heathers likens the ceiling to an umbrella's ribs and the floor to its
+scalloped canopy edge; the inner arches show up among the points of its
+canopy.) These inner arches never bound a report, since each is a sample that
+exists. But each is the ceiling for data confined to its two values, and that
+makes them useful.
+
 ## What the data must contain
 
 A report whose SD rises above the arch over `[2, 7]` cannot come from data that

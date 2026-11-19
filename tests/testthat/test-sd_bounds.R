@@ -102,3 +102,11 @@ test_that("input guards fire", {
   expect_error(sd_bounds(l = 5, u = 1))
   expect_error(sd_bounds(n = 1, mean = 3))
 })
+
+test_that("the integer floor is the ceiling's arch between neighbouring integers", {
+  m <- c(1.2, 2.5, 3.75, 6.9)
+  expect_equal(
+    sd_min_integer(m, n = 30),
+    sd_max_muilwijk(m, n = 30, lower = floor(m), upper = floor(m) + 1)
+  )
+})
