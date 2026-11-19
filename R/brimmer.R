@@ -334,7 +334,7 @@ brimmer_multiple <- function(data, ..., include_inputs = TRUE) {
 #'   neighbourhoods are sampled far more densely than `by` - so the spacing
 #'   cannot be recovered from the returned means, and a consumer that needs to
 #'   tell a sampling gap from a genuine gap in the band (as [band_polygon()]
-#'   and hence [plot_sd_bounds()] must) has to be told. See [plot_sd_bounds()].
+#'   and hence [sd_bounds_plot()] must) has to be told. See [sd_bounds_plot()].
 #' @examples
 #' curve <- sd_bounds_curve(l = 1, u = 7, n = 30, by = 0.1)
 #' head(curve[, c("mean", "min_sd", "max_sd")])
@@ -410,7 +410,9 @@ umbrella_data <- function(n, l, u, digits = 2, Z = "integer",
   # and the granularity tests read the value as a decimal string, so an
   # off-by-one-ulp grid point can flip a GRIMMER verdict.
   means <- round(seq(l, u, by = step), digits)
-  use_grimmer <- Z == "integer" && requireNamespace("scrutiny", quietly = TRUE)
+  # items averaged per observation, as in sd_bounds()
+  m <- if (scoring == "meanscored") n_items else 1L
+  use_grimmer <- Z == "integer"
   rows <- list()
   for (mu in means) {
     # sd_bounds() embeds the rounding-aware GRIM prefilter: a mean whose
@@ -427,9 +429,10 @@ umbrella_data <- function(n, l, u, digits = 2, Z = "integer",
     # verdict is left NA.
     grimmer <- rep(NA, length(sds))
     if (use_grimmer && any(in_bounds))
-      grimmer[in_bounds] <- as.logical(.grimmer_compat(
+      grimmer[in_bounds] <- as.logical(scrutiny::grimmer(
         x = mu, sd = sds[in_bounds], n = n, digits_x = digits,
-        digits_sd = digits, items = n_items, rounding = rounding))
+        digits_sd = digits, items_averaged = m, data_type = "integer",
+        rounding = rounding))
     consistent <- in_bounds &
       (if (use_grimmer) !is.na(grimmer) & grimmer else TRUE)
     rows[[length(rows) + 1]] <- data.frame(

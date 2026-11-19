@@ -23,31 +23,14 @@
 # design, not of the reported value.
 .grim_grid_cache <- new.env(parent = emptyenv())
 
-# Internal: scrutiny::grim_map() consistency across both interfaces, for
-# means given as character strings that all share `digits` decimal places.
-#
-# scrutiny <= 0.6.1 reads the decimal places off a character x. Later builds
-# reject a character x outright and take a numeric x with a scalar digits_x
-# argument (see R/scrutiny-compat.R). Returns a logical vector in row order.
-.grim_map_consistency <- function(x, n, items, digits, rounding) {
-  df <- tibble::tibble(x = x, n = n, items = items)
-  if (.takes_digits(scrutiny::grim_map)) {
-    df$x <- as.numeric(df$x)
-    out <- scrutiny::grim_map(df, digits_x = digits, rounding = rounding)
-  } else {
-    out <- scrutiny::grim_map(df, rounding = rounding)
-  }
-  as.logical(out$consistency)
-}
-
-# Internal: observed GRIM consistency for rows with mixed decimal places.
+# Internal: GRIM consistency per row, by scrutiny::grim_map(). `x` holds the
+# means as character strings and `digits` their decimal places, one per row.
+# Returns a logical vector in row order.
 .grim_observed <- function(x, n, items, digits, rounding) {
-  out <- logical(length(x))
-  for (d in unique(digits)) {
-    i <- which(digits == d)
-    out[i] <- .grim_map_consistency(x[i], n[i], items[i], d, rounding)
-  }
-  out
+  df <- tibble::tibble(x = as.numeric(x), n = n, items_averaged = items)
+  out <- scrutiny::grim_map(df, digits_x = digits, data_type = "integer",
+                            rounding = rounding)
+  as.logical(out$consistency)
 }
 
 # Internal: the grid-consistency vector for every unique (digits, n, items),
@@ -61,7 +44,7 @@
     t <- todo[todo$digits == d, ]
     grid <- formatC((0:(10^d - 1)) / 10^d, format = "f", digits = d)
     len <- length(grid)
-    cons <- .grim_map_consistency(
+    cons <- .grim_observed(
       x = rep(grid, nrow(t)), n = rep(t$n, each = len),
       items = rep(t$items, each = len), digits = d, rounding = rounding
     )

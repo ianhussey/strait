@@ -8,8 +8,8 @@
 .quasi_band <- function(mean, n, l, u, mg) {
   data.frame(
     mean = mean,
-    lo = sd_min_quasi_integer(mg * (mean - l), n) / mg,
-    hi = sd_max_structure_s(mg * (mean - l), n, 0, mg * (u - l)) / mg
+    min_sd = sd_min_quasi_integer(mg * (mean - l), n) / mg,
+    max_sd = sd_max_structure_s(mg * (mean - l), n, 0, mg * (u - l)) / mg
   )
 }
 
@@ -37,18 +37,18 @@
 
 .gcd2 <- function(a, b) { while (b) { t <- b; b <- a %% b; a <- t }; a }
 
-# Internal: apply one reporting-rounding convention, using scrutiny's
-# implementations so that the vocabulary matches the rest of the error-detection
-# ecosystem. "native" is base R's round(), which rounds halves to even.
+# Internal: apply one reporting-rounding convention, using roundwork's
+# implementations (formerly scrutiny's) so that the vocabulary matches the rest
+# of the error-detection ecosystem. "native" is base R's round(), which rounds halves to even.
 .round_reported <- function(x, digits, rounding) {
   switch(rounding,
-    half_up    = scrutiny::round_up(x, digits),
-    half_down  = scrutiny::round_down(x, digits),
+    half_up    = roundwork::round_up(x, digits),
+    half_down  = roundwork::round_down(x, digits),
     native     = round(x, digits),
-    ceiling    = scrutiny::round_ceiling(x, digits),
-    floor      = scrutiny::round_floor(x, digits),
-    trunc      = scrutiny::round_trunc(x, digits),
-    anti_trunc = scrutiny::round_anti_trunc(x, digits),
+    ceiling    = roundwork::round_ceiling(x, digits),
+    floor      = roundwork::round_floor(x, digits),
+    trunc      = roundwork::round_trunc(x, digits),
+    anti_trunc = roundwork::round_anti_trunc(x, digits),
     stop("unknown rounding rule: ", rounding)
   )
 }
@@ -147,17 +147,99 @@
 
 #' Feasible-region data for one constraint set
 #'
-#' The `(mean, lo, hi)` band, or the lattice of attainable reported `(mean, sd)`
-#' tuples, for a chosen constraint set. See [plot_sd_region()] for the `rule`
-#' vocabulary; this is the data behind that plot.
+#' The `(mean, min_sd, max_sd)` band, or the lattice of attainable reported
+#' `(mean, sd)` tuples, for a chosen constraint set. [sd_region_plot()] draws
+#' it, and [umbrella_plot()] draws the bands of the umbrella-shaped rules.
 #'
-#' @inheritParams plot_sd_region
-#' @return For band rules, a data frame with `mean`, `lo`, `hi`. For the lattice
-#'   rules (`"integer"`, `"integer_alpha"`, `"attainable"`,
-#'   `"attainable_alpha"`), a data frame with `mean`, `sd`: the tuples passing
-#'   every applicable test. The `type` attribute is `"band"` or `"points"`.
+#' Rules, in the order they enter the framework (`n_items > 1` puts every rule in
+#' mean-score units for a composite of that many integer items):
+#'
+#' \describe{
+#'   \item{`"range"`}{`(u - l)/sqrt(2)`, no floor; ignores `n` and the mean
+#'     (Popoviciu 1935, range only).}
+#'   \item{`"range_n"`}{the parity ceiling, no floor (Popoviciu, as restored by
+#'     Petocz 2005).}
+#'   \item{`"mean"`, `"muilwijk"`}{Muilwijk's mean-conditional ceiling as
+#'     originally stated, over a floor of zero (Muilwijk 1966; Bhatia-Davis
+#'     2000). A valid ceiling at every mean, but attained only where the counts
+#'     at each limit come out whole, so it is conservative elsewhere: see
+#'     `"mestdagh"` for the same constraint set with the count-parity
+#'     correction applied, and [sd_delta()] for the correction itself. At
+#'     `n = 7` on a 1-7 scale the two differ by up to 0.64 SD units. The two
+#'     names are aliases.}
+#'   \item{`"mean_naive_floor"`}{that arch plus the naive Bernoulli floor
+#'     (Fuenderich et al. 2025).}
+#'   \item{`"pesant_regin"`}{integer minimum with a loose (parity) ceiling
+#'     (Pesant and Regin 2005).}
+#'   \item{`"mestdagh"`}{the sharp integer maximum, no floor (Mestdagh et al.
+#'     2018): `"mean"` with the count-parity correction, hence never above it.}
+#'   \item{`"quasi"`}{both bounds sharp and GRIM-free (this package's default).
+#'     This is the umbrella, which [umbrella_plot()] fills when given this
+#'     band.}
+#'   \item{`"alpha"`}{additionally conditioning on a reported Cronbach's `alpha`;
+#'     needs `n_items >= 2`.}
+#'   \item{`"integer"`}{strictly integer data: the lattice of reported
+#'     `(mean, sd)` tuples passing GRIM, GRIMMER and the bounds — that is,
+#'     exactly what [brimmer()] admits. Built via [umbrella_data()], so the
+#'     pairs are rounded to `digits`. A set of points, because no band is
+#'     defined at means and SDs integer data cannot produce.}
+#'   \item{`"integer_alpha"`}{that lattice, additionally inside the
+#'     alpha-conditional bounds.}
+#'   \item{`"attainable"`}{the EXACT attainable `(mean, sd)` tuples of strictly
+#'     integer data, with no reporting grid and so no `digits`. Unlike
+#'     `"integer"` this shows the true interior holes, which rounding to a
+#'     reporting grid smears shut; it is enumerated by dynamic programming and
+#'     errors if the lattice is too large.}
+#'   \item{`"attainable_alpha"`}{those exact tuples, additionally inside the
+#'     alpha-conditional bounds.}
+#' }
+#'
+#' The two lattice rules are easy to confuse and the difference is not small.
+#' GRIMMER is necessary but not sufficient for an integer sample to exist, so
+#' the attainable set is a strict subset of the GRIMMER-consistent one. At
+#' `l = 1, u = 5, n = 10, digits = 2` there are 491 GRIMMER-consistent reported
+#' pairs against 447 attainable ones rounded to the same grid: 9 percent pass
+#' `"integer"` without being attainable, and none go the other way. At
+#' `l = 0, u = 6, n = 23` with two items the gap is 23,738 against 8,634. Use
+#' [brimmest()] to certify a single tuple rather than rounding a lattice to
+#' compare against.
+#'
+#' Note also that `"integer"` returns pairs already rounded to `digits`, so
+#' testing membership means rounding the candidate first: an exact sample SD of
+#' 0.5270463 matches nothing until it becomes 0.53.
+#'
+#' @param l,u Numeric scalars, the scale limits (mean-score units when
+#'   `n_items > 1` and `scoring` is left at its default).
+#' @param n Integer scalar, sample size.
+#' @param rule Which constraint set; see Details.
+#' @param scoring One of `"singleitem"`, `"sumscored"`, `"meanscored"`, as in
+#'   [sd_bounds()]. Defaults to `"meanscored"` when `n_items > 1` and
+#'   `"singleitem"` otherwise. Under `"sumscored"`, `l` and `u` are the
+#'   composite's limits and the reported values live on the unit grid, so
+#'   `n_items` enters only as Cronbach's alpha's `k`.
+#' @param n_items Integer, number of items in the composite (default 1).
+#' @param alpha Reported Cronbach's alpha; required by the alpha rules.
+#' @param digits Reported decimal places, used by the rounded lattice rules
+#'   (default 2); ignored by the exact `"attainable"` rules.
+#' @param round_digits Optionally round the returned `(mean, sd)` lattice to
+#'   this many decimal places, collapsing pairs that round together. `NULL`
+#'   (default) returns them unrounded, which for the `"attainable"` rules means
+#'   exactly. Band rules are unaffected: rounding a bound can turn it
+#'   anti-conservative, so bounds are always returned at full precision.
+#' @param rounding How to round when `round_digits` is given. `"half_up"`
+#'   (default) and the other named rules use roundwork's implementations, so the
+#'   vocabulary matches GRIM and GRIMMER; `"native"` is base R's `round()`,
+#'   which rounds halves to even.
+#' @param by Optional mean-grid spacing (default `(u - l) / 1000`); ignored by
+#'   the lattice rules, which step by `10^-digits`.
+#' @return For band rules, a data frame with `mean`, `min_sd`, `max_sd`, which
+#'   are `NA` where no SD is possible; its `"step"` attribute is the grid
+#'   spacing `by`. For the lattice rules (`"integer"`, `"integer_alpha"`,
+#'   `"attainable"`, `"attainable_alpha"`), a data frame with `mean`, `sd`: the
+#'   tuples passing every applicable test. The `type` attribute is `"band"` or
+#'   `"points"`.
 #' @examples
-#' # a band rule returns (mean, lo, hi) across the scale
+#' # a band rule returns (mean, min_sd, max_sd) across the scale
 #' band <- sd_region_data(l = 1, u = 5, n = 7, rule = "quasi")
 #' head(band)
 #' attr(band, "type")
@@ -213,11 +295,11 @@ sd_region_data <- function(l, u, n,
       bd <- do.call(rbind, lapply(mus, function(mu) {
         d <- sd_bounds(l = l, u = u, n = n, mean = mu, Z = "integer",
                        scoring = scoring, n_items = k, alpha = alpha)
-        data.frame(mean = mu, lo = d$min_sd, hi = d$max_sd,
+        data.frame(mean = mu, min_sd = d$min_sd, max_sd = d$max_sd,
                    ok = isTRUE(d$feasible) && !is.na(d$min_sd))
       }))
       out <- merge(out, bd, by = "mean")
-      out <- out[out$ok & out$sd >= out$lo - 1e-9 & out$sd <= out$hi + 1e-9,
+      out <- out[out$ok & out$sd >= out$min_sd - 1e-9 & out$sd <= out$max_sd + 1e-9,
                  c("mean", "sd"), drop = FALSE]
       out <- out[order(out$mean, out$sd), , drop = FALSE]
     }
@@ -233,14 +315,14 @@ sd_region_data <- function(l, u, n,
   naive <- sd_min_integer(g$mg * m, n) / g$mg  # strict Bernoulli floor, off-grid too
 
   d <- switch(rule,
-    range        = data.frame(mean = m, lo = 0,      hi = sd_max_span(l, u)),
-    range_n      = data.frame(mean = m, lo = 0,      hi = sd_max_span_n(l, u, n)),
-    mean         = data.frame(mean = m, lo = 0,      hi = sd_max_muilwijk(m, n, l, u)),
-    mean_naive_floor = data.frame(mean = m, lo = naive,
-                                  hi = sd_max_muilwijk(m, n, l, u)),
-    mestdagh     = data.frame(mean = m, lo = 0,      hi = q$hi),
-    pesant_regin = data.frame(mean = m, lo = q$lo,   hi = sd_max_span_n(l, u, n)),
-    quasi        = data.frame(mean = m, lo = q$lo,   hi = q$hi),
+    range        = data.frame(mean = m, min_sd = 0,      max_sd = sd_max_span(l, u)),
+    range_n      = data.frame(mean = m, min_sd = 0,      max_sd = sd_max_span_n(l, u, n)),
+    mean         = data.frame(mean = m, min_sd = 0,      max_sd = sd_max_muilwijk(m, n, l, u)),
+    mean_naive_floor = data.frame(mean = m, min_sd = naive,
+                                  max_sd = sd_max_muilwijk(m, n, l, u)),
+    mestdagh     = data.frame(mean = m, min_sd = 0,      max_sd = q$max_sd),
+    pesant_regin = data.frame(mean = m, min_sd = q$min_sd,   max_sd = sd_max_span_n(l, u, n)),
+    quasi        = data.frame(mean = m, min_sd = q$min_sd,   max_sd = q$max_sd),
     alpha        = {
       cc <- (k - 1) / k
       D  <- 1 - cc * alpha
@@ -249,173 +331,94 @@ sd_region_data <- function(l, u, n,
       ceil_a <- sqrt((n / (n - 1)) *
                      v_max_alpha(g$to_sum(m), k, n, g$item_l, g$item_u) / D) / g$sd_div
       data.frame(mean = m,
-                 lo = q$lo / sqrt(D),          # alpha-amplified quasi-integer floor
-                 hi = pmin(ceil_a, q$hi))      # alpha can only tighten
+                 min_sd = q$min_sd / sqrt(D),          # alpha-amplified quasi-integer floor
+                 max_sd = pmin(ceil_a, q$max_sd))      # alpha can only tighten
     }
   )
   # an empty band (floor above ceiling) is infeasible, not a negative region
-  bad <- d$lo > d$hi + 1e-12
-  d$lo[bad] <- NA_real_; d$hi[bad] <- NA_real_
+  bad <- d$min_sd > d$max_sd + 1e-12
+  d$min_sd[bad] <- NA_real_; d$max_sd[bad] <- NA_real_
   attr(d, "type") <- "band"
+  attr(d, "step") <- by
   d
 }
 
-#' Plot the feasible SD region for a chosen constraint set
+#' Plot the feasible SD region for a constraint set
 #'
-#' Draws the region of sample SDs a constraint set asserts to be possible, as a
-#' function of the mean, with the sharp quasi-integer band optionally repeated as
-#' a dashed reference. This reproduces the panels of the nested-constraints
-#' figure in the STRAIT article from a single entry point.
+#' Draws what one constraint set from [sd_region_data()] asserts to be
+#' possible: a band of sample SDs as a function of the mean, or a lattice of
+#' attainable `(mean, sd)` tuples. A second band can be drawn as a dashed
+#' reference, such as the sharp `"quasi"` band that the other rules are judged
+#' against. Together these reproduce the panels of the nested-constraints
+#' figure in the STRAIT article.
 #'
-#' Rules, in the order they enter the framework (`n_items > 1` puts every rule in
-#' mean-score units for a composite of that many integer items):
-#'
-#' \describe{
-#'   \item{`"range"`}{`(u - l)/sqrt(2)`, no floor; ignores `n` and the mean
-#'     (Popoviciu 1935, range only).}
-#'   \item{`"range_n"`}{the parity ceiling, no floor (Popoviciu, as restored by
-#'     Petocz 2005).}
-#'   \item{`"mean"`, `"muilwijk"`}{Muilwijk's mean-conditional ceiling as
-#'     originally stated, over a floor of zero (Muilwijk 1966; Bhatia-Davis
-#'     2000). A valid ceiling at every mean, but attained only where the counts
-#'     at each limit come out whole, so it is conservative elsewhere: see
-#'     `"mestdagh"` for the same constraint set with the count-parity
-#'     correction applied, and [sd_delta()] for the correction itself. At
-#'     `n = 7` on a 1-7 scale the two differ by up to 0.64 SD units. The two
-#'     names are aliases.}
-#'   \item{`"mean_naive_floor"`}{that arch plus the naive Bernoulli floor
-#'     (Fuenderich et al. 2025).}
-#'   \item{`"pesant_regin"`}{integer minimum with a loose (parity) ceiling
-#'     (Pesant and Regin 2005).}
-#'   \item{`"mestdagh"`}{the sharp integer maximum, no floor (Mestdagh et al.
-#'     2018): `"mean"` with the count-parity correction, hence never above it.}
-#'   \item{`"quasi"`}{both bounds sharp and GRIM-free (this package's default).}
-#'   \item{`"alpha"`}{additionally conditioning on a reported Cronbach's `alpha`;
-#'     needs `n_items >= 2`.}
-#'   \item{`"integer"`}{strictly integer data: the lattice of reported
-#'     `(mean, sd)` tuples passing GRIM, GRIMMER and the bounds — that is,
-#'     exactly what [brimmer()] admits. Built via [umbrella_data()], so the
-#'     pairs are rounded to `digits`. Drawn as points, because no band is
-#'     defined at means and SDs integer data cannot produce.}
-#'   \item{`"integer_alpha"`}{that lattice, additionally inside the
-#'     alpha-conditional bounds.}
-#'   \item{`"attainable"`}{the EXACT attainable `(mean, sd)` tuples of strictly
-#'     integer data, with no reporting grid and so no `digits`. Unlike
-#'     `"integer"` this shows the true interior holes, which rounding to a
-#'     reporting grid smears shut; it is enumerated by dynamic programming and
-#'     errors if the lattice is too large.}
-#'   \item{`"attainable_alpha"`}{those exact tuples, additionally inside the
-#'     alpha-conditional bounds.}
-#' }
-#'
-#' The two lattice rules are easy to confuse and the difference is not small.
-#' GRIMMER is necessary but not sufficient for an integer sample to exist, so
-#' the attainable set is a strict subset of the GRIMMER-consistent one. At
-#' `l = 1, u = 5, n = 10, digits = 2` there are 491 GRIMMER-consistent reported
-#' pairs against 447 attainable ones rounded to the same grid: 9 percent pass
-#' `"integer"` without being attainable, and none go the other way. At
-#' `l = 0, u = 6, n = 23` with two items the gap is 23,738 against 8,634. Use
-#' [brimmest()] to certify a single tuple rather than rounding a lattice to
-#' compare against.
-#'
-#' Note also that `"integer"` returns pairs already rounded to `digits`, so
-#' testing membership means rounding the candidate first: an exact sample SD of
-#' 0.5270463 matches nothing until it becomes 0.53.
-#'
-#' @param l,u Numeric scalars, the scale limits (mean-score units when
-#'   `n_items > 1` and `scoring` is left at its default).
-#' @param n Integer scalar, sample size.
-#' @param rule Which constraint set to draw; see Details.
-#' @param scoring One of `"singleitem"`, `"sumscored"`, `"meanscored"`, as in
-#'   [sd_bounds()]. Defaults to `"meanscored"` when `n_items > 1` and
-#'   `"singleitem"` otherwise. Under `"sumscored"`, `l` and `u` are the
-#'   composite's limits and the reported values live on the unit grid, so
-#'   `n_items` enters only as Cronbach's alpha's `k`.
-#' @param n_items Integer, number of items in the composite (default 1).
-#' @param alpha Reported Cronbach's alpha; required by the alpha rules.
-#' @param digits Reported decimal places, used by the rounded lattice rules
-#'   (default 2); ignored by the exact `"attainable"` rules.
-#' @param round_digits Optionally round the returned `(mean, sd)` lattice to
-#'   this many decimal places, collapsing pairs that round together. `NULL`
-#'   (default) returns them unrounded, which for the `"attainable"` rules means
-#'   exactly. Band rules are unaffected: rounding a bound can turn it
-#'   anti-conservative, so bounds are always returned at full precision.
-#' @param rounding How to round when `round_digits` is given. `"half_up"`
-#'   (default) and the other named rules use scrutiny's implementations, so the
-#'   vocabulary matches GRIM and GRIMMER; `"native"` is base R's `round()`,
-#'   which rounds halves to even.
-#' @param reference Draw the alpha-free sharp quasi-integer band as a dashed
-#'   reference (default `TRUE`; skipped for `rule = "quasi"`, which is that band).
+#' @param data Output of [sd_region_data()]: a band, with `mean`, `min_sd`, and
+#'   `max_sd`, or a lattice, with `mean` and `sd`, filtered by `consistent`
+#'   when that column is present, as in [umbrella_data()] output.
+#' @param reference Optional band to draw as a dashed reference, such as
+#'   `sd_region_data(l, u, n, rule = "quasi")` for the same design.
+#'   [sd_bounds_curve()] output works too.
 #' @param title Optional plot title.
-#' @param by Optional mean-grid spacing (default `(u - l) / 1000`); ignored by
-#'   the lattice rules, which step by `10^-digits`.
-#' @param shade `"outside"` (default) shades the infeasible region and leaves
-#'   the feasible one clear, matching [plot_sd_bounds()]; `"inside"` fills the
-#'   band. The outside form is drawn with [band_polygon()], so a rule whose
-#'   band is undefined at some means — the alpha rules near each limit — leaves
+#' @param shade For a band, `"outside"` (default) shades the infeasible region
+#'   and leaves the feasible one clear, matching [sd_bounds_plot()]; `"inside"`
+#'   fills the band. The outside form is drawn with [band_polygon()], so a band
+#'   that is undefined at some means — the alpha rules near each limit — leaves
 #'   those means shaded rather than blank.
 #' @param expand Padding around the plotted region, as a proportion of the
-#'   scale width `u - l` rather than a fixed number of SD units, so the margin
-#'   looks the same on a 1-5 scale and a 0-100 one. Applied to both axes.
+#'   range of the means (the scale width) rather than a fixed number of SD
+#'   units, so the margin looks the same on a 1-5 scale and a 0-100 one.
+#'   Applied to both axes.
 #' @param fill,line_colour,reference_colour,point_colour,point_size Appearance.
 #' @return A ggplot object.
 #' @examples
-#' plot_sd_region(l = 1, u = 5, n = 7, rule = "mean")            # Bhatia-Davis
-#' plot_sd_region(l = 1, u = 5, n = 7, rule = "quasi")           # sharp, GRIM-free
+#' quasi <- sd_region_data(l = 1, u = 5, n = 7, rule = "quasi")
+#' sd_region_plot(quasi)                                   # sharp, GRIM-free
+#' sd_region_plot(sd_region_data(l = 1, u = 5, n = 7, rule = "mean"),
+#'                reference = quasi)                       # Bhatia-Davis
 #' \donttest{
 #' # digits = 1 keeps the reporting grid small: the lattice rules screen every
-#' # cell with GRIMMER, which is ~25x slower on CRAN scrutiny (0.6.1) than on
-#' # later versions
-#' plot_sd_region(l = 1, u = 5, n = 7, rule = "integer",         # attainable tuples
-#'                digits = 1)
-#' plot_sd_region(l = 1, u = 5, n = 7, rule = "alpha",
-#'                n_items = 2, alpha = 0.7)
+#' # cell with GRIMMER
+#' sd_region_plot(sd_region_data(l = 1, u = 5, n = 7, rule = "integer",
+#'                               digits = 1),
+#'                reference = quasi)                       # attainable tuples
+#' sd_region_plot(sd_region_data(l = 1, u = 5, n = 7, rule = "alpha",
+#'                               n_items = 2, alpha = 0.7),
+#'                reference = sd_region_data(l = 1, u = 5, n = 7,
+#'                                           rule = "quasi", n_items = 2))
 #' }
 #' @export
-plot_sd_region <- function(l, u, n,
-                           rule = c("quasi", "range", "range_n", "mean", "muilwijk",
-                                    "mean_naive_floor", "mestdagh",
-                                    "pesant_regin", "alpha", "integer",
-                                    "integer_alpha", "attainable",
-                                    "attainable_alpha"),
-                           scoring = NULL,
-                           n_items = 1, alpha = NULL, digits = 2,
-                           round_digits = NULL, rounding = "half_up",
-                           reference = TRUE, title = NULL, by = NULL,
+sd_region_plot <- function(data, reference = NULL, title = NULL,
                            shade = c("outside", "inside"), expand = 0.03,
                            fill = "grey85", line_colour = "black",
                            reference_colour = "grey45",
                            point_colour = "#1d4ed8", point_size = 0.5) {
-  rule <- match.arg(rule)
-  if (rule == "muilwijk") rule <- "mean"          # alias: named for its author
   shade <- match.arg(shade)
   stopifnot(requireNamespace("ggplot2", quietly = TRUE))
-  d <- sd_region_data(l = l, u = u, n = n, rule = rule, scoring = scoring,
-                      n_items = n_items, alpha = alpha, digits = digits,
-                      by = by, round_digits = round_digits,
-                      rounding = rounding)
-  gg <- .scoring_geometry(
-    if (is.null(scoring)) (if (n_items > 1) "meanscored" else "singleitem")
-    else match.arg(scoring, c("singleitem", "sumscored", "meanscored")),
-    n_items, l, u)
+  is_band <- !"sd" %in% names(data)
+  if (is_band) {
+    data <- .band_mask(data)
+  } else if ("consistent" %in% names(data)) {
+    # full umbrella_data() output: only the consistent tuples exist
+    data <- data[!is.na(data$consistent) & data$consistent, , drop = FALSE]
+  }
+  ref <- if (!is.null(reference)) .band_mask(reference)
 
   p <- ggplot2::ggplot()
   # the region itself first, so the dashed reference stays visible on top of it
-  if (identical(attr(d, "type"), "band")) {
+  if (is_band) {
     if (shade == "inside") {
-      p <- p + ggplot2::geom_ribbon(data = d,
+      p <- p + ggplot2::geom_ribbon(data = data,
                                     ggplot2::aes(x = .data$mean,
-                                                 ymin = .data$lo,
-                                                 ymax = .data$hi),
+                                                 ymin = .data$min_sd,
+                                                 ymax = .data$max_sd),
                                     fill = fill, na.rm = TRUE)
     } else {
       # Knock the feasible rings out of a shaded panel rather than assembling
       # the shading around them. The alpha rules leave stretches near each
-      # limit where no composite exists and `lo`/`hi` are NA; a ribbon draws
-      # nothing there, so assembled shading would leave those means unshaded
-      # and imply every SD is possible at them. See band_polygon().
-      step <- if (is.null(by)) (u - l) / 1000 else by
-      rings <- band_polygon(d, by = step)
+      # limit where no composite exists and `min_sd`/`max_sd` are NA; a ribbon
+      # draws nothing there, so assembled shading would leave those means
+      # unshaded and imply every SD is possible at them. See band_polygon().
+      rings <- band_polygon(data, by = .band_step(data))
       p <- p + ggplot2::annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf,
                                  ymax = Inf, fill = "grey10", alpha = 0.12)
       if (!is.null(rings))
@@ -425,43 +428,38 @@ plot_sd_region <- function(l, u, n,
     }
   }
 
-  # dashed reference: the sharp alpha-free band this rule should be judged against
-  if (isTRUE(reference) && rule != "quasi") {
-    step <- if (is.null(by)) (u - l) / 1000 else by
-    ref <- .quasi_band(seq(l, u, by = step), n, l, u, gg$mg)
+  if (!is.null(ref)) {
     p <- p +
-      ggplot2::geom_line(data = ref, ggplot2::aes(.data$mean, .data$hi),
+      ggplot2::geom_line(data = ref, ggplot2::aes(.data$mean, .data$max_sd),
                          colour = reference_colour, linetype = "dashed",
                          linewidth = 0.25, na.rm = TRUE) +
-      ggplot2::geom_line(data = ref, ggplot2::aes(.data$mean, .data$lo),
+      ggplot2::geom_line(data = ref, ggplot2::aes(.data$mean, .data$min_sd),
                          colour = reference_colour, linetype = "dashed",
                          linewidth = 0.25, na.rm = TRUE)
   }
 
-  if (identical(attr(d, "type"), "points")) {
-    p <- p + ggplot2::geom_point(data = d, ggplot2::aes(.data$mean, .data$sd),
+  if (is_band) {
+    p <- p +
+      ggplot2::geom_line(data = data, ggplot2::aes(.data$mean, .data$max_sd),
+                         colour = line_colour, linewidth = 0.4, na.rm = TRUE) +
+      ggplot2::geom_line(data = data, ggplot2::aes(.data$mean, .data$min_sd),
+                         colour = line_colour, linewidth = 0.4, na.rm = TRUE)
+  } else {
+    p <- p + ggplot2::geom_point(data = data, ggplot2::aes(.data$mean, .data$sd),
                                  colour = point_colour, size = point_size,
                                  na.rm = TRUE)
-  } else {
-    p <- p +
-      ggplot2::geom_line(data = d, ggplot2::aes(.data$mean, .data$hi),
-                         colour = line_colour, linewidth = 0.4, na.rm = TRUE) +
-      ggplot2::geom_line(data = d, ggplot2::aes(.data$mean, .data$lo),
-                         colour = line_colour, linewidth = 0.4, na.rm = TRUE)
   }
 
   # limits are set from the data rather than left to ggplot2, because the
   # outside shading needs finite ones; padding is a proportion of the scale
   # width so the margin is constant across scales of very different widths.
-  pad <- expand * (u - l)
-  y_hi <- if (identical(attr(d, "type"), "points"))
-            max(d$sd, na.rm = TRUE)
-          else max(c(d$hi, if (isTRUE(reference) && rule != "quasi")
-                             .quasi_band(seq(l, u, length.out = 101), n, l, u,
-                                         gg$mg)$hi), na.rm = TRUE)
+  means <- range(c(data$mean, reference$mean), na.rm = TRUE)
+  pad <- expand * diff(means)
+  y_hi <- max(c(if (is_band) data$max_sd else data$sd, ref$max_sd),
+              na.rm = TRUE)
 
   p +
-    ggplot2::coord_cartesian(xlim = c(l - pad, u + pad),
+    ggplot2::coord_cartesian(xlim = means + c(-pad, pad),
                              ylim = c(-pad, y_hi + pad), expand = FALSE) +
     ggplot2::labs(x = "Mean", y = "Sample standard deviation", title = title) +
     ggplot2::theme_minimal() +

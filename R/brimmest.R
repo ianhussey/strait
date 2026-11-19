@@ -1,5 +1,5 @@
 # Exact certification of reported (mean, SD) tuples against the attainable
-# lattice of strictly integer data. See R/plot_sd_region.R for the dynamic
+# lattice of strictly integer data. See R/sd_region_plot.R for the dynamic
 # program that enumerates the lattice.
 
 # Internal: forward-round lattice values straight to whole numbers of

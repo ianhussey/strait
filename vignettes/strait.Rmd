@@ -132,7 +132,7 @@ brimmer_multiple(reports, l = 1, u = 7, n = 30,
 ## Visualising the feasible envelope
 
 `sd_bounds_curve()` traces the floor and ceiling across the mean;
-`plot_sd_bounds()` draws the band and, optionally, reported points coloured by
+`sd_bounds_plot()` draws the band and, optionally, reported points coloured by
 consistency.
 
 ```{r}
@@ -141,7 +141,7 @@ points <- brimmer_multiple(
   data.frame(mean = c(3.0, 4.0, 2.5), sd = c(2.5, 0.2, 3.6)),
   l = 1, u = 7, n = 30, mean_digits = 1, sd_digits = 1, Z = "quasiinteger")
 
-plot_sd_bounds(curve, points = points)
+sd_bounds_plot(curve, reports = points)
 ```
 
 Shading marks what is *ruled out*, so the clear region is the answer to the
@@ -151,7 +151,7 @@ rather than a fixed number of SD units, so a 1–7 scale and a 0–100 one are
 padded alike.
 
 ```{r}
-plot_sd_bounds(curve, points = points, shade = "inside", expand = 0.06)
+sd_bounds_plot(curve, reports = points, shade = "inside", expand = 0.06)
 ```
 
 On the POMP scale, `reference = "parity"` keeps the geometry undistorted (a
@@ -159,19 +159,21 @@ linear rescaling), while `reference = "sharp"` maps the feasible region to the
 unit square so a point's height is its position within the band.
 
 ```{r}
-plot_sd_bounds_pomp(curve, points = points, reference = "sharp")
+sd_bounds_pomp_plot(curve, reports = points, reference = "sharp")
 ```
 
 ## The nested constraints, drawn
 
-Each constraint set in the framework is a `rule` that `plot_sd_region()` can
-draw on its own, which is the quickest way to see what adding a constraint buys.
+Each constraint set in the framework is a `rule` of `sd_region_data()`, and
+`sd_region_plot()` draws it on its own, optionally against another as a dashed
+reference. That is the quickest way to see what adding a constraint buys.
 
 ```{r}
-plot_sd_region(l = 1, u = 5, n = 7, rule = "muilwijk",
+quasi <- sd_region_data(l = 1, u = 5, n = 7, rule = "quasi")
+sd_region_plot(sd_region_data(l = 1, u = 5, n = 7, rule = "muilwijk"),
+               reference = quasi,
                title = "Muilwijk's ceiling, as originally stated")
-plot_sd_region(l = 1, u = 5, n = 7, rule = "quasi",
-               title = "Both bounds sharp, and GRIM-free")
+sd_region_plot(quasi, title = "Both bounds sharp, and GRIM-free")
 ```
 
 `"muilwijk"` (an alias for `"mean"`) lets the counts at each limit be
@@ -195,24 +197,23 @@ becoming blank, which would wrongly suggest any SD were possible there.
 
 ```{r}
 d <- sd_region_data(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70)
-c(means = nrow(d), undefined = sum(is.na(d$lo)),
+c(means = nrow(d), undefined = sum(is.na(d$min_sd)),
   rings = length(unique(band_polygon(d, by = 3 / 1000)$ring)))
 
-plot_sd_region(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70,
-               title = "A reported alpha: three rings, not one band")
+sd_region_plot(d, title = "A reported alpha: three rings, not one band")
 ```
 
 ## The umbrella
 
 `umbrella_data()` builds the full grid of reported (mean, SD) pairs at a given
 reporting precision, tagging each as consistent, GRIMMER-inconsistent, or out of
-bounds. `plot_umbrella()` draws only the consistent ones by default, since every
+bounds. `umbrella_plot()` draws only the consistent ones by default, since every
 other cell is a value that cannot be reported.
 
 ```{r}
 um  <- umbrella_data(n = 14, l = 1, u = 7, digits = 2)
 cur <- sd_bounds_curve(l = 1, u = 7, n = 14, Z = "quasiinteger")
-plot_umbrella(um, curve = cur)
+umbrella_plot(um, bounds = cur)
 ```
 
 The vertical striping is the real structure: the means an integer sum can round
@@ -221,8 +222,56 @@ bounds rule out from what GRIMMER additionally rules out — useful for expositi
 though it spends most of its ink on impossible values.
 
 ```{r}
-plot_umbrella(um, curve = cur, style = "tiles")
+umbrella_plot(um, bounds = cur, style = "tiles")
 ```
+
+Given a band instead, `umbrella_plot()` draws the umbrella itself: the
+continuous region that the reportable values are drawn from. The sharp band of
+`sd_bounds_curve()` has a kink at every multiple of `1 / n`; the band of
+`rule = "mean_naive_floor"` is smooth, since both of its edges are variances of
+two-point distributions (the Bhatia-Davis ceiling, and an arch between each
+pair of neighbouring whole numbers).
+
+```{r}
+umbrella_plot(cur)
+umbrella_plot(sd_region_data(l = 1, u = 7, n = 14, rule = "mean_naive_floor"))
+```
+
+Those two edges are members of one family. A sample on just two values, `x`
+and `y`, has an SD that traces an arch from `x` to `y` as its mean moves between
+them: `sd_max_muilwijk(mean, n, lower = x, upper = y)`, a semicircle when the
+population SD is drawn in the same units as the mean. The ceiling is the arch
+between the scale limits, the integer floor (`sd_min_integer()`) the arches
+between neighbouring whole numbers, and every other pair of values spans an
+arch in between. (In the
+[earliest umbrella plot](https://jamesheathers.medium.com/sprite-interlude-the-umbrella-graph-connecting-grim-and-sprite-also-brunch-sucks-1266c629c974),
+Heathers likens the ceiling to an umbrella's ribs and the floor to its
+scalloped canopy edge; the inner arches show up among the points of its
+canopy.) These inner arches never bound a report, since each is a sample that
+exists. But each is the ceiling for data confined to its two values, and that
+makes them useful.
+
+## What the data must contain
+
+A report whose SD rises above the arch over `[2, 7]` cannot come from data that
+avoid the value 1. `implied_range()` turns this around: it finds how far the
+smallest observation is forced down, and the largest up, by moving each scale
+limit inward until `brimmer()` no longer calls the report consistent.
+
+```{r}
+# near the ceiling: the data must include both a 1 and a 7
+implied_range(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
+              sd = 2.83, sd_digits = 2, Z = "integer")
+
+# a small SD: at least one response of 3 or lower, and one of 5 or higher
+implied_range(l = 1, u = 7, n = 30, mean = 4.00, mean_digits = 2,
+              sd = 0.53, sd_digits = 2, Z = "integer")
+```
+
+This never flags a report; it says what the data behind a consistent one must
+look like. A sample forced onto both scale limits is a sample split into
+opposing camps, which may be plausible for a polarising question and
+implausible for most others.
 
 ## Settling what survives
 

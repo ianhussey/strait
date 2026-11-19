@@ -7,7 +7,7 @@
 #
 # Results can be read in the measure's own units or in the scale-free (POMP)
 # units of the STRAIT article, against either of two reference denominators;
-# see the "About" panel and `?plot_sd_bounds_pomp`.
+# see the "About" panel and `?sd_bounds_pomp_plot`.
 #
 # Hussey, I. (2026). strait: Bounds checks for reported summary statistics.
 # https://doi.org/10.5281/zenodo.21439905
@@ -19,13 +19,12 @@ library(bslib)
 library(ggplot2)
 library(strait)
 
-# The shading of the feasible region relies on sd_bounds_curve() recording the
-# mean-grid spacing that plot_sd_bounds() needs, which arrived in 0.4.10. An
-# older install draws the band as thousands of slivers instead of one region,
-# and does so silently, so refuse to start rather than deploy a wrong figure.
-if (utils::packageVersion("strait") < "0.4.10") {
+# The plots are drawn by sd_bounds_plot() and sd_bounds_pomp_plot(), which took
+# these names, and `reports` in place of `points`, in 0.5.0. An older install
+# fails on the first plot, so refuse to start rather than deploy a broken app.
+if (utils::packageVersion("strait") < "0.5.0") {
   stop(
-    "This app needs strait >= 0.4.10 (installed: ",
+    "This app needs strait >= 0.5.0 (installed: ",
     utils::packageVersion("strait"),
     "). Update with remotes::install_github('ianhussey/strait').",
     call. = FALSE
@@ -164,7 +163,7 @@ stat_cards <- function(cells) {
 # In both, the same grid is walked through sd_bounds() directly - thinning the
 # kinks to CURVE_MAX_KINKS in the second case - and the POMP columns rebuilt
 # exactly as sd_bounds_curve() builds them, so either branch returns an object
-# plot_sd_bounds() and plot_sd_bounds_pomp() can draw. Only the drawing is
+# sd_bounds_plot() and sd_bounds_pomp_plot() can draw. Only the drawing is
 # approximated: the verdict is computed from the reported values themselves and
 # never from this curve.
 CURVE_MAX_KINKS <- 600L
@@ -179,7 +178,7 @@ bounds_curve <- function(p) {
   if (!p$use_ab && !thinned) {
     # `by` is left at the package default: at half a second for a typical
     # design it is cheap enough, and it resolves the floor's sawtooth exactly.
-    # (sd_bounds_curve() records the spacing it used, so plot_sd_bounds() no
+    # (sd_bounds_curve() records the spacing it used, so sd_bounds_plot() no
     # longer has to guess it, and a coarser `by` would be safe here too.)
     out <- sd_bounds_curve(
       l = p$l, u = p$u, n = p$n, Z = p$Z,
@@ -191,7 +190,7 @@ bounds_curve <- function(p) {
 
   # A strictly uniform grid: the kinks are sampled rather than landed on, which
   # is what "thinned" warns about below the plot, and the spacing is recorded in
-  # the same "step" attribute sd_bounds_curve() sets, so plot_sd_bounds() can
+  # the same "step" attribute sd_bounds_curve() sets, so sd_bounds_plot() can
   # tell a genuine gap in the band from an ordinary interval.
   means <- seq(p$l, p$u, length.out = 1200)
   out <- do.call(rbind, lapply(means, function(mu) {
@@ -799,8 +798,8 @@ server <- function(input, output, session) {
     x
   }
 
-  # one row, in exactly the shape plot_sd_bounds() and plot_sd_bounds_pomp()
-  # take as `points`
+  # one row, in exactly the shape sd_bounds_plot() and sd_bounds_pomp_plot()
+  # take as `reports`
   report <- reactive({
     p <- params()
     do.call(
@@ -887,16 +886,16 @@ server <- function(input, output, session) {
       )
     )
     if (identical(p$units, "native")) {
-      plot_sd_bounds(cur, points = pts, title = title)
+      sd_bounds_plot(cur, reports = pts, title = title)
     } else {
       # both scale-free panels are drawn on one square frame, so the two
       # denominators can be compared by eye. coord_fixed() replaces the
-      # coordinate system plot_sd_bounds_pomp() already set, which ggplot2
+      # coordinate system sd_bounds_pomp_plot() already set, which ggplot2
       # announces; the replacement is the point, so the message is muted.
       # No limits are imposed with it: a reported SD above its denominator
       # belongs on the plot, not clipped off the top of it.
       suppressMessages(
-        plot_sd_bounds_pomp(cur, points = pts, reference = p$reference,
+        sd_bounds_pomp_plot(cur, reports = pts, reference = p$reference,
                             title = title) +
           ggplot2::coord_fixed(ratio = 1)
       )

@@ -307,15 +307,15 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
   grim_v <- NA
   grimmer_v <- NA
   if (Z == "integer" && !is.null(rounding) && !is.null(mean)) {
-    if (!requireNamespace("scrutiny", quietly = TRUE))
-      stop("the scrutiny package is required for GRIM/GRIMMER verdicts under Z = 'integer' with rounding")
-    grim_v <- isTRUE(as.logical(unname(
-      .grim_compat(x = mean, n = n, digits = mean_digits,
-                   items = n_items, rounding = rounding)))[1])
+    # items_averaged is m, not n_items: a sum score is a whole number per
+    # person, so only mean-scored data are averages of several items.
+    grim_v <- isTRUE(as.logical(unname(scrutiny::grim(
+      x = mean, n = n, digits_x = mean_digits, items_averaged = m,
+      data_type = "integer", rounding = rounding)))[1])
     if (!is.null(sd))
-      grimmer_v <- isTRUE(as.logical(unname(
-        .grimmer_compat(x = mean, sd = sd, n = n, digits_x = mean_digits,
-                        digits_sd = sd_digits, items = n_items, rounding = rounding)))[1])
+      grimmer_v <- isTRUE(as.logical(unname(scrutiny::grimmer(
+        x = mean, sd = sd, n = n, digits_x = mean_digits, digits_sd = sd_digits,
+        items_averaged = m, data_type = "integer", rounding = rounding)))[1])
   }
 
   # helper: does the reported sd (as an interval if rounded) overlap the bounds

@@ -20,6 +20,12 @@ All observations on the two integers adjacent to the mean (Pesant & Regin
 GRIM-consistent means; the caller is responsible for that check (see
 \code{\link[=is_grim_consistent]{is_grim_consistent()}}), otherwise use \code{\link[=sd_min_quasi_integer]{sd_min_quasi_integer()}}.
 }
+\details{
+It is the same arch as the ceiling, \code{\link[=sd_max_muilwijk]{sd_max_muilwijk()}}, taken between the
+two integers either side of the mean instead of between the scale limits:
+the floor and the ceiling of the umbrella plot are both SDs of two-value
+samples, at the narrowest and the widest spacing.
+}
 \examples{
 # zero at a whole-number mean, largest half way between two integers
 sd_min_integer(mean = 3, n = 30)

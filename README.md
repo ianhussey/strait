@@ -56,7 +56,7 @@ brim(l = 1, u = 7, n = 30, mean = 3.51, mean_digits = 2, Z = "integer")
 
 `brimmer()` also adds Percent-Of-Maximum-Possible (POMP) transforms of the mean and SD so results from different scales can be compared on one axis. `brimmer_multiple()` applies it across a data frame.
 
-`umbrella_data()` builds the full grid of reported means and SDs for a design, tagging each as consistent, GRIMMER-inconsistent or out of bounds, which `plot_umbrella()` renders as the characteristic "umbrella" of feasible values.
+`umbrella_data()` builds the full grid of reported means and SDs for a design, tagging each as consistent, GRIMMER-inconsistent or out of bounds, which `umbrella_plot()` renders as the characteristic "umbrella" of feasible values.
 
 ### Exact certification
 
@@ -135,14 +135,14 @@ curve  <- sd_bounds_curve(l = 1, u = 7, n = 15, Z = "quasiinteger")
 points <- brimmer_multiple(
   data.frame(mean = 5.07, sd = 2.92),
   l = 1, u = 7, n = 15, mean_digits = 2, sd_digits = 2, Z = "quasiinteger")
-plot_sd_bounds(curve, points = points)
+sd_bounds_plot(curve, reports = points)
 
 # The same on a standardised POMP scale so different designs can be pooled
-plot_sd_bounds_pomp(curve, points = points, reference = "sharp")
+sd_bounds_pomp_plot(curve, reports = points, reference = "sharp")
 
 # The umbrella of all jointly GRIM + GRIMMER + bounds consistent values
 umbrella_data(n = 14, l = 1, u = 7, digits = 2) |>
-  plot_umbrella()
+  umbrella_plot()
 ```
 
 ## API
@@ -157,9 +157,9 @@ umbrella_data(n = 14, l = 1, u = 7, digits = 2) |>
 | `brimmest_multiple(data, ...)` | the same certificate across a data frame, grouping rows by design so one lattice serves them all |
 | `sd_bounds_curve(l, u, n, ...)` | trace the floor and ceiling of the SD across the mean (hole-free under `"quasiinteger"`) |
 | `umbrella_data(n, l, u, ...)` | build the grid of reported (mean, SD) pairs with their consistency verdicts |
-| `plot_sd_bounds(curve, ...)` | plot the SD-bounds envelope on the native scale, with reported points |
-| `plot_sd_bounds_pomp(curve, ...)` | plot on a POMP scale (`reference = "parity"` or `"sharp"`) so designs can be pooled |
-| `plot_umbrella(umbrella, ...)` | plot the feasible (mean, SD) umbrella |
+| `sd_bounds_plot(data, ...)` | plot the SD-bounds envelope on the native scale, with reported values |
+| `sd_bounds_pomp_plot(data, ...)` | plot on a POMP scale (`reference = "parity"` or `"sharp"`) so designs can be pooled |
+| `umbrella_plot(data, ...)` | plot the feasible (mean, SD) umbrella: its reportable values, or, given a band, the continuous region they are drawn from |
 
 The single-purpose bound primitives (e.g. `sd_max_structure_s()`, `sd_min_quasi_integer()`, `unround_interval()`) are also exported.
 
@@ -168,20 +168,6 @@ The single-purpose bound primitives (e.g. `sd_max_structure_s()`, `sd_min_quasi_
 - **A small residual blind spot at the umbrella's edge.** A handful of reported (mean, SD) tuples pass GRIM, GRIMMER *and* the SD bounds yet still have no integer-data solution. These are rare and predictably located, hugging the mean-conditional ceiling at the very top of the umbrella. The closed-form screen is *necessary but not sufficient*: it never rejects a report real integer data can produce, but it does admit these. `brimmest()` settles them exactly — see below. See also the validation document in `validation/`.
 
 ## TODO
-
-- **Do not submit to CRAN until `scrutiny` 0.6.2 is released. The current CRAN release returns wrong GRIMMER verdicts.** This is a correctness problem, not merely a slow one. Note the direction throughout: it is CRAN's **0.6.1** that is affected, not the GitHub main branch.
-
-    **The defect.** scrutiny 0.6.1's GRIMMER test 3 flags attainable values as inconsistent ([scrutiny#80](https://github.com/lhdjung/scrutiny/issues/80); it warns about this on every call). Because CRAN builds against 0.6.1, a CRAN release of `strait` would ship those false flags. On a 0–6 scale at *n* = 12 and one decimal place, 24 of 1497 grid cells differ between the two scrutiny versions — **all in the same direction**, 0.6.1 rejecting what 0.6.2 accepts, and all of them `in_bounds`, so GRIMMER alone is responsible. That is roughly a **2% false-flag rate** on legitimate reports. For a tool used to question published work, a false impossibility is the costly error.
-
-    **`brimmest()` proves 0.6.1 is the wrong one.** This is no longer an inference from two versions disagreeing. `brimmest()` enumerates the attainable lattice constructively, and at *n* = 12 on 1–5 it proves 16 tuples attainable that 0.6.1 rejects. One of them, mean 1.2 / SD 0.5, has the explicit witness `c(rep(1, 9), 2, 2, 2)` — twelve integers in range, exact mean 1.25 → "1.2", exact SD 0.4523 → "0.5" — which `unsum::closure_generate()` independently confirms with one solution.
-
-    **Three tests already detect it**, and none should be marked `skip_on_cran()`, since they are the only thing catching the upstream bug: `test-plot_sd_region.R:226` (forward-rounded attainable tuples must be a subset of the GRIMMER lattice), `test-plot_sd_region.R:237` (grid consistency count), and `test-brimmest.R:30` (the screen must never reject what `brimmest()` proves attainable). The last is the sharpest, being a contradiction of a constructive proof rather than a disagreement between heuristics.
-
-    **If a release cannot wait**, the defensive option is for `.grimmer_compat()` to detect the affected scrutiny and return `NA` rather than propagate a wrong `FALSE` — GRIMMER simply unavailable on old scrutiny, which is honest, leaving the bounds tests and `brimmest()` fully functional. That is a deliberate design decision, not a workaround to apply silently.
-
-    **Timing, secondarily.** GRIMMER on 0.6.1 also evaluates roughly **25x slower** than on 0.6.2 — 200 evaluations take 1.78s vs 0.31s, and `umbrella_data(n = 12, l = 1, u = 7, digits = 2)` takes 113s vs 4s. GRIM, the `round_*` helpers and `brimmest()` are unaffected. Examples have been sized against 0.6.1 and total ~3.5s, and both vignettes rebuild in ~142s, but the test suite runs ~520s there and emits ~39,000 warnings. The remaining hotspots are the `umbrella_data(n = 12, l = 1, u = 7, digits = 2)` call in `tests/testthat/test-builders-and-plots.R` and the `"integer"` / `"integer_alpha"` rules at `digits = 2` in `tests/testthat/test-plot_sd_region.R`.
-
-    **Exit condition.** `R/scrutiny-compat.R` dispatches between the two argument interfaces at run time, so both versions run. Once 0.6.2 reaches CRAN, the shim, the timing problem and the correctness problem all retire together in favour of `Imports: scrutiny (>= 0.6.2)`. Worth asking the `scrutiny` maintainer for that timeline.
 
 - **Revisit the phrasing of the inconsistency decisions.** `consistent` is a single Boolean over tests with very different epistemic status, and the wording should probably reflect that:
     - `in_scale_range` and `bounds` failures are *arithmetic proofs of impossibility* — no dataset with those summary statistics exists.

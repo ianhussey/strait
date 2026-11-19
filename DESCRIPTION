@@ -1,6 +1,6 @@
 Package: strait
 Title: Bounds Checks for Reported Summary Statistics
-Version: 0.4.13
+Version: 0.5.0
 Authors@R:
     person("Ian", "Hussey", , "ian.hussey@unibe.ch", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-8906-7559"))
@@ -15,7 +15,8 @@ Depends:
     R (>= 4.1)
 Imports:
     ggplot2,
-    scrutiny,
+    roundwork (>= 0.2.0),
+    scrutiny (>= 1.0.0),
     splines,
     tibble
 Suggests:

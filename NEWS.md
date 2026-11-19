@@ -1,3 +1,70 @@
+# strait 0.5.0
+
+## New features
+
+* `implied_range()` finds the range a consistent report forces the data to
+  cover: the smallest observation is at most `min_at_most` and the largest at
+  least `max_at_least`. An SD near the ceiling of a 1-7 scale, for instance,
+  forces both a 1 and a 7 into the data. Each bound is where `brimmer()` stops
+  calling the report consistent as one scale limit moves inward, so the two
+  always agree.
+
+## Breaking changes
+
+* The plotting functions are named after the data they draw, as the data
+  builders are: `plot_sd_bounds()` is now `sd_bounds_plot()`,
+  `plot_sd_bounds_pomp()` is `sd_bounds_pomp_plot()`, `plot_sd_region()` is
+  `sd_region_plot()`, and `plot_umbrella()` is `umbrella_plot()`. Each takes
+  what it draws as its first argument, `data`.
+
+* `sd_region_plot()` takes the output of `sd_region_data()` instead of computing
+  it from `l`, `u`, `n`, and `rule`. The dashed reference band, which it used to
+  add by default, is now explicit: `reference = sd_region_data(l, u, n, rule =
+  "quasi")`.
+
+* `umbrella_plot()` takes `data` and `bounds` instead of `umbrella` and
+  `curve`. Given a band, with `min_sd` and `max_sd` (such as
+  `sd_bounds_curve()` output), instead of a lattice, it fills the umbrella
+  itself, in the new `fill` colour; `sd_region_data(rule = "mean_naive_floor")`
+  gives a smooth one. `bounds` are drawn as dashed lines in `reference_colour`
+  under both lattice styles.
+
+* `sd_bounds_plot()` and `sd_bounds_pomp_plot()` take the reported values as
+  `reports` instead of `points`. `sd_bounds_plot()` also takes a band from
+  `sd_region_data()`.
+
+* Bands from `sd_region_data()`, and the input of `band_polygon()`, name their
+  columns `min_sd` and `max_sd` instead of `lo` and `hi`, as in
+  `sd_bounds_curve()` and `umbrella_data()`. `sd_region_data()` records its grid
+  spacing in a `"step"` attribute.
+
+* strait requires scrutiny 1.0.0 or later, and imports roundwork, to which
+  scrutiny's rounding functions moved. The run-time switch between scrutiny's
+  old and new interfaces is gone.
+
+## Bug fixes
+
+* Under `scoring = "sumscored"`, the GRIM and GRIMMER verdicts of `sd_bounds()`,
+  `brimmer()`, and `umbrella_data()` treated each sum score as the average of
+  `n_items` items, which made them too lenient. A sum score is one whole number
+  per person.
+
+* The plot functions no longer draw across a gap in a band, at means where no
+  SD is possible. `sd_bounds_plot(shade = "inside")` and the parity band of
+  `sd_bounds_pomp_plot()` filled it in, and their outlines, like the dashed
+  reference lines of `sd_region_plot()` and `umbrella_plot()`, joined its two
+  sides with a straight line.
+
+* `sd_max_structure_s()` lost precision next to a scale limit, where it
+  computed a tiny sum of squares as the difference of large ones. Within about
+  1e-8 of a limit it returned 0, below the quasi-integer floor, so `sd_bounds()`
+  called such a mean infeasible; `sd_bounds_curve()` samples two of them, next
+  to the kinks at `l` and `u`.
+
+* `sd_region_plot()` draws only the consistent tuples of a lattice with a
+  `consistent` column, such as `umbrella_data()` output, as `umbrella_plot()`
+  does, rather than every cell of the grid.
+
 # strait 0.4.13
 
 ## New features
