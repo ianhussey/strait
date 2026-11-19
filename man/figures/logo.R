@@ -1,9 +1,11 @@
 # The hex logo: the umbrella plot of a 1-7 scale, drawn as the arches it is made
 # of (after Heathers 2017), and mirrored. A sample that uses only the values a
-# and b has population SD sqrt((M - a) * (b - M)), a semicircle from a to b when
-# mean and SD share units. The floor is the arches between neighbouring values,
-# the ceiling the arch between the extremes, and the arches between all other
-# pairs lie inside.
+# and b has an SD that traces an arch from a to b as its mean moves between
+# them, sd_max_muilwijk(mean, n, a, b). The ceiling is the arch between the
+# extremes, the floor (sd_min_integer()) the arches between neighbouring values,
+# and the arches between all other pairs lie inside. All are computed with
+# strait's own functions. Drawn with one SD unit as long as one mean unit
+# divided by the Bessel factor, every arch is a semicircle.
 #
 # Being circles, they take their size from the hex: each ceiling is tangent to
 # the two edges that make the hex's point above (or below) it, less a small
@@ -15,6 +17,7 @@
 # https://jamesheathers.medium.com/sprite-interlude-the-umbrella-graph-connecting-grim-and-sprite-also-brunch-sucks-1266c629c974
 #
 # Run from the package root: Rscript man/figures/logo.R
+pkgload::load_all(quiet = TRUE)
 out <- "man/figures/logo.png"
 
 navy <- "#173d63"
@@ -42,35 +45,37 @@ base <- cy - gap # the upper umbrella's rib tips
 R <- (base - 10) * cos(pi / 6) - 8 - 9
 x <- cx - R + (seq_len(k) - 1) * 2 * R / (k - 1)
 
-# An upper semicircle from scale point a to b; sweep 1 runs left to right over
-# the top, sweep 0 right to left.
-arc <- function(a, b, sweep = 1) {
-  sprintf(
-    "A%.2f,%.2f 0 0 %d %.2f,%g",
-    abs(x[b] - x[a]) / 2,
-    abs(x[b] - x[a]) / 2,
-    sweep,
-    x[b],
-    base
-  )
+# From (mean, SD) to the drawing. The sample size only sets the Bessel factor,
+# which scales every arch alike, so the SD axis is scaled to make the ceiling's
+# peak R high, as the ceiling is 2R wide.
+n <- 30
+X <- function(mean) x[1] + (mean - 1) * 2 * R / (k - 1)
+px_per_sd <- R / sd_max_muilwijk((1 + k) / 2, n, lower = 1, upper = k)
+Y <- function(sd) base - sd * px_per_sd
+polyline <- function(mean, sd) {
+  paste0("M", paste(sprintf("%.2f,%.2f", X(mean), Y(sd)), collapse = "L"))
 }
+means <- function(from, to) seq(from, to, length.out = 120 * (to - from) + 1)
 
-canopy <- paste(
-  sprintf("M%.2f,%g", x[1], base),
-  arc(1, k),
-  paste(vapply(k:2, function(i) arc(i, i - 1, sweep = 0), ""), collapse = " "),
+m <- means(1, k)
+canopy <- paste0(
+  polyline(
+    c(m, rev(m)),
+    c(sd_max_muilwijk(m, n, lower = 1, upper = k), rev(sd_min_integer(m, n)))
+  ),
   "Z"
 )
 
 pairs <- t(combn(k, 2))
 inner <- pairs[pairs[, 2] - pairs[, 1] > 1 & pairs[, 2] - pairs[, 1] < k - 1, ]
 
-arches <- sprintf(
-  '<path d="M%.2f,%g %s"/>',
-  x[inner[, 1]],
-  base,
-  apply(inner, 1, function(p) arc(p[1], p[2]))
-)
+arches <- apply(inner, 1, function(p) {
+  m <- means(p[1], p[2])
+  sprintf(
+    '<path d="%s"/>',
+    polyline(m, sd_max_muilwijk(m, n, lower = p[1], upper = p[2]))
+  )
+})
 
 # Drawn in line: the inner arches faint, the outline of the canopy (ceiling
 # and floor) bold, so the umbrella stands out from the arches inside it.
