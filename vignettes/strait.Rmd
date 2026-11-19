@@ -237,6 +237,28 @@ umbrella_plot(cur)
 umbrella_plot(sd_region_data(l = 1, u = 7, n = 14, rule = "mean_naive_floor"))
 ```
 
+## What the data must contain
+
+A report whose SD rises above the arch over `[2, 7]` cannot come from data that
+avoid the value 1. `implied_range()` turns this around: it finds how far the
+smallest observation is forced down, and the largest up, by moving each scale
+limit inward until `brimmer()` no longer calls the report consistent.
+
+```{r}
+# near the ceiling: the data must include both a 1 and a 7
+implied_range(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
+              sd = 2.83, sd_digits = 2, Z = "integer")
+
+# a small SD: at least one response of 3 or lower, and one of 5 or higher
+implied_range(l = 1, u = 7, n = 30, mean = 4.00, mean_digits = 2,
+              sd = 0.53, sd_digits = 2, Z = "integer")
+```
+
+This never flags a report; it says what the data behind a consistent one must
+look like. A sample forced onto both scale limits is a sample split into
+opposing camps, which may be plausible for a polarising question and
+implausible for most others.
+
 ## Settling what survives
 
 The umbrella above is drawn from the *screen*, so some of the cells it marks
