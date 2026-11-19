@@ -1,5 +1,14 @@
 # strait 0.5.0
 
+## New features
+
+* `implied_range()` finds the range a consistent report forces the data to
+  cover: the smallest observation is at most `min_at_most` and the largest at
+  least `max_at_least`. An SD near the ceiling of a 1-7 scale, for instance,
+  forces both a 1 and a 7 into the data. Each bound is where `brimmer()` stops
+  calling the report consistent as one scale limit moves inward, so the two
+  always agree.
+
 ## Breaking changes
 
 * The plotting functions are named after the data they draw, as the data
