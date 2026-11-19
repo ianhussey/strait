@@ -137,6 +137,15 @@ sd_max_span_n <- function(lower, upper, n) {
 #' [sd_max_structure_s()], which never exceeds this. Retained because it is the
 #' form most often cited in the literature and is useful as a reference curve.
 #'
+#' For any two values `lower < upper`, not just the scale limits, it is the SD
+#' of a sample on those two values alone, as a function of its mean: an arch
+#' from `lower` to `upper` (a semicircle for the population SD, with mean and SD
+#' in the same units). The umbrella plot is made of these arches. Its ceiling is
+#' the arch between the scale limits; its integer floor, [sd_min_integer()], is
+#' the arch between the two whole numbers either side of the mean; and the arch
+#' between any other two values is the ceiling for data confined to them, which
+#' [implied_range()] uses to find the range a report forces the data to cover.
+#'
 #' @param mean Numeric vector, mean(s) in `[lower, upper]`.
 #' @param n Integer scalar, sample size, `n >= 2`.
 #' @param lower,upper Numeric scalars, the limits.
@@ -194,6 +203,11 @@ sd_max_structure_s <- function(mean, n, lower, upper) {
 #' 2005; Bernoulli form). Range-free. Defined only at
 #' GRIM-consistent means; the caller is responsible for that check (see
 #' [is_grim_consistent()]), otherwise use [sd_min_quasi_integer()].
+#'
+#' It is the same arch as the ceiling, [sd_max_muilwijk()], taken between the
+#' two integers either side of the mean instead of between the scale limits:
+#' the floor and the ceiling of the umbrella plot are both SDs of two-value
+#' samples, at the narrowest and the widest spacing.
 #'
 #' @param mean Numeric vector, GRIM-consistent mean(s).
 #' @param n Integer scalar, sample size, `n >= 2`.
