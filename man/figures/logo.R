@@ -9,6 +9,9 @@ coast <- "#8dbfe2"
 grid_col <- "#8dbfe2"
 ink <- env("INK", "#a9d0ec")
 
+# Change to adjust the size of the compass roses
+rose_fill_value <- 0.65
+
 reg <- strait::sd_region_data(
   l = 1,
   u = 5,
@@ -36,6 +39,68 @@ path <- function(x, y) {
   paste0("M", paste(sprintf("%.2f,%.2f", x, y), collapse = "L"), "Z")
 }
 umbrella <- path(c(ux, rev(ux)), c(top_y, rev(low_y)))
+
+# A small compass rose in the middle of each umbrella, north toward the
+# dome's peak: an eight-pointed two-tone star on one ring, in the coast's
+# light blue.
+rose_ink <- env("ROSE_INK", coast)
+edge_x <- c(ux, ux)
+edge_y <- c(top_y, low_y)
+cys <- seq(-h + 10, -10, by = 0.5)
+room <- vapply(cys, function(cy) min(sqrt(edge_x^2 + (edge_y - cy)^2)), 0)
+rose_y <- cys[which.max(room)]
+rose_r <- max(room) / 1.42 * as.numeric(env("ROSE_FILL", rose_fill_value))
+polar <- function(r, deg) {
+  cbind(r * sin(deg * pi / 180), -r * cos(deg * pi / 180))
+}
+poly <- function(p, fill, stroke = "none", sw = 0) {
+  sprintf(
+    '<polygon points="%s" fill="%s" stroke="%s" stroke-width="%.2f" stroke-linejoin="round"/>',
+    paste(sprintf("%.2f,%.2f", p[, 1], p[, 2]), collapse = " "),
+    fill,
+    stroke,
+    sw
+  )
+}
+circle <- function(r, sw) {
+  sprintf(
+    '<circle r="%.2f" fill="none" stroke="%s" stroke-width="%.2f"/>',
+    r,
+    rose_ink,
+    sw
+  )
+}
+star_point <- function(deg, tip, base, half) {
+  o <- c(0, 0)
+  t <- polar(tip, deg)
+  l <- polar(base, deg - half)
+  r <- polar(base, deg + half)
+  c(
+    poly(rbind(o, t, l), land, rose_ink, 0.6),
+    poly(rbind(o, t, r), rose_ink)
+  )
+}
+rose <- function(r) {
+  c(
+    sprintf('<g transform="translate(0,%.2f)">', rose_y),
+    circle(0.72 * r, 1.1),
+    unlist(lapply(
+      c(45, 135, 225, 315),
+      star_point,
+      tip = 0.75 * r,
+      base = 0.2 * r,
+      half = 45
+    )),
+    unlist(lapply(
+      c(0, 90, 180, 270),
+      star_point,
+      tip = 1.1 * r,
+      base = 0.2 * r,
+      half = 45
+    )),
+    "</g>"
+  )
+}
 shore <- function(x, y, angle) {
   c(
     sprintf('<g transform="translate(%.1f,%.1f) rotate(%g)">', x, y, angle),
@@ -47,6 +112,7 @@ shore <- function(x, y, angle) {
       2 * line
     ),
     sprintf('<path d="%s" fill="%s"/>', umbrella, land),
+    if (Sys.getenv("ROSE", "1") == "1") rose(rose_r),
     "</g>"
   )
 }
