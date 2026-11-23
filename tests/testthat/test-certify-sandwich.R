@@ -102,6 +102,7 @@ test_that("the sd = 0 sign trap and the empty candidate range survive", {
 })
 
 test_that("the fast path agrees with the corridor DP cell for cell", {
+  skip_on_cran() # exhaustive over whole grids; CI and local runs still do it
   for (cfg in list(c(l = 1, u = 5, n = 9), c(l = 0, u = 6, n = 12),
                    c(l = 1, u = 7, n = 11))) {
     l <- cfg[["l"]]; u <- cfg[["u"]]; n <- cfg[["n"]]; W <- u - l

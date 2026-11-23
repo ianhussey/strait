@@ -126,6 +126,7 @@ test_that("Poisson-binomial pmf sums to 1 and matches dbinom for equal q", {
 })
 
 test_that("O/E is calibrated: mean approx lambda under the mixture", {
+  skip_on_cran() # a 600-run simulation; CI and local runs still do it
   set.seed(20260927)
   ns <- c(12, 17, 23, 28, 33, 39, 41, 46, 52, 57,
           63, 68, 71, 77, 84, 88, 93, 97, 30, 45)

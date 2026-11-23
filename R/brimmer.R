@@ -175,26 +175,28 @@ brimmer <- function(l = NULL, u = NULL, a = NULL, b = NULL,
   pomp <- .pomp_cols(mean, sd, r$min_sd, r$max_sd, eff_lower, eff_upper, n,
                      has_mean = !is.null(mean))
 
-  tibble::tibble(consistent = length(failed) == 0,
-                 failed_tests = paste(failed, collapse = ","),
-                 min_sd = r$min_sd, max_sd = r$max_sd, feasible = r$feasible,
-                 in_scale_range = in_scale_range,
-                 grim = r$grim, grimmer = r$grimmer,
-                 sd_in_bounds = r$sd_in_bounds,
-                 pomp_mean = pomp$pomp_mean,
-                 pomp_sd_parity = pomp$pomp_sd_parity,
-                 pomp_sd_sharp = pomp$pomp_sd_sharp,
-                 note = note)
+  # new_tibble(), as in sd_bounds(), since brimmer_multiple() calls this per row
+  tibble::new_tibble(list(
+    consistent = length(failed) == 0,
+    failed_tests = paste(failed, collapse = ","),
+    min_sd = r$min_sd, max_sd = r$max_sd, feasible = r$feasible,
+    in_scale_range = in_scale_range,
+    grim = r$grim, grimmer = r$grimmer, sd_in_bounds = r$sd_in_bounds,
+    pomp_mean = pomp$pomp_mean, pomp_sd_parity = pomp$pomp_sd_parity,
+    pomp_sd_sharp = pomp$pomp_sd_sharp,
+    note = note
+  ), nrow = 1L)
 }
 
 # Internal: brimmer()'s row for a report that cannot be judged.
 .brimmer_na <- function(note) {
-  tibble::tibble(consistent = NA, failed_tests = NA_character_,
-                 min_sd = NA_real_, max_sd = NA_real_, feasible = NA,
-                 in_scale_range = NA, grim = NA, grimmer = NA,
-                 sd_in_bounds = NA, pomp_mean = NA_real_,
-                 pomp_sd_parity = NA_real_, pomp_sd_sharp = NA_real_,
-                 note = note)
+  tibble::new_tibble(list(
+    consistent = NA, failed_tests = NA_character_,
+    min_sd = NA_real_, max_sd = NA_real_, feasible = NA,
+    in_scale_range = NA, grim = NA, grimmer = NA, sd_in_bounds = NA,
+    pomp_mean = NA_real_, pomp_sd_parity = NA_real_, pomp_sd_sharp = NA_real_,
+    note = note
+  ), nrow = 1L)
 }
 
 #' BRIM: check a reported mean against the scale bounds
@@ -255,9 +257,11 @@ brim <- function(l = NULL, u = NULL, a = NULL, b = NULL,
                              lower_attained = !is.null(a),
                              upper_attained = !is.null(b),
                              n = n)
-  tibble::tibble(r[c("consistent", "failed_tests", "in_scale_range", "grim")],
-                 band_lo = band[1], band_hi = band[2],
-                 r[c("pomp_mean", "note")])
+  tibble::new_tibble(c(
+    as.list(r[c("consistent", "failed_tests", "in_scale_range", "grim")]),
+    list(band_lo = band[1], band_hi = band[2]),
+    as.list(r[c("pomp_mean", "note")])
+  ), nrow = 1L)
 }
 
 # ---- Layer 6: batch report checking ------------------------------------------
@@ -383,18 +387,25 @@ sd_bounds_curve <- function(l, u, n, Z = "quasiinteger",
                     seq(ceiling(l * m),  floor(u * m))  / m))
   means <- sort(unique(pmin(u, pmax(l,
     c(seq(l, u, by = by), kinks, kinks + 1e-9, kinks - 1e-9)))))
-  out <- do.call(rbind, lapply(means, function(mu) {
-    d <- sd_bounds(l = l, u = u, n = n, mean = mu, Z = Z,
-                   scoring = scoring, n_items = n_items, alpha = alpha)
-    data.frame(mean = mu, min_sd = d$min_sd, max_sd = d$max_sd,
-               feasible = d$feasible)
-  }))
+  # one row per mean, collected column-wise: binding thousands of one-row
+  # tables took longer than computing the bounds
+  rows <- means |>
+    lapply(\(mu) sd_bounds(l = l, u = u, n = n, mean = mu, Z = Z,
+                           scoring = scoring, n_items = n_items, alpha = alpha))
+  pick <- \(name, type) vapply(rows, \(d) d[[name]], type)
+  min_sd <- pick("min_sd", numeric(1))
+  max_sd <- pick("max_sd", numeric(1))
   parity_max <- sd_max_span_n(l, u, n)
-  out$pomp_mean <- (out$mean - l) / (u - l)
-  out$parity_max <- parity_max
-  out$ceil_parity <- out$max_sd / parity_max
-  out$floor_parity <- out$min_sd / parity_max
-  out <- tibble::as_tibble(out)
+  out <- tibble::tibble(
+    mean = means,
+    min_sd = min_sd,
+    max_sd = max_sd,
+    feasible = pick("feasible", logical(1)),
+    pomp_mean = (means - l) / (u - l),
+    parity_max = parity_max,
+    ceil_parity = max_sd / parity_max,
+    floor_parity = min_sd / parity_max
+  )
   attr(out, "step") <- by
   out
 }
