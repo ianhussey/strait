@@ -115,7 +115,7 @@ test_that("sd_max_muilwijk is the smooth arch and never below Structure S", {
 
 test_that("the exact lattice matches brute-force enumeration", {
   brute <- function(n, l, u) {
-    g <- as.matrix(expand.grid(rep(list(l:u), n)))
+    g <- multisets(l:u, n)
     m <- unique(round(cbind(rowMeans(g), apply(g, 1, stats::sd)), 10))
     m[order(m[, 1], m[, 2]), , drop = FALSE]
   }
@@ -196,7 +196,7 @@ test_that("the lattice DP's state-space reductions are sound", {
   for (cfg in list(c(4, 1, 5), c(5, 0, 3), c(7, 0, 6), c(6, 0, 2))) {
     n <- cfg[1]; l <- cfg[2]; u <- cfg[3]
     d <- strait:::.attainable_lattice(l, u, n, 1)
-    g <- as.matrix(expand.grid(rep(list(l:u), n)))
+    g <- multisets(l:u, n)
     b <- unique(round(cbind(rowMeans(g), apply(g, 1, stats::sd)), 10))
     b <- b[order(b[, 1], b[, 2]), , drop = FALSE]
     a <- unique(round(as.matrix(d[c("mean", "sd")]), 10))
@@ -212,6 +212,12 @@ test_that("the lattice DP's state-space reductions are sound", {
   # the guard fires only when the REDUCED grid is oversized; the reductions
   # bring cases within reach that the naive (S, Q) grid could not hold
   expect_error(strait:::.attainable_lattice(1, 7, 61, 5), "too large")
+  # n = 300 on 0-6 stays under it; the next test builds that lattice
+  expect_lt(strait:::.lattice_cells(0, 6, 300, 1), 2e7)
+})
+
+test_that("the reduced grid enumerates a design the naive one cannot hold", {
+  skip_on_cran() # builds the n = 300 lattice, about 14 s
   expect_silent(strait:::.attainable_lattice(0, 6, 300, 1))
 })
 

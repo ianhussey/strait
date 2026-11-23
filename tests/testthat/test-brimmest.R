@@ -87,6 +87,7 @@ test_that("brimmest() matches CLOSURE cell for cell", {
 # ---- the targeted route (R/attainable-target.R) ------------------------------
 
 test_that("the targeted route and the lattice route give identical verdicts", {
+  skip_on_cran() # exhaustive over whole grids; CI and local runs still do it
   # brimmest() picks a route by design size; both must certify the same set
   for (cfg in list(c(1, 5, 9), c(0, 6, 10), c(1, 7, 8))) {
     l <- cfg[1]; u <- cfg[2]; n <- cfg[3]
