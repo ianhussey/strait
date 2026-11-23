@@ -190,6 +190,29 @@ attainable_lattice <- function(
   )
 }
 
+# Internal: give a region the same columns whatever its rule, so that
+# sd_region_data() is type-stable: a band leaves `sd` NA, a lattice
+# `min_sd` and `max_sd`.
+region_columns <- function(region, type) {
+  template <- c("mean", "min_sd", "max_sd", "sd")
+  for (column in setdiff(template, names(region))) {
+    region[[column]] <- rep(NA_real_, nrow(region))
+  }
+  out <- tibble::as_tibble(region[template])
+  attr(out, "type") <- type
+  out
+}
+
+# Internal: is `data` a band (`min_sd`, `max_sd`) rather than a lattice of
+# tuples (`sd`)? sd_region_data() has both columns and says which in its
+# `type` attribute; sd_bounds_curve() output has no `sd` at all.
+is_band <- function(data) {
+  sd <- data[["sd"]]
+  is.null(sd) ||
+    identical(attr(data, "type"), "band") ||
+    (length(sd) > 0 && all(is.na(sd)))
+}
+
 #' Feasible-region data for one constraint set
 #'
 #' The `(mean, min_sd, max_sd)` band, or the lattice of attainable reported
@@ -277,12 +300,13 @@ attainable_lattice <- function(
 #'   by [roundwork::reround()].
 #' @param by Optional mean-grid spacing (default `(u - l) / 1000`); ignored by
 #'   the lattice rules, which step by `10^-digits`.
-#' @return For band rules, a tibble with `mean`, `min_sd`, `max_sd`, which
-#'   are `NA` where no SD is possible; its `"step"` attribute is the grid
-#'   spacing `by`. For the lattice rules (`"integer"`, `"integer_alpha"`,
-#'   `"attainable"`, `"attainable_alpha"`), a tibble with `mean`, `sd`: the
-#'   tuples passing every applicable test. The `type` attribute is `"band"` or
-#'   `"points"`.
+#' @return A tibble with `mean`, `min_sd`, `max_sd` and `sd`, and a `type`
+#'   attribute of `"band"` or `"points"`. Band rules fill `min_sd` and
+#'   `max_sd`, which are `NA` where no SD is possible, leave `sd` `NA`, and
+#'   record the grid spacing `by` in a `"step"` attribute. The lattice rules
+#'   (`"integer"`, `"integer_alpha"`, `"attainable"`, `"attainable_alpha"`)
+#'   fill `sd` with the tuples passing every applicable test and leave
+#'   `min_sd` and `max_sd` `NA`.
 #' @examples
 #' # a band rule returns (mean, min_sd, max_sd) across the scale
 #' band <- sd_region_data(l = 1, u = 5, n = 7, rule = "quasi")
@@ -364,8 +388,7 @@ sd_region_data <- function(
     out <- umbrella[which(umbrella$consistent), c("mean", "sd")] |>
       tibble::as_tibble() |>
       round_lattice(round_digits, rounding)
-    attr(out, "type") <- "points"
-    return(out)
+    return(region_columns(out, "points"))
   }
 
   # exact lattice rules: the true attainable tuples, with no reporting grid.
@@ -404,8 +427,7 @@ sd_region_data <- function(
       ]
     }
     out <- round_lattice(out, round_digits, rounding)
-    attr(out, "type") <- "points"
-    return(out)
+    return(region_columns(out, "points"))
   }
 
   if (is.null(by)) {
@@ -478,7 +500,7 @@ sd_region_data <- function(
   bad <- out$min_sd > out$max_sd + TOLERANCE_TIGHT
   out$min_sd[bad] <- NA_real_
   out$max_sd[bad] <- NA_real_
-  attr(out, "type") <- "band"
+  out <- region_columns(out, "band")
   attr(out, "step") <- by
   out
 }
@@ -540,7 +562,7 @@ sd_region_plot <- function(
   point_size = 0.5
 ) {
   shade <- rlang::arg_match(shade)
-  is_band <- !"sd" %in% names(data)
+  is_band <- is_band(data)
   if (is_band) {
     data <- band_mask(data)
   } else if ("consistent" %in% names(data)) {

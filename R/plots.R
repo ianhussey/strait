@@ -358,7 +358,7 @@ umbrella_plot <- function(
 ) {
   style <- rlang::arg_match(style)
   shade <- rlang::arg_match(shade)
-  is_band <- !"sd" %in% names(data)
+  is_band <- is_band(data)
   if (is_band && !all(c("min_sd", "max_sd") %in% names(data))) {
     cli::cli_abort(
       "{.arg data} needs {.code mean} and {.code sd} (a lattice) or {.code mean}, {.code min_sd}, and {.code max_sd} (a band)"

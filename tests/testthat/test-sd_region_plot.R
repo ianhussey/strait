@@ -57,7 +57,12 @@ test_that("lattice rules return attainable tuples, and alpha is a strict subset"
   b  <- sd_region_data(l, u, n, rule = "integer_alpha", n_items = 2,
                        alpha = 0.70, digits = 2)
   expect_identical(attr(a, "type"), "points")
-  expect_named(a, c("mean", "sd"))
+  # every rule returns the same columns; a lattice leaves the band's NA
+  expect_named(a, c("mean", "min_sd", "max_sd", "sd"))
+  expect_true(all(is.na(a$min_sd)) && all(is.na(a$max_sd)))
+  band <- sd_region_data(l, u, n, rule = "quasi")
+  expect_named(band, names(a))
+  expect_true(all(is.na(band$sd)))
   expect_gt(nrow(a), 0)
   expect_lt(nrow(b), nrow(a))                                   # alpha removes tuples
   expect_true(all(paste(b$mean, b$sd) %in% paste(a$mean, a$sd))) # strict subset
