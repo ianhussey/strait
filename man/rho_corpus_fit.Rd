@@ -7,7 +7,8 @@
 rho_corpus_fit(corpus, df = 3, iterate = TRUE, ...)
 }
 \arguments{
-\item{corpus}{A data frame with columns \code{L}, \code{U}, \code{M}, \code{SD} and \code{N}.}
+\item{corpus}{A data frame with columns \code{l}, \code{u}, \code{n}, \code{mean} and \code{sd},
+one row per study. Scales may differ between rows.}
 
 \item{df}{Degrees of freedom of the natural spline. Default 3.}
 
@@ -17,8 +18,8 @@ rho_corpus_fit(corpus, df = 3, iterate = TRUE, ...)
 }
 \value{
 An object of class \code{rho_corpus}: the \code{fit} (\code{\link[metafor:rma.uni]{metafor::rma()}}),
-the spline \code{basis}, the per-study \code{data} (with \code{mu_hat}, \code{rho_hat},
-\code{var_rho}) and \code{tau} (\eqn{\hat\tau}). Use \code{\link[=predict]{predict()}} on it.
+the spline \code{basis}, the per-study \code{data} (a tibble with \code{mu_hat},
+\code{rho_hat}, \code{var_rho}) and \code{tau} (\eqn{\hat\tau}). Use \code{\link[=predict]{predict()}} on it.
 }
 \description{
 Fits a random-effects meta-regression of per-study method-of-moments

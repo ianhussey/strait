@@ -27,13 +27,13 @@ counterfactuals, e.g. avoidance of, or heaping on, final digits 0 and 5.
 }
 \examples{
 dat <- data.frame(
-  x = c("3.41", "2.87", "4.12", "3.05", "2.66", "3.90"),
+  x = c(3.41, 2.87, 4.12, 3.05, 2.66, 3.90),
   n = c(28, 31, 45, 22, 37, 19)
 )
 grim_sensitivity(dat, list(
   avoid_0_5 = function(d) ifelse(d \%in\% c(0, 5), 0.5, 1),
   heap_0_5  = function(d) ifelse(d \%in\% c(0, 5), 3, 1)
-))
+), digits_x = 2, items_averaged = 1)
 }
 \seealso{
 \code{\link[=grim_aggregate]{grim_aggregate()}}

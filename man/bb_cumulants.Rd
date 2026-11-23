@@ -7,7 +7,7 @@
 bb_cumulants(m, mu, rho)
 }
 \arguments{
-\item{m}{Whole number of scale steps, \code{U - L}.}
+\item{m}{Whole number of scale steps, \code{u - l}.}
 
 \item{mu}{Mean proportion in \eqn{(0, 1)}.}
 

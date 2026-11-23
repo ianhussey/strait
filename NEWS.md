@@ -11,6 +11,27 @@
 
 ## Breaking changes
 
+* `sd_plausibility()`, `rho_from_summary()`, `s2_exact()` and
+  `rho_corpus_fit()` use strait's argument names:
+  `sd_plausibility(l, u, n, mean, sd = NULL, ..., digits_mean = NULL)`,
+  `rho_from_summary(l, u, n, mean, sd, ...)` and `s2_exact(m, mu, rho, n,
+  sums)`. `rho_corpus_fit()` expects corpus columns `l`, `u`, `n`, `mean` and
+  `sd`, and scales may differ between rows. Positional calls in the old
+  `(L, U, M, N)` order now swap `n` and `mean`. `s2_exact()` returns tibbles.
+
+* `sd_plausibility()` conditions on the reported mean by default
+  (`condition_on_mean = TRUE`), as recommended for checking a reported
+  (mean, SD) pair. `"chisq3"` and `"cf"` cannot condition, so they need
+  `condition_on_mean = FALSE`.
+
+* `grim_aggregate()`, `grim_aggregate_by()` and `grim_sensitivity()` follow
+  scrutiny 1.0: `x` must be numeric, with `digits_x` given as an argument or a
+  `data` column (not both); a character `x` is an error that points to
+  `scrutiny::decimal_places()`. `items` is now `items_averaged` (argument and
+  column) and has no default. `percent` is removed. New `threshold` and
+  `symmetric` arguments are passed to scrutiny with `rounding`. The `$data`
+  column `digits` is now `digits_x`.
+
 * The plotting functions are named after the data they draw, as the data
   builders are: `plot_sd_bounds()` is now `sd_bounds_plot()`,
   `plot_sd_bounds_pomp()` is `sd_bounds_pomp_plot()`, `plot_sd_region()` is
@@ -43,6 +64,36 @@
   old and new interfaces is gone.
 
 ## Bug fixes
+
+* `grim_aggregate()`:
+  * Missing values in `x`, `n`, `digits_x` or `items_averaged`, an infinite
+    `n`, and an empty `data` are errors. Before, a malformed mean such as
+    `"3,14"` silently passed GRIM.
+  * If even lambda = 1 cannot explain the observed failures, the confidence
+    interval for lambda is `NA` with a warning that the model is rejected,
+    instead of collapsing to `[1, 1]`.
+  * `conf_level` must lie in (0, 1) and `support_c` above 1. The interval label
+    keeps decimals: `lambda_ci_97.5`, not `lambda_ci_98`.
+  * `q` and `mean_q` are exactly 0 where every ending passes. A function `eps`
+    is called once, and the `eps` column is present even when no value is
+    informative.
+
+* `grim_aggregate_by()` keeps rows whose grouping value is `NA` as their own
+  group instead of dropping them, and errors if a `by` column clashes with an
+  output column such as `F` or `k`.
+
+* `sd_plausibility()`:
+  * `digits_mean` is recycled with `mean`. Before, every row after the first
+    got wrong hard bounds.
+  * A mean at a scale limit given with `sd` returns zero bounds, as with
+    `rho`, instead of "missing input".
+  * On a two-point scale (`u - l == 1`), `rho` is `NA` with a note that it is
+    not identified; `rho_from_summary()` errors there.
+  * Giving both `rho` and `sd` is an error rather than ignoring `sd`.
+  * `method = "exact"` computes the distribution once per row and node and
+    reuses it for every `p`.
+  * The help page gains an Accuracy section: with strong skew, the `"chisq3"`
+    and `"cf"` lower bounds can be anti-conservative.
 
 * Under `scoring = "sumscored"`, the GRIM and GRIMMER verdicts of `sd_bounds()`,
   `brimmer()`, and `umbrella_data()` treated each sum score as the average of

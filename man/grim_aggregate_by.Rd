@@ -7,9 +7,11 @@
 grim_aggregate_by(data, by, ...)
 }
 \arguments{
-\item{data}{A data frame as for \code{\link[=grim_aggregate]{grim_aggregate()}}.}
+\item{data}{A data frame as for \code{\link[=grim_aggregate]{grim_aggregate()}}. Give per-row
+\code{digits_x} and \code{items_averaged} as columns.}
 
-\item{by}{Character vector of grouping column names.}
+\item{by}{Character vector of grouping column names. They must not clash
+with the output columns (such as \code{k}, \code{F}, \code{E} or \code{O_E}).}
 
 \item{...}{Further arguments passed to \code{\link[=grim_aggregate]{grim_aggregate()}}.}
 }
@@ -20,15 +22,16 @@ no informative values have \code{NA} for everything past \code{F}.
 }
 \description{
 Runs \code{\link[=grim_aggregate]{grim_aggregate()}} separately within each group of \code{data} (e.g. one
-group per paper) and returns one row per group.
+group per paper) and returns one row per group. A missing \code{by} value forms
+its own group.
 }
 \examples{
 dat <- data.frame(
   paper = rep(c("A", "B"), each = 4),
-  x = c("3.41", "2.87", "4.12", "3.05", "2.60", "3.93", "1.14", "2.29"),
+  x = c(3.41, 2.87, 4.12, 3.05, 2.60, 3.93, 1.14, 2.29),
   n = c(28, 31, 45, 22, 37, 19, 26, 33)
 )
-grim_aggregate_by(dat, by = "paper")
+grim_aggregate_by(dat, by = "paper", digits_x = 2, items_averaged = 1)
 }
 \seealso{
 \code{\link[=grim_aggregate]{grim_aggregate()}}

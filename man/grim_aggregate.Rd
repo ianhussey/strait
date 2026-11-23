@@ -6,27 +6,35 @@
 \usage{
 grim_aggregate(
   data,
-  items = 1,
+  digits_x = NULL,
+  ...,
+  items_averaged = NULL,
   rounding = "up_or_down",
+  threshold = 5,
+  symmetric = FALSE,
   g = NULL,
   eps = NULL,
   support_c = c(8, 32),
   ci = FALSE,
-  conf_level = 0.9,
-  percent = FALSE
+  conf_level = 0.9
 )
 }
 \arguments{
-\item{data}{A data frame with columns \code{x} (reported means, \strong{character},
-so that trailing zeros define the reporting precision) and \code{n} (sample
-sizes), and optionally \code{items}.}
+\item{data}{A data frame with columns \code{x} (reported means, numeric) and
+\code{n} (sample sizes), and optionally \code{digits_x} and \code{items_averaged}.}
 
-\item{items}{Number of items per mean, used when \code{data} has no \code{items}
-column. Default 1.}
+\item{digits_x}{Decimal places of the reported means, as reported
+(\code{5.10} has 2). Required: give it here or as a column of \code{data}, not
+both. A single value or one per row.}
 
-\item{rounding}{Rounding rule, passed to \code{\link[scrutiny:grim_map]{scrutiny::grim_map()}} and used
-identically for observed consistency and for pass rates. Default
-\code{"up_or_down"}.}
+\item{...}{Must be empty. Arguments after the dots must be named in full.}
+
+\item{items_averaged}{Number of items averaged per mean. Required, as an
+argument or a column of \code{data}, like \code{digits_x}.}
+
+\item{rounding, threshold, symmetric}{Rounding settings, passed to
+\code{\link[scrutiny:grim_map]{scrutiny::grim_map()}} and used identically for observed consistency
+and for pass rates. Defaults as in scrutiny.}
 
 \item{g}{Counterfactual distribution of non-genuine values over the
 reporting grid, for sensitivity analyses. \code{NULL} (default) is uniform.
@@ -41,15 +49,16 @@ Weights are normalised to sum to 1.}
 single probability, one per row of \code{data}, or a \verb{function(q, n, d)}
 returning either.}
 
-\item{support_c}{Likelihood ratios defining the support intervals for
-\eqn{\lambda}. Default \code{c(8, 32)}.}
+\item{support_c}{Likelihood ratios (each > 1) defining the support
+intervals for \eqn{\lambda}. Default \code{c(8, 32)}.}
 
 \item{ci}{Logical; also report a confidence interval for \eqn{\lambda}.
-Default \code{FALSE}.}
+Default \code{FALSE}. If even \eqn{\lambda = 1} makes the observed \code{F}
+implausibly large, the model is rejected: the interval is \code{NA}, with a
+warning.}
 
-\item{conf_level}{Confidence level for that interval. Default 0.90.}
-
-\item{percent}{Must be \code{FALSE}: percentages are out of scope.}
+\item{conf_level}{Confidence level for that interval, in (0, 1). Default
+0.90.}
 }
 \value{
 An object of class \code{grim_aggregate}: a list with
@@ -57,9 +66,10 @@ An object of class \code{grim_aggregate}: a list with
 \item \code{summary}: a long tibble, one row per quantity in ladder order, with
 columns \code{step}, \code{quantity}, \code{value} (point quantities), \code{lower} and
 \code{upper} (intervals), \code{assumptions} and \code{interpretation};
-\item \code{data}: the input with added columns \code{digits}, \code{consistency}, \code{f},
-\code{p_pass}, \code{q}, \code{informative} and \code{flag_impossible};
-\item \code{settings}: the rounding rule and counterfactual used.
+\item \code{data}: the input as a tibble with columns \code{digits_x},
+\code{items_averaged}, \code{consistency}, \code{f}, \code{p_pass}, \code{q}, \code{informative},
+\code{flag_impossible} and, with \code{eps}, \code{eps};
+\item \code{settings}: the rounding settings and counterfactual used.
 }
 }
 \description{
@@ -147,10 +157,10 @@ B (+ I for the tail probability). No \eqn{\varepsilon} enters steps
 
 \examples{
 dat <- data.frame(
-  x = c("3.41", "2.87", "4.12", "3.05", "2.66", "3.90"),
+  x = c(3.41, 2.87, 4.12, 3.05, 2.66, 3.90),
   n = c(28, 31, 45, 22, 37, 19)
 )
-res <- grim_aggregate(dat)
+res <- grim_aggregate(dat, digits_x = 2, items_averaged = 1)
 res
 res$summary
 }

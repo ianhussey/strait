@@ -16,41 +16,62 @@
 #   M   mixture: each value is non-genuine with probability lambda
 #   B   authentic baseline: an authentic value fails with probability eps_i
 
-# Grid-consistency vectors, keyed by "digits|n|items|rounding". Each entry is
-# the logical vector c(j / 10^d; n, items, d) for j = 0, ..., 10^d - 1. GRIM
-# consistency is periodic with period 1 in the mean, so one unit interval is
-# exact. The cache persists for the session: pass rates are a property of the
-# design, not of the reported value.
+# Grid-consistency vectors, keyed by "digits|n|items|rounding|threshold|
+# symmetric". Each entry is the logical vector c(j / 10^d; n, items, d) for
+# j = 0, ..., 10^d - 1. GRIM consistency is periodic with period 1 in the
+# mean, so one unit interval is exact. The cache persists for the session:
+# pass rates are a property of the design, not of the reported value.
 .grim_grid_cache <- new.env(parent = emptyenv())
 
-# Internal: GRIM consistency per row, by scrutiny::grim_map(). `x` holds the
-# means as character strings and `digits` their decimal places, one per row.
-# Returns a logical vector in row order.
-.grim_observed <- function(x, n, items, digits, rounding) {
-  df <- tibble::tibble(x = as.numeric(x), n = n, items_averaged = items)
-  out <- scrutiny::grim_map(df, digits_x = digits, data_type = "integer",
-                            rounding = rounding)
+# Internal: scrutiny::grim_map() consistency for numeric means, one call for
+# all rows. `set` holds rounding, threshold and symmetric. Returns a logical
+# vector in row order.
+.grim_consistency <- function(x, n, items, digits, set) {
+  df <- tibble::tibble(x = x, n = n, items_averaged = items, digits_x = digits)
+  out <- scrutiny::grim_map(
+    df,
+    data_type = "integer",
+    rounding = set$rounding,
+    threshold = set$threshold,
+    symmetric = set$symmetric
+  )
   as.logical(out$consistency)
 }
 
+# Internal: observed verdicts; a separate binding so tests can stub them
+# without touching the pass-rate grid.
+.grim_observed <- function(...) .grim_consistency(...)
+
 # Internal: the grid-consistency vector for every unique (digits, n, items),
-# computed in one grim_map() call per decimal count and cached.
-.grim_grid <- function(digits, n, items, rounding) {
-  key <- paste(digits, n, items, rounding, sep = "|")
+# computed in one grim_map() call and cached.
+.grim_grid <- function(digits, n, items, set) {
+  key <- paste(
+    digits,
+    n,
+    items,
+    set$rounding,
+    set$threshold,
+    set$symmetric,
+    sep = "|"
+  )
   todo <- unique(data.frame(key, digits, n, items)[
     !vapply(key, exists, logical(1), envir = .grim_grid_cache,
-            inherits = FALSE), ])
-  for (d in unique(todo$digits)) {
-    t <- todo[todo$digits == d, ]
-    grid <- formatC((0:(10^d - 1)) / 10^d, format = "f", digits = d)
-    len <- length(grid)
-    cons <- .grim_observed(
-      x = rep(grid, nrow(t)), n = rep(t$n, each = len),
-      items = rep(t$items, each = len), digits = d, rounding = rounding
+      inherits = FALSE
+    ),
+  ])
+  if (nrow(todo) > 0) {
+    len <- 10^todo$digits
+    i <- rep(seq_len(nrow(todo)), len)
+    j <- sequence(len) - 1
+    cons <- .grim_consistency(
+      j / len[i],
+      todo$n[i],
+      todo$items[i],
+      todo$digits[i],
+      set
     )
-    for (r in seq_len(nrow(t))) {
-      assign(t$key[r], cons[(r - 1) * len + seq_len(len)],
-             envir = .grim_grid_cache)
+    for (r in seq_len(nrow(todo))) {
+      assign(todo$key[r], cons[i == r], envir = .grim_grid_cache)
     }
   }
   lapply(key, get, envir = .grim_grid_cache, inherits = FALSE)
@@ -140,45 +161,122 @@
   a2 <- (1 - conf_level) / 2
   ge <- function(l) .poisbinom_tails(l * q, F)[["upper"]] - a2
   le <- function(l) .poisbinom_tails(l * q, F)[["lower"]] - a2
-  lower <- if (F == 0) 0 else if (ge(1) < 0) 1 else
-    stats::uniroot(ge, c(0, 1), tol = 1e-10)$root
+  if (F > 0 && ge(1) < 0) {
+    warning(
+      "Even lambda = 1 makes ",
+      F,
+      " or more failures less likely ",
+      "than (1 - conf_level) / 2: the mixture model is rejected, so ",
+      "the confidence interval is NA.",
+      call. = FALSE
+    )
+    return(c(NA_real_, NA_real_))
+  }
+  lower <- if (F == 0) 0 else stats::uniroot(ge, c(0, 1), tol = 1e-10)$root
   upper <- if (le(1) > 0) 1 else
     stats::uniroot(le, c(0, 1), tol = 1e-10)$root
   c(lower, upper)
 }
 
-# Internal: validate input and derive digits and items.
-.grim_agg_input <- function(data, items, percent) {
-  if (isTRUE(percent)) {
-    stop("Percentages are out of scope for grim_aggregate(): the pass-rate ",
-         "grid assumes means, not percentages.", call. = FALSE)
+# Internal: one per-row helper from either a `data` column or an argument,
+# never both, never neither. `old` names a column renamed in this version.
+.grim_agg_helper <- function(data, name, arg, old = NULL) {
+  in_data <- name %in% names(data)
+  if (in_data && !is.null(arg)) {
+    stop(
+      "`",
+      name,
+      "` is both a column of `data` and an argument. ",
+      "Give it one way only.",
+      call. = FALSE
+    )
   }
+  if (!in_data && is.null(arg)) {
+    hint <- if (!is.null(old) && old %in% names(data)) {
+      paste0(" `data` has a column `", old, "`: rename it to `", name, "`.")
+    } else {
+      ""
+    }
+    stop(
+      "`",
+      name,
+      "` is required, as a column of `data` or as an ",
+      "argument.",
+      hint,
+      call. = FALSE
+    )
+  }
+  v <- if (in_data) data[[name]] else arg
+  if (!(length(v) %in% c(1L, nrow(data)))) {
+    stop(
+      "`",
+      name,
+      "` must have length 1 or one value per row of `data`.",
+      call. = FALSE
+    )
+  }
+  rep_len(v, nrow(data))
+}
+
+# Internal: stop unless `v` holds whole numbers >= `min`, none missing.
+.ga_check_whole <- function(v, name, min) {
+  if (
+    !is.numeric(v) ||
+      anyNA(v) ||
+      any(!is.finite(v)) ||
+      any(v < min) ||
+      any(v != round(v))
+  ) {
+    stop(
+      "`",
+      name,
+      "` must contain whole numbers >= ",
+      min,
+      ", with no ",
+      "missing or infinite values.",
+      call. = FALSE
+    )
+  }
+}
+
+# Internal: validate input; return x, n, items and digits, one per row.
+.grim_agg_input <- function(data, digits_x, items_averaged) {
   if (!is.data.frame(data) || !all(c("x", "n") %in% names(data))) {
-    stop("`data` must be a data frame with columns `x` (reported means, as ",
-         "character) and `n` (sample sizes).", call. = FALSE)
+    stop(
+      "`data` must be a data frame with columns `x` (reported means) ",
+      "and `n` (sample sizes).",
+      call. = FALSE
+    )
   }
-  if (!is.character(data$x)) {
-    stop("`x` must be character, so that trailing zeros define the ",
-         "reporting precision (\"5.10\", not 5.1).", call. = FALSE)
+  if (nrow(data) == 0) {
+    stop("`data` has no rows.", call. = FALSE)
   }
-  if (anyNA(data$x) || anyNA(data$n)) {
-    stop("`x` and `n` must not contain missing values.", call. = FALSE)
+  if (!is.numeric(data$x)) {
+    stop(
+      "`x` must be numeric, with the reported decimal places in ",
+      "`digits_x` (a column or an argument). For means stored as ",
+      "strings, `scrutiny::decimal_places()` counts them.",
+      call. = FALSE
+    )
   }
-  n <- data$n
-  if (!is.numeric(n) || any(n < 1) || any(n != round(n))) {
-    stop("`n` must contain positive whole numbers.", call. = FALSE)
+  if (anyNA(data$x) || any(!is.finite(data$x))) {
+    stop(
+      "`x` must not contain missing or infinite values (row(s) ",
+      paste(which(!is.finite(data$x)), collapse = ", "),
+      ").",
+      call. = FALSE
+    )
   }
-  m <- if ("items" %in% names(data)) data$items else
-    rep_len(items, nrow(data))
-  if (!is.numeric(m) || any(m < 1) || any(m != round(m))) {
-    stop("`items` must contain positive whole numbers.", call. = FALSE)
-  }
-  d <- scrutiny::decimal_places(data$x)
+  d <- .grim_agg_helper(data, "digits_x", digits_x)
+  m <- .grim_agg_helper(data, "items_averaged", items_averaged, old = "items")
+  .ga_check_whole(data$n, "n", 1)
+  .ga_check_whole(d, "digits_x", 0)
+  .ga_check_whole(m, "items_averaged", 1)
   if (any(d > 6)) {
     stop("Values reported to more than 6 decimal places are not supported ",
          "(the pass-rate grid has 10^d points).", call. = FALSE)
   }
-  list(x = data$x, n = as.integer(n), m = as.integer(m), d = as.integer(d))
+  list(x = data$x, n = as.integer(data$n), m = as.integer(m), d = as.integer(d))
 }
 
 # Internal: resolve eps to one baseline failure probability per input row.
@@ -277,14 +375,17 @@
 #'    B (+ I for the tail probability). No \eqn{\varepsilon} enters steps
 #'    0-8.
 #'
-#' @param data A data frame with columns `x` (reported means, **character**,
-#'   so that trailing zeros define the reporting precision) and `n` (sample
-#'   sizes), and optionally `items`.
-#' @param items Number of items per mean, used when `data` has no `items`
-#'   column. Default 1.
-#' @param rounding Rounding rule, passed to [scrutiny::grim_map()] and used
-#'   identically for observed consistency and for pass rates. Default
-#'   `"up_or_down"`.
+#' @param data A data frame with columns `x` (reported means, numeric) and
+#'   `n` (sample sizes), and optionally `digits_x` and `items_averaged`.
+#' @param digits_x Decimal places of the reported means, as reported
+#'   (`5.10` has 2). Required: give it here or as a column of `data`, not
+#'   both. A single value or one per row.
+#' @param ... Must be empty. Arguments after the dots must be named in full.
+#' @param items_averaged Number of items averaged per mean. Required, as an
+#'   argument or a column of `data`, like `digits_x`.
+#' @param rounding,threshold,symmetric Rounding settings, passed to
+#'   [scrutiny::grim_map()] and used identically for observed consistency
+#'   and for pass rates. Defaults as in scrutiny.
 #' @param g Counterfactual distribution of non-genuine values over the
 #'   reporting grid, for sensitivity analyses. `NULL` (default) is uniform.
 #'   Either a **function of the final digit**, called once on `0:9` and
@@ -296,51 +397,90 @@
 #' @param eps Optional authentic-baseline failure probabilities for step 9: a
 #'   single probability, one per row of `data`, or a `function(q, n, d)`
 #'   returning either.
-#' @param support_c Likelihood ratios defining the support intervals for
-#'   \eqn{\lambda}. Default `c(8, 32)`.
+#' @param support_c Likelihood ratios (each > 1) defining the support
+#'   intervals for \eqn{\lambda}. Default `c(8, 32)`.
 #' @param ci Logical; also report a confidence interval for \eqn{\lambda}.
-#'   Default `FALSE`.
-#' @param conf_level Confidence level for that interval. Default 0.90.
-#' @param percent Must be `FALSE`: percentages are out of scope.
+#'   Default `FALSE`. If even \eqn{\lambda = 1} makes the observed `F`
+#'   implausibly large, the model is rejected: the interval is `NA`, with a
+#'   warning.
+#' @param conf_level Confidence level for that interval, in (0, 1). Default
+#'   0.90.
 #'
 #' @return An object of class `grim_aggregate`: a list with
 #'   * `summary`: a long tibble, one row per quantity in ladder order, with
 #'     columns `step`, `quantity`, `value` (point quantities), `lower` and
 #'     `upper` (intervals), `assumptions` and `interpretation`;
-#'   * `data`: the input with added columns `digits`, `consistency`, `f`,
-#'     `p_pass`, `q`, `informative` and `flag_impossible`;
-#'   * `settings`: the rounding rule and counterfactual used.
+#'   * `data`: the input as a tibble with columns `digits_x`,
+#'     `items_averaged`, `consistency`, `f`, `p_pass`, `q`, `informative`,
+#'     `flag_impossible` and, with `eps`, `eps`;
+#'   * `settings`: the rounding settings and counterfactual used.
 #' @seealso [grim_aggregate_by()] for one summary per group,
 #'   [grim_sensitivity()] for a sweep over counterfactuals.
 #' @examples
 #' dat <- data.frame(
-#'   x = c("3.41", "2.87", "4.12", "3.05", "2.66", "3.90"),
+#'   x = c(3.41, 2.87, 4.12, 3.05, 2.66, 3.90),
 #'   n = c(28, 31, 45, 22, 37, 19)
 #' )
-#' res <- grim_aggregate(dat)
+#' res <- grim_aggregate(dat, digits_x = 2, items_averaged = 1)
 #' res
 #' res$summary
 #' @export
-grim_aggregate <- function(data, items = 1, rounding = "up_or_down",
+grim_aggregate <- function(
+  data,
+  digits_x = NULL,
+  ...,
+  items_averaged = NULL,
+  rounding = "up_or_down",
+  threshold = 5,
+  symmetric = FALSE,
                            g = NULL, eps = NULL, support_c = c(8, 32),
-                           ci = FALSE, conf_level = 0.90, percent = FALSE) {
-  inp <- .grim_agg_input(data, items, percent)
-  x <- inp$x; n <- inp$n; m <- inp$m; d <- inp$d
+  ci = FALSE,
+  conf_level = 0.90
+) {
+  .ga_check_dots(...)
+  if (
+    !is.numeric(support_c) ||
+      length(support_c) == 0 ||
+      anyNA(support_c) ||
+      any(support_c <= 1) ||
+      any(!is.finite(support_c))
+  ) {
+    stop("`support_c` must be finite likelihood ratios > 1.", call. = FALSE)
+  }
+  if (
+    !is.numeric(conf_level) ||
+      length(conf_level) != 1 ||
+      is.na(conf_level) ||
+      conf_level <= 0 ||
+      conf_level >= 1
+  ) {
+    stop("`conf_level` must be a single number in (0, 1).", call. = FALSE)
+  }
+  inp <- .grim_agg_input(data, digits_x, items_averaged)
+  x <- inp$x
+  n <- inp$n
+  m <- inp$m
+  d <- inp$d
+  set <- list(rounding = rounding, threshold = threshold, symmetric = symmetric)
 
   # 0. GRIM result per value
-  consistency <- .grim_observed(x, n, m, d, rounding)
+  consistency <- .grim_observed(x, n, m, d, set)
   f <- as.integer(!consistency)
 
   # 1. pass rates, under g and (for the impossibility flag) uniform
-  grids <- .grim_grid(d, n, m, rounding)
+  grids <- .grim_grid(d, n, m, set)
   p_unif <- vapply(grids, mean, numeric(1))
   p_pass <- vapply(seq_along(grids), function(i) {
     sum(.grid_weights(g, d[i]) * grids[[i]])
-  }, numeric(1))
-  q <- pmax(0, 1 - p_pass)
+    },
+    numeric(1)
+  )
+  # snap floating-point residue (1 - 1 = 1.1e-16) to exact 0
+  tol <- 1e-12
+  q <- 1 - p_pass
+  q[q < tol] <- 0
 
   # 2. informative values; impossible failures
-  tol <- 1e-12
   flag_impossible <- f == 1L & p_unif >= 1 - tol
   if (any(flag_impossible)) {
     warning(sum(flag_impossible), " value(s) fail GRIM although every ",
@@ -349,24 +489,30 @@ grim_aggregate <- function(data, items = 1, rounding = "up_or_down",
             "indicates an extraction or reporting error; they are flagged ",
             "and excluded.", call. = FALSE)
   }
-  bad_g <- f == 1L & !flag_impossible & q <= tol
+  bad_g <- f == 1L & !flag_impossible & q == 0
   if (any(bad_g)) {
     stop("`g` gives zero weight to every inconsistent ending for failing ",
          "row(s) ", paste(which(bad_g), collapse = ", "), ", so the ",
          "counterfactual cannot produce the observed failure.", call. = FALSE)
   }
-  informative <- q > tol & !flag_impossible
+  informative <- q > 0 & !flag_impossible
+  eps_all <- if (!is.null(eps)) .grim_agg_eps(eps, q, n, d)
 
   out_data <- tibble::as_tibble(data)
-  out_data$digits <- d
+  out_data$digits_x <- d
+  out_data$items_averaged <- m
   out_data$consistency <- consistency
   out_data$f <- f
   out_data$p_pass <- p_pass
   out_data$q <- q
   out_data$informative <- informative
   out_data$flag_impossible <- flag_impossible
+  if (!is.null(eps)) {
+    out_data$eps <- eps_all
+  }
 
-  fi <- f[informative]; qi <- q[informative]
+  fi <- f[informative]
+  qi <- q[informative]
   k <- length(fi); F <- sum(fi)
 
   rows <- list(
@@ -385,12 +531,15 @@ grim_aggregate <- function(data, items = 1, rounding = "up_or_down",
     .grim_agg_row(2, "F", F, assumptions = "none",
                   interpretation = "GRIM failures among informative values")
   )
+  settings <- c(set, list(g = g, eps = !is.null(eps)))
 
   if (k == 0) {
-    summary <- do.call(rbind, rows)
     return(structure(
-      list(summary = summary, data = out_data,
-           settings = list(rounding = rounding, g = g, eps = !is.null(eps))),
+      list(
+        summary = do.call(rbind, rows),
+        data = out_data,
+        settings = settings
+      ),
       class = "grim_aggregate"))
   }
 
@@ -427,15 +576,21 @@ grim_aggregate <- function(data, items = 1, rounding = "up_or_down",
   }
   if (isTRUE(ci)) {
     lc <- .lambda_ci(fi, qi, conf_level)
-    rows <- c(rows, list(.grim_agg_row(
-      8, paste0("lambda_ci_", round(100 * conf_level)), lower = lc[1],
+    pct <- format(100 * conf_level)
+    rows <- c(
+      rows,
+      list(.grim_agg_row(
+        8,
+        paste0("lambda_ci_", pct),
+        lower = lc[1],
       upper = lc[2], assumptions = "A0, U, I, M",
-      interpretation = paste0(round(100 * conf_level),
-                              "% confidence interval (tail inversion)"))))
+        interpretation = paste0(pct, "% confidence interval (tail inversion)")
+      ))
+    )
   }
 
   if (!is.null(eps)) {
-    ei <- .grim_agg_eps(eps, q, n, d)[informative]
+    ei <- eps_all[informative]
     E_A <- sum(ei)
     rows <- c(rows, list(
       .grim_agg_row(9, "E_A", E_A, assumptions = "B",
@@ -445,16 +600,47 @@ grim_aggregate <- function(data, items = 1, rounding = "up_or_down",
       .grim_agg_row(9, "p_vs_baseline", .poisbinom_tails(ei, F)[["upper"]],
                     assumptions = "B, I",
                     interpretation = "P(F' >= F) if every value were authentic")
-    ))
-    out_data$eps <- .grim_agg_eps(eps, q, n, d)
+      )
+    )
   }
 
   structure(
-    list(summary = do.call(rbind, rows), data = out_data,
-         settings = list(rounding = rounding, g = g, eps = !is.null(eps))),
-    class = "grim_aggregate")
+    list(summary = do.call(rbind, rows), data = out_data, settings = settings),
+    class = "grim_aggregate"
+  )
 }
 
+# Internal: stop if `...` is not empty, pointing renamed arguments to their
+# new names.
+.ga_check_dots <- function(
+  ...,
+  .renamed = c(items = "items_averaged", percent = "")
+) {
+  if (...length() == 0) {
+    return(invisible())
+  }
+  nms <- names(list(...))
+  if (is.null(nms)) {
+    nms <- rep("", ...length())
+  }
+  renamed <- .renamed
+  hint <- ifelse(
+    nms %in% names(renamed),
+    ifelse(
+      renamed[nms] == "",
+      paste0(" `", nms, "` was removed."),
+      paste0(" `", nms, "` was renamed to `", renamed[nms], "`.")
+    ),
+    ""
+  )
+  stop(
+    "Unknown or unnamed argument(s) in `...`: ",
+    paste0("`", nms, "`", collapse = ", "),
+    ".",
+    paste(hint, collapse = ""),
+    call. = FALSE
+  )
+}
 #' @export
 print.grim_aggregate <- function(x, digits = 3, ...) {
   s <- x$summary
@@ -494,8 +680,9 @@ print.grim_aggregate <- function(x, digits = 3, ...) {
 # intervals as `quantity_lower` / `quantity_upper`.
 .grim_agg_wide <- function(s) {
   out <- list()
+  interval <- grepl("^(theta|lambda_support_|lambda_ci_)", s$quantity)
   for (i in seq_len(nrow(s))) {
-    if (is.na(s$value[i]) && !is.na(s$lower[i])) {
+    if (interval[i]) {
       out[[paste0(s$quantity[i], "_lower")]] <- s$lower[i]
       out[[paste0(s$quantity[i], "_upper")]] <- s$upper[i]
     } else {
@@ -508,10 +695,13 @@ print.grim_aggregate <- function(x, digits = 3, ...) {
 #' GRIM aggregation by group
 #'
 #' Runs [grim_aggregate()] separately within each group of `data` (e.g. one
-#' group per paper) and returns one row per group.
+#' group per paper) and returns one row per group. A missing `by` value forms
+#' its own group.
 #'
-#' @param data A data frame as for [grim_aggregate()].
-#' @param by Character vector of grouping column names.
+#' @param data A data frame as for [grim_aggregate()]. Give per-row
+#'   `digits_x` and `items_averaged` as columns.
+#' @param by Character vector of grouping column names. They must not clash
+#'   with the output columns (such as `k`, `F`, `E` or `O_E`).
 #' @param ... Further arguments passed to [grim_aggregate()].
 #' @return A wide tibble with the grouping columns followed by one column per
 #'   point quantity and `_lower` / `_upper` columns per interval. Groups with
@@ -520,20 +710,40 @@ print.grim_aggregate <- function(x, digits = 3, ...) {
 #' @examples
 #' dat <- data.frame(
 #'   paper = rep(c("A", "B"), each = 4),
-#'   x = c("3.41", "2.87", "4.12", "3.05", "2.60", "3.93", "1.14", "2.29"),
+#'   x = c(3.41, 2.87, 4.12, 3.05, 2.60, 3.93, 1.14, 2.29),
 #'   n = c(28, 31, 45, 22, 37, 19, 26, 33)
 #' )
-#' grim_aggregate_by(dat, by = "paper")
+#' grim_aggregate_by(dat, by = "paper", digits_x = 2, items_averaged = 1)
 #' @export
 grim_aggregate_by <- function(data, by, ...) {
-  if (!all(by %in% names(data))) {
+  if (!is.data.frame(data) || !is.character(by) || !all(by %in% names(data))) {
     stop("`by` must name columns of `data`.", call. = FALSE)
   }
-  key <- interaction(data[by], drop = TRUE, lex.order = TRUE)
-  groups <- split(seq_len(nrow(data)), key)
+  # sort by the grouping columns, NA last, and keep NA as its own group
+  o <- do.call(order, unname(as.list(data[by])))
+  key <- do.call(
+    paste,
+    c(
+      lapply(data[by], function(v) {
+        paste0(is.na(v), v)
+      }),
+      sep = "\r"
+    )
+  )[o]
+  groups <- split(o, factor(key, levels = unique(key)))
   wide <- lapply(groups, function(i) {
     res <- grim_aggregate(data[i, , drop = FALSE], ...)
-    cbind(data[i[1], by, drop = FALSE], .grim_agg_wide(res$summary))
+    w <- .grim_agg_wide(res$summary)
+    clash <- intersect(by, names(w))
+    if (length(clash)) {
+      stop(
+        "`by` column(s) ",
+        paste0("`", clash, "`", collapse = ", "),
+        " clash with output columns of the same name. Rename them.",
+        call. = FALSE
+      )
+    }
+    cbind(as.data.frame(data[i[1], by, drop = FALSE]), w)
   })
   # groups with k = 0 lack the later columns
   cols <- unique(unlist(lapply(wide, names)))
@@ -563,13 +773,13 @@ grim_aggregate_by <- function(data, by, ...) {
 #' @seealso [grim_aggregate()]
 #' @examples
 #' dat <- data.frame(
-#'   x = c("3.41", "2.87", "4.12", "3.05", "2.66", "3.90"),
+#'   x = c(3.41, 2.87, 4.12, 3.05, 2.66, 3.90),
 #'   n = c(28, 31, 45, 22, 37, 19)
 #' )
 #' grim_sensitivity(dat, list(
 #'   avoid_0_5 = function(d) ifelse(d %in% c(0, 5), 0.5, 1),
 #'   heap_0_5  = function(d) ifelse(d %in% c(0, 5), 3, 1)
-#' ))
+#' ), digits_x = 2, items_averaged = 1)
 #' @export
 grim_sensitivity <- function(data, g_list, ...) {
   if (!is.list(g_list) || is.null(names(g_list)) || any(names(g_list) == "")) {
