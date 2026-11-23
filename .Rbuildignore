@@ -13,3 +13,6 @@
 ^paper$
 ^app$
 ^dev$
+^CITATION\.cff$
+^TODO\.md$
+^\.claude$

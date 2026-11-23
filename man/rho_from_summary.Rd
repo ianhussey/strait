@@ -4,12 +4,16 @@
 \alias{rho_from_summary}
 \title{Method-of-moments rho from summary statistics}
 \usage{
-rho_from_summary(L, U, M, SD, N, rho_var = NULL)
+rho_from_summary(l, u, n, mean, sd, ..., rho_var = NULL)
 }
 \arguments{
-\item{L, U}{Scale limits; \code{U - L} a whole number. Scalars or vectors.}
+\item{l, u}{Scale limits (scalars); \code{u - l} a whole number \eqn{\ge 2}
+(on a two-point scale \eqn{\rho} is not identified).}
 
-\item{M, SD, N}{Reported mean, SD and sample size (vectors).}
+\item{n, mean, sd}{Reported sample size, mean and SD (vectors, each of
+length 1 or a common length).}
+
+\item{...}{Must be empty.}
 
 \item{rho_var}{Optional \eqn{\rho} at which to evaluate the kurtosis in
 the variance (default: \eqn{\max(0, \hat\rho)}). \code{\link[=rho_corpus_fit]{rho_corpus_fit()}}
@@ -19,7 +23,7 @@ passes the shrunken corpus prediction here.}
 A tibble with \code{mu_hat}, \code{rho_hat} and \code{var_rho}.
 }
 \description{
-\eqn{\hat\mu = (M - L)/m} and \eqn{\hat\rho = [SD^2/(m\hat\mu(1 -
+\eqn{\hat\mu = (mean - l)/m} and \eqn{\hat\rho = [sd^2/(m\hat\mu(1 -
 \hat\mu)) - 1]/(m - 1)}. \eqn{\hat\rho} is linear in \eqn{S^2}, so it is
 unbiased for \eqn{\rho} (given \eqn{\mu}), with sampling variance
 \eqn{\mathrm{Var}(S^2)/[m(m - 1)\mu(1 - \mu)]^2}. Negative
@@ -27,9 +31,9 @@ unbiased for \eqn{\rho} (given \eqn{\mu}), with sampling variance
 }
 \note{
 The variance treats \eqn{\mu} as known. Its sampling error adds a
-term of order \eqn{1/N} that is small next to \eqn{\mathrm{Var}(S^2)}
+term of order \eqn{1/n} that is small next to \eqn{\mathrm{Var}(S^2)}
 except near the scale limits.
 }
 \examples{
-rho_from_summary(0, 63, M = c(25, 12), SD = c(8, 7), N = c(50, 120))
+rho_from_summary(0, 63, n = c(50, 120), mean = c(25, 12), sd = c(8, 7))
 }

@@ -1,4 +1,4 @@
-#' strait: Truncation-Induced Dependency among Summary Statistics
+#' strait: Bounds Checks for Reported Summary Statistics
 #'
 #' A forensic meta-science / trustworthiness-assessment toolkit for checking
 #' whether reported means, standard deviations and sample sizes measured on a
@@ -13,8 +13,8 @@
 #' \code{brimmer_multiple()} applies it across a data frame. Companion
 #' functions trace the feasible envelope (\code{sd_bounds_curve()}), build the
 #' jointly GRIM-, GRIMMER- and bounds-consistent grid (\code{umbrella_data()}),
-#' and visualise both on the native and POMP scales (\code{plot_sd_bounds()},
-#' \code{plot_sd_bounds_pomp()}, \code{plot_umbrella()}).
+#' and visualise both on the native and POMP scales (\code{sd_bounds_plot()},
+#' \code{sd_bounds_pomp_plot()}, \code{umbrella_plot()}).
 #'
 #' @seealso The package README and vignette (\code{vignette("strait")}) for a
 #'   worked example and the method background.

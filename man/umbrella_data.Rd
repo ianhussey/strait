@@ -5,9 +5,9 @@
 \title{Build the GRIM x GRIMMER x bounds umbrella grid (full, with verdicts)}
 \usage{
 umbrella_data(
-  n,
   l,
   u,
+  n,
   digits = 2,
   Z = "integer",
   scoring = "singleitem",
@@ -17,9 +17,9 @@ umbrella_data(
 )
 }
 \arguments{
-\item{n}{Integer scalar, sample size.}
-
 \item{l, u}{Numeric scalars, limits.}
+
+\item{n}{Integer scalar, sample size.}
 
 \item{digits}{Integer, reported decimal places (grid step \code{10^-digits}).}
 
@@ -31,10 +31,11 @@ umbrella_data(
 cell is tested against are the alpha-conditional ones, so the grid shows the
 jointly GRIM-, GRIMMER- and alpha-consistent tuples.}
 
-\item{rounding}{Rounding rule for mean and SD (default \code{"up_or_down"}).}
+\item{rounding}{Rounding method for mean and SD, named as in scrutiny
+(default \code{"up_or_down"}).}
 }
 \value{
-A data.frame: \code{mean}, \code{sd}, \code{min_sd}, \code{max_sd}, \code{in_bounds},
+A tibble: \code{mean}, \code{sd}, \code{min_sd}, \code{max_sd}, \code{in_bounds},
 \code{grimmer}, \code{consistent}. \code{grimmer} is evaluated only for SDs inside the
 sharp bounds (elsewhere the tuple is already inconsistent and \code{grimmer}
 is \code{NA}); GRIM-inconsistent means are pruned before any SD is tested,
@@ -52,7 +53,7 @@ well as the passing "umbrella".
 \examples{
 # the full grid of reportable (mean, sd) pairs for a small design
 # (a 3-point scale at 1 decimal place, to keep the example quick)
-grid <- umbrella_data(n = 12, l = 1, u = 3, digits = 1)
+grid <- umbrella_data(l = 1, u = 3, n = 12, digits = 1)
 head(grid)
 
 # how many pairs survive every test

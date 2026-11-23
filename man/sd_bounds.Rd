@@ -11,9 +11,9 @@ sd_bounds(
   b = NULL,
   n = NULL,
   mean = NULL,
-  mean_digits = NULL,
+  digits_mean = NULL,
   sd = NULL,
-  sd_digits = NULL,
+  digits_sd = NULL,
   rounding = NULL,
   Z = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
@@ -30,18 +30,20 @@ sd_bounds(
 
 \item{mean}{Numeric scalar or NULL, the reported sample mean.}
 
-\item{mean_digits}{Integer scalar or NULL, decimal places of the reported
+\item{digits_mean}{Integer scalar or NULL, decimal places of the reported
 mean (required with \code{rounding}).}
 
 \item{sd}{Numeric scalar or NULL, the reported sample SD (verdict columns
 only; never affects the bounds).}
 
-\item{sd_digits}{Integer scalar or NULL, decimal places of the reported SD
+\item{digits_sd}{Integer scalar or NULL, decimal places of the reported SD
 (required for GRIMMER and for interval-based \code{sd_in_bounds} when
 \code{rounding} is set).}
 
-\item{rounding}{NULL (mean is exact) or a rounding/truncation rule; see
-\code{\link[=unround_interval]{unround_interval()}}.}
+\item{rounding}{NULL (mean is exact) or a rounding method, named as in
+scrutiny: \code{"up_or_down"}, \code{"ceiling_or_floor"}, \code{"up"}, \code{"down"},
+\code{"even"}, \code{"ceiling"}, \code{"floor"}, \code{"trunc"}, \code{"anti_trunc"}, or one of
+the \code{"ties_*"} methods. See \code{\link[roundwork:unround]{roundwork::unround()}}.}
 
 \item{Z}{"continuous" (default), "integer", or "quasiinteger".}
 
@@ -54,7 +56,7 @@ only; never affects the bounds).}
 \code{scoring = "sumscored"} or \code{"meanscored"}).}
 }
 \value{
-A one-row data.frame: \code{min_sd}, \code{max_sd} (Inf if unbounded),
+A one-row tibble: \code{min_sd}, \code{max_sd} (Inf if unbounded),
 \code{feasible} (FALSE when the constraint set admits no sample, with
 \code{min_sd}/\code{max_sd} NA), \code{min_rule}, \code{max_rule} (which bound binds),
 \code{grim}, \code{grimmer} (scrutiny's verdicts; NA when not applicable),
@@ -77,18 +79,17 @@ each. \code{a} supersedes \code{l} and \code{b} supersedes \code{u} (a wall beyo
 extreme is vacuous). Attainment leaves ceilings unchanged but creates
 nonzero floors.
 \item \code{n} — sample size (required for any mean-conditional bound).
-\item \code{mean}, \code{mean_digits} — the reported mean, numeric, with its number of
-reported decimal places. This mirrors scrutiny's post-string API (numeric
-\code{x} plus \code{digits_x}); a character-parsing wrapper can be layered above via
-\code{\link[=infer_digits]{infer_digits()}}, but is not required here. With \code{rounding = NULL} the
-mean is treated as exact and \code{mean_digits} is ignored.
-\item \code{rounding} — NULL (mean exact) or one of \code{"up_or_down"}, \code{"up"},
-\code{"down"}, \code{"even"}, \code{"ceiling"}, \code{"floor"}, \code{"trunc"}, \code{"anti_trunc"}
-(see \code{\link[=unround_interval]{unround_interval()}}; requires \code{mean_digits}). The returned bounds
+\item \code{mean}, \code{digits_mean} — the reported mean, numeric, with its number of
+reported decimal places, as \code{x} and \code{digits_x} in scrutiny. With
+\code{rounding = NULL} the mean is treated as exact and \code{digits_mean} is
+ignored.
+\item \code{rounding} — NULL (mean exact) or one of scrutiny's rounding methods,
+such as \code{"up_or_down"}, \code{"up"}, \code{"even"} or \code{"trunc"} (see
+\code{\link[roundwork:unround]{roundwork::unround()}}; requires \code{digits_mean}). The returned bounds
 are then the ENVELOPE over all exact means consistent with the report,
 intersected with the feasible mean band. Under \code{Z = "integer"} the
 envelope enumerates the GRIM-consistent means in the interval exactly.
-\item \code{sd}, \code{sd_digits} — optionally, the reported SD and its decimal places.
+\item \code{sd}, \code{digits_sd} — optionally, the reported SD and its decimal places.
 The SD never changes the bounds; it enables the report-consistency
 columns: \code{sd_in_bounds} (does the SD's own rounding interval overlap
 \verb{[min_sd, max_sd]}?) and, under \code{Z = "integer"} with \code{rounding} set, the
@@ -135,13 +136,13 @@ sd_bounds(l = 1, b = 4, n = 9, mean = 3.5, Z = "integer")    # mixed
 
 # reported mean rounded to 2 dp: envelope over [2.965, 2.975];
 # GRIM verdict deferred to scrutiny
-sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
+sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
           rounding = "up_or_down", Z = "integer")
 # with a reported SD: adds scrutiny's GRIMMER verdict and the bounds check
-sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
-          sd = 2.83, sd_digits = 2, rounding = "up_or_down", Z = "integer")
+sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+          sd = 2.83, digits_sd = 2, rounding = "up_or_down", Z = "integer")
 # truncated reporting
-sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
+sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
           rounding = "trunc", Z = "quasiinteger")
 
 # sum-scored 3-item composite (l, u, mean in sum units) with alpha

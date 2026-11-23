@@ -24,6 +24,16 @@ smooth arch obtained by allowing fractional counts at the two limits, so it is
 \code{\link[=sd_max_structure_s]{sd_max_structure_s()}}, which never exceeds this. Retained because it is the
 form most often cited in the literature and is useful as a reference curve.
 }
+\details{
+For any two values \code{lower < upper}, not just the scale limits, it is the SD
+of a sample on those two values alone, as a function of its mean: an arch
+from \code{lower} to \code{upper} (a semicircle for the population SD, with mean and SD
+in the same units). The umbrella plot is made of these arches. Its ceiling is
+the arch between the scale limits; its integer floor, \code{\link[=sd_min_integer]{sd_min_integer()}}, is
+the arch between the two whole numbers either side of the mean; and the arch
+between any other two values is the ceiling for data confined to them, which
+\code{\link[=implied_range]{implied_range()}} uses to find the range a report forces the data to cover.
+}
 \examples{
 # the smooth arch, highest at the scale midpoint
 sd_max_muilwijk(mean = c(2, 4, 6), n = 30, lower = 1, upper = 7)

@@ -81,7 +81,7 @@ test_that("parity alone settles reports the sandwich admits", {
   # 0-100, n = 100, mean 99.80, sd 0.50: the sum is 9980 and the only integer
   # in the SD's window is 996029, which is odd while the sum is even
   W <- 100; n <- 100
-  tg <- .target_states(0, 100, n, 1, 99.80, 0.50, 2, 2, "half_up")
+  tg <- .target_states(0, 100, n, 1, 99.80, 0.50, 2, 2, "up")
   expect_true(nrow(tg) >= 1)
   expect_null(.k_window(tg$S[1], tg$Q_lo[1], tg$Q_hi[1],
                         tg$lo_incl[1], tg$hi_incl[1], n, W))
@@ -89,15 +89,15 @@ test_that("parity alone settles reports the sandwich admits", {
 })
 
 test_that("the sd = 0 sign trap and the empty candidate range survive", {
-  # unround_interval(0, ...) reaches below zero; squaring that endpoint would
+  # unrounding 0 reaches below zero; squaring that endpoint would
   # put a positive floor under the sum of squares and exclude the constant
   # sample, which is the one sample a reported SD of 0 must admit
   W <- 6; n <- 12
-  tg <- .target_states(0, 6, n, 1, 3.0, 0.0, 1, 1, "half_up")
+  tg <- .target_states(0, 6, n, 1, 3.0, 0.0, 1, 1, "up")
   expect_true(.certify_fast(W, n, tg))
   # a mean admitting no integer sum yields no targets at all, so the fast path
   # must report impossible rather than iterating a descending sequence
-  tg0 <- .target_states(0, 6, n, 1, 3.51, 1.0, 2, 1, "half_up")
+  tg0 <- .target_states(0, 6, n, 1, 3.51, 1.0, 2, 1, "up")
   expect_false(.certify_fast(W, n, tg0))
 })
 
@@ -107,7 +107,7 @@ test_that("the fast path agrees with the corridor DP cell for cell", {
     l <- cfg[["l"]]; u <- cfg[["u"]]; n <- cfg[["n"]]; W <- u - l
     gr <- expand.grid(mean = seq(l, u, by = 0.1),
                       sd = seq(0, (u - l) / 2, by = 0.1))
-    for (rr in c("half_up", "half_down")) {
+    for (rr in c("up", "down")) {
       fast <- rep(NA, nrow(gr)); slow <- fast
       for (i in seq_len(nrow(gr))) {
         tg <- .target_states(l, u, n, 1, gr$mean[i], gr$sd[i], 1, 1, rr)
@@ -123,7 +123,7 @@ test_that("the fast path agrees with the corridor DP cell for cell", {
 test_that("brimmest() reaches the same verdicts by either route", {
   # search_budget = 0 refuses the constructive search everything, so the
   # corridor DP answers instead: the two must not disagree
-  args <- list(l = 0, u = 20, n = 30, digits = 1,
+  args <- list(l = 0, u = 20, n = 30, digits_mean = 1, digits_sd = 1,
                mean = c(10.0, 9.7, 0.2, 19.9, 3.4),
                sd   = c(5.0, 0.1, 0.5, 0.2, 12.0))
   fast <- do.call(brimmest, args)
@@ -135,7 +135,7 @@ test_that("brimmest() reaches the same verdicts by either route", {
 test_that("a design the lattice refuses is certified anyway", {
   # 0-63 at n = 50 needs a 3151 x 24801 state table, so only the targeted
   # routes can answer at all -- and the fast path answers immediately
-  r <- brimmest(l = 0, u = 63, n = 50, mean = 30.42, sd = 12.71, digits = 2)
+  r <- brimmest(l = 0, u = 63, n = 50, mean = 30.42, sd = 12.71, digits_mean = 2, digits_sd = 2)
   expect_true(r$possible)
 })
 

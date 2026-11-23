@@ -1,9 +1,38 @@
 # Geometry helpers shared by the plotting layer: feasible regions as closed
 # rings, and the count-parity correction factor as a quantity in its own right.
 
+# Internal: a band (sd_bounds_curve() or sd_region_data() output) with its SD
+# columns set to NA at every mean where no SD is possible. Those rows are kept,
+# not dropped: ggplot2 breaks a ribbon or a line at an NA row, but draws
+# straight across a row that is missing, which would fill in or outline a gap
+# where the band does not exist.
+.band_mask <- function(d) {
+  ok <- is.finite(d$min_sd) & is.finite(d$max_sd)
+  if (!is.null(d[["feasible"]])) ok <- ok & d$feasible
+  for (col in intersect(c("min_sd", "max_sd", "floor_parity", "ceil_parity"),
+                        names(d)))
+    d[[col]][!ok] <- NA_real_
+  d
+}
+
+# Internal: the mean-grid spacing of a band, which band_polygon() needs to tell
+# a sampling gap from a genuine one. sd_bounds_curve() and sd_region_data()
+# record it, because a grid can be non-uniform: sd_bounds_curve() adds each
+# kink of the 1/(n * n_items) lattice plus a pair of neighbours 1e-9 away.
+# Guessing it from the means fails once the kinks outnumber the uniform grid
+# (about n * (u - l) > 333 at the default `by`): the median then falls BELOW
+# the plain spacing, every ordinary interval reads as a gap, and the band is
+# drawn as thousands of slivers. The median remains the fallback for a band
+# built by hand, whose uniform grid makes it right.
+.band_step <- function(d) {
+  step <- attr(d, "step")
+  if (!is.null(step)) step
+  else if (nrow(d) > 1) stats::median(diff(d$mean)) else 1
+}
+
 #' A feasible region as closed rings
 #'
-#' Converts a `(mean, lo, hi)` band into one or more closed polygons, so that a
+#' Converts a `(mean, min_sd, max_sd)` band into one or more closed polygons, so that a
 #' region can be drawn as a ring rather than as the area between two curves.
 #'
 #' Drawing a band with `ggplot2::geom_ribbon()` assumes the band exists at every
@@ -12,7 +41,7 @@
 #' the constraints at all, and `sd_region_data()` returns `NA` there. A ribbon
 #' simply draws nothing across such a gap. If the plot shades the *feasible*
 #' region the gap is merely invisible; if it shades the *infeasible* region — as
-#' [plot_sd_bounds()] and [plot_sd_region()] do by default — the gap becomes an
+#' [sd_bounds_plot()] and [sd_region_plot()] do by default — the gap becomes an
 #' unshaded bar, which asserts that any SD whatsoever is possible at those
 #' means. That is the one thing such a figure must not say.
 #'
@@ -28,31 +57,31 @@
 #' these are left in rather than dropped, since whether an isolated feasible
 #' point should be shown is the caller's decision.
 #'
-#' @param d A data frame with `mean`, `lo` and `hi`, e.g. from
+#' @param d A data frame with `mean`, `min_sd` and `max_sd`, e.g. from
 #'   [sd_region_data()] under a band rule.
 #' @param by The mean-grid spacing of `d`, used to tell a gap from jitter.
 #' @return A long-format data frame with `mean`, `y` and a `ring` id, ready for
 #'   `geom_polygon(aes(group = ring))`, or `NULL` if no row is finite.
-#' @seealso [sd_region_data()], [plot_sd_region()].
+#' @seealso [sd_region_data()], [sd_region_plot()].
 #' @examples
 #' # a reported alpha leaves stretches near each limit where no composite exists
 #' d <- sd_region_data(0, 3, 7, rule = "alpha", n_items = 2, alpha = 0.70,
 #'                     by = 0.001)
-#' sum(is.na(d$lo))
+#' sum(is.na(d$min_sd))
 #'
 #' # the feasible region is therefore three rings, not one band
 #' rings <- band_polygon(d, by = 0.001)
 #' length(unique(rings$ring))
 #' @export
 band_polygon <- function(d, by) {
-  d <- d[is.finite(d$lo) & is.finite(d$hi), , drop = FALSE]
+  d <- d[is.finite(d$min_sd) & is.finite(d$max_sd), , drop = FALSE]
   if (!nrow(d)) return(NULL)
   d <- d[order(d$mean), , drop = FALSE]
   run <- c(0, cumsum(diff(d$mean) > by * 1.5))
   out <- do.call(rbind, lapply(unique(run), function(k) {
     g <- d[run == k, , drop = FALSE]
     data.frame(mean = c(g$mean, rev(g$mean), g$mean[1]),
-               y    = c(g$hi,   rev(g$lo),   g$hi[1]),
+               y    = c(g$max_sd,   rev(g$min_sd),   g$max_sd[1]),
                ring = k)
   }))
   rownames(out) <- NULL
@@ -110,8 +139,7 @@ sd_delta <- function(mean, n, lower, upper, tol = 1e-9) {
   R <- upper - lower
   nl <- n * (upper - mean) / R
   nu <- n * (mean - lower) / R
-  fr <- function(x) { f <- x - floor(x); ifelse(f > 1 - tol, 0, f) }
   muil <- n * (upper - mean) * (mean - lower)   # SS of the uncorrected bound
-  ss <- muil - fr(nl) * fr(nu) * R^2            # SS of the sharp bound
+  ss <- muil - frac(nl, tol) * frac(nu, tol) * R^2  # SS of the sharp bound
   ifelse(muil <= 0, 1, pmax(0, ss) / muil)
 }

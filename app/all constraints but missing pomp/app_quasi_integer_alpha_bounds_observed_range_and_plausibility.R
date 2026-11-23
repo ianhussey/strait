@@ -26,7 +26,7 @@
 # because the approximation is poor in the lower tail at small n.
 #
 # Needs this repository's strait (loaded from source, two levels up) or an
-# installed strait >= 0.4.13.
+# installed strait >= 0.5.0.
 #
 # ---- original header ----
 #
@@ -98,7 +98,7 @@ local({
     requireNamespace("strait")
   }
   if (!"sd_plausibility" %in% getNamespaceExports("strait")) {
-    stop("This app needs strait >= 0.4.13 (sd_plausibility()).")
+    stop("This app needs strait >= 0.5.0 (sd_plausibility(l, u, n, mean)).")
   }
 })
 
@@ -407,7 +407,7 @@ server <- function(input, output, session) {
     if (is.null(pb)) return(NULL)
     xs <- seq(pb$L, pb$U, length.out = 123)
     xs <- xs[-c(1, length(xs))]
-    r <- strait::sd_plausibility(pb$L, pb$U, M = xs, N = pb$n,
+    r <- strait::sd_plausibility(pb$L, pb$U, n = pb$n, mean = xs,
                                  p = c(0.01, 0.001), rho = pb$rho, tau = pb$tau,
                                  method = "chisq2", condition_on_mean = TRUE)
     data.frame(muS = xs,
@@ -430,7 +430,7 @@ server <- function(input, output, session) {
     if (!is.null(ex)) {
       out <- ex; method <- "exact"
     } else {
-      r <- strait::sd_plausibility(pb$L, pb$U, M = b$muS, N = pb$n,
+      r <- strait::sd_plausibility(pb$L, pb$U, n = pb$n, mean = b$muS,
                                    p = c(0.01, 0.001), rho = pb$rho,
                                    tau = pb$tau, method = "chisq2",
                                    condition_on_mean = TRUE)

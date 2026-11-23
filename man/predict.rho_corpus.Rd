@@ -9,7 +9,7 @@
 \arguments{
 \item{object}{A \code{rho_corpus} object from \code{\link[=rho_corpus_fit]{rho_corpus_fit()}}.}
 
-\item{mu}{Mean proportions \eqn{(M - L)/(U - L)} at which to predict.}
+\item{mu}{Mean proportions \eqn{(mean - l)/(u - l)} at which to predict.}
 
 \item{...}{Unused.}
 }

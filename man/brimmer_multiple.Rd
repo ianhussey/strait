@@ -16,8 +16,9 @@ results; if FALSE, only the result columns (same row order), for drop-in
 use inside a \code{dplyr::mutate()}/\code{purrr} pipeline.}
 }
 \value{
-A data frame of the \code{\link[=brimmer]{brimmer()}} columns, one row per input
-row (optionally with the inputs prepended).
+A tibble of the \code{\link[=brimmer]{brimmer()}} columns, one row per input row
+(optionally with the inputs prepended). A row with a missing input gets
+a missing verdict, as in \code{\link[=brimmer]{brimmer()}}.
 }
 \description{
 Applies \code{\link[=brimmer]{brimmer()}} to each row of a data frame, de-duplicating
@@ -29,7 +30,7 @@ an error.
 }
 \details{
 Recognised names (column or constant): \code{l}, \code{u}, \code{a}, \code{b}, \code{n}, \code{mean},
-\code{mean_digits}, \code{sd}, \code{sd_digits}, \code{rounding}, \code{Z}, \code{scoring}, \code{n_items},
+\code{digits_mean}, \code{sd}, \code{digits_sd}, \code{rounding}, \code{Z}, \code{scoring}, \code{n_items},
 \code{alpha}.
 }
 \examples{
@@ -40,6 +41,6 @@ reports <- data.frame(mean = c(2.97, 3.51, 4.20),
 # the scale limits and reported precision are constant across rows;
 # row 2 reports an SD above the ceiling for a 1-7 scale at n = 30
 out <- brimmer_multiple(reports, l = 1, u = 7,
-                                mean_digits = 2, sd_digits = 2)
+                                digits_mean = 2, digits_sd = 2)
 out[, c("mean", "sd", "n", "consistent", "failed_tests")]
 }

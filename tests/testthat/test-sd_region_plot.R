@@ -5,23 +5,23 @@ bes <- sqrt(n / (n - 1))
 test_that("band rules reproduce the article's nested-constraint panels", {
   # Popoviciu, range only
   d <- sd_region_data(l, u, n, rule = "range", by = 0.002)
-  expect_equal(d$lo, rep(0, length(m)))
-  expect_equal(d$hi, rep((u - l) / sqrt(2), length(m)))
+  expect_equal(d$min_sd, rep(0, length(m)))
+  expect_equal(d$max_sd, rep((u - l) / sqrt(2), length(m)))
 
   # Muilwijk / Bhatia-Davis arch, no floor
   d <- sd_region_data(l, u, n, rule = "mean", by = 0.002)
-  expect_equal(d$hi, bes * sqrt(pmax(0, (u - m) * (m - l))))
-  expect_equal(d$lo, rep(0, length(m)))
+  expect_equal(d$max_sd, bes * sqrt(pmax(0, (u - m) * (m - l))))
+  expect_equal(d$min_sd, rep(0, length(m)))
 
   # that arch plus the naive Bernoulli floor
   d <- sd_region_data(l, u, n, rule = "mean_naive_floor", by = 0.002)
-  expect_equal(d$lo, bes * sqrt((m - floor(m)) * (1 - (m - floor(m)))))
-  expect_equal(d$hi, bes * sqrt(pmax(0, (u - m) * (m - l))))
+  expect_equal(d$min_sd, bes * sqrt((m - floor(m)) * (1 - (m - floor(m)))))
+  expect_equal(d$max_sd, bes * sqrt(pmax(0, (u - m) * (m - l))))
 
   # this article: both bounds sharp, GRIM-free
   d <- sd_region_data(l, u, n, rule = "quasi", by = 0.002)
-  expect_equal(d$lo, sd_min_quasi_integer(m, n))
-  expect_equal(d$hi, sd_max_structure_s(m, n, l, u))
+  expect_equal(d$min_sd, sd_min_quasi_integer(m, n))
+  expect_equal(d$max_sd, sd_max_structure_s(m, n, l, u))
 })
 
 test_that("the alpha rule matches the article's alpha panel", {
@@ -35,16 +35,16 @@ test_that("the alpha rule matches the article's alpha panel", {
   exp_lo[bad] <- NA_real_; exp_hi[bad] <- NA_real_
 
   d <- sd_region_data(l, u, n, rule = "alpha", n_items = k, alpha = a, by = 0.002)
-  expect_equal(d$lo, exp_lo)
-  expect_equal(d$hi, exp_hi)
+  expect_equal(d$min_sd, exp_lo)
+  expect_equal(d$max_sd, exp_hi)
 })
 
 test_that("alpha only tightens, and is inert / rejected at one item", {
   free  <- sd_region_data(l, u, n, rule = "quasi", n_items = 2, by = 0.01)
   withA <- sd_region_data(l, u, n, rule = "alpha", n_items = 2, alpha = 0.7, by = 0.01)
-  ok <- !is.na(withA$hi)
-  expect_true(all(withA$hi[ok] <= free$hi[ok] + 1e-9))
-  expect_true(all(withA$lo[ok] >= free$lo[ok] - 1e-9))
+  ok <- !is.na(withA$max_sd)
+  expect_true(all(withA$max_sd[ok] <= free$max_sd[ok] + 1e-9))
+  expect_true(all(withA$min_sd[ok] >= free$min_sd[ok] - 1e-9))
   expect_error(sd_region_data(l, u, n, rule = "alpha", n_items = 1, alpha = 0.7))
   expect_error(sd_region_data(l, u, n, rule = "alpha"))          # alpha required
   expect_error(sd_region_data(l, u, n, rule = "integer_alpha"))  # alpha required
@@ -61,9 +61,14 @@ test_that("lattice rules return attainable tuples, and alpha is a strict subset"
   expect_true(all(paste(b$mean, b$sd) %in% paste(a$mean, a$sd))) # strict subset
 
   # every retained tuple really is inside the alpha-conditional bounds
-  keep <- b[seq(1, nrow(b), length.out = min(40, nrow(b))), ]
+  keep <- b[round(seq(1, nrow(b), length.out = min(40, nrow(b)))), ]
   ok <- vapply(seq_len(nrow(keep)), function(i) {
-    r <- sd_bounds(l = l, u = u, n = n, mean = keep$mean[i], mean_digits = 2,
+      r <- sd_bounds(
+        l = l,
+        u = u,
+        n = n,
+        mean = keep$mean[i],
+        digits_mean = 2,
                    rounding = "up_or_down", Z = "integer", scoring = "meanscored",
                    n_items = 2, alpha = 0.70)
     isTRUE(r$feasible) &&
@@ -76,13 +81,31 @@ test_that("lattice rules return attainable tuples, and alpha is a strict subset"
 test_that("every rule returns a ggplot", {
   for (r in c("range", "range_n", "mean", "mean_naive_floor", "mestdagh",
               "pesant_regin", "quasi")) {
-    expect_s3_class(plot_sd_region(l, u, n, rule = r), "ggplot")
+    expect_s3_class(sd_region_plot(sd_region_data(l, u, n, rule = r)), "ggplot")
   }
-  expect_s3_class(plot_sd_region(l, u, n, rule = "alpha", n_items = 2, alpha = 0.7),
-                  "ggplot")
-  expect_s3_class(plot_sd_region(l, u, n, rule = "integer", digits = 1), "ggplot")
-  expect_s3_class(plot_sd_region(l, u, n, rule = "integer_alpha", n_items = 2,
-                                 alpha = 0.7, digits = 1), "ggplot")
+  quasi2 <- sd_region_data(l, u, n, rule = "quasi", n_items = 2)
+  expect_s3_class(sd_region_plot(sd_region_data(l, u, n, rule = "alpha",
+                                                n_items = 2, alpha = 0.7),
+                                 reference = quasi2), "ggplot")
+  expect_s3_class(sd_region_plot(sd_region_data(l, u, n, rule = "integer",
+                                                digits = 1),
+                                 reference = sd_region_data(l, u, n)), "ggplot")
+  expect_s3_class(sd_region_plot(sd_region_data(l, u, n, rule = "integer_alpha",
+                                                n_items = 2, alpha = 0.7,
+                                                digits = 1)), "ggplot")
+})
+
+test_that("sd_region_plot() draws its data and the reference band", {
+  mean_band <- sd_region_data(l, u, n, rule = "mean")
+  quasi <- sd_region_data(l, u, n, rule = "quasi")
+  p <- sd_region_plot(mean_band, reference = quasi, shade = "inside")
+  ribbon <- ggplot2::layer_data(p, 1)
+  expect_equal(ribbon$ymax, mean_band$max_sd)
+  dashed <- ggplot2::layer_data(p, 2)
+  expect_equal(dashed$y, quasi$max_sd)
+  expect_true(all(dashed$linetype == "dashed"))
+  # the band records its grid spacing for band_polygon()
+  expect_equal(attr(quasi, "step"), (u - l) / 1000)
 })
 
 test_that("sd_max_muilwijk is the smooth arch and never below Structure S", {
@@ -99,7 +122,7 @@ test_that("the exact lattice matches brute-force enumeration", {
   for (cfg in list(c(4, 1, 5), c(5, 0, 3), c(3, 1, 7))) {
     n <- cfg[1]; l <- cfg[2]; u <- cfg[3]
     d <- sd_region_data(l, u, n, rule = "attainable")
-    a <- unique(round(as.matrix(d), 10))
+    a <- unique(round(as.matrix(d[c("mean", "sd")]), 10))
     a <- a[order(a[, 1], a[, 2]), , drop = FALSE]
     expect_equal(unname(a), unname(brute(n, l, u)), tolerance = 1e-9)
   }
@@ -129,7 +152,7 @@ test_that("scoring decouples granularity from alpha's k", {
                            scoring = "sumscored", alpha = 0.5, by = 1)
   a_mean <- sd_region_data(0, 3, 23, rule = "alpha", n_items = 2,
                            scoring = "meanscored", alpha = 0.5, by = 0.5)
-  expect_equal(a_sum$hi, 2 * a_mean$hi, tolerance = 1e-8)
+  expect_equal(a_sum$max_sd, 2 * a_mean$max_sd, tolerance = 1e-8)
   # default scoring is unchanged
   expect_identical(sd_region_data(1, 7, 7, rule = "quasi", n_items = 5, by = 0.05),
                    sd_region_data(1, 7, 7, rule = "quasi", n_items = 5,
@@ -176,7 +199,7 @@ test_that("the lattice DP's state-space reductions are sound", {
     g <- as.matrix(expand.grid(rep(list(l:u), n)))
     b <- unique(round(cbind(rowMeans(g), apply(g, 1, stats::sd)), 10))
     b <- b[order(b[, 1], b[, 2]), , drop = FALSE]
-    a <- unique(round(as.matrix(d), 10))
+    a <- unique(round(as.matrix(d[c("mean", "sd")]), 10))
     a <- a[order(a[, 1], a[, 2]), , drop = FALSE]
     expect_equal(unname(a), unname(b), tolerance = 1e-9)
   }
@@ -195,7 +218,12 @@ test_that("the lattice DP's state-space reductions are sound", {
 test_that("round_digits/rounding round the emitted lattice", {
   ex <- sd_region_data(0, 3, 7, rule = "attainable")
   expect_true(any(abs(ex$sd * 100 - round(ex$sd * 100)) > 1e-9))  # exact by default
-  for (rr in c("half_up", "half_down", "native", "ceiling", "floor",
+  for (rr in c(
+    "up",
+    "down",
+    "even",
+    "ceiling",
+    "floor",
                "trunc", "anti_trunc")) {
     r <- sd_region_data(0, 3, 7, rule = "attainable", round_digits = 1,
                         rounding = rr)
@@ -220,7 +248,7 @@ test_that("forward-rounded exact tuples are a subset of the GRIMMER lattice", {
     n <- cfg[1]; l <- cfg[2]; u <- cfg[3]; dg <- cfg[4]
     k <- function(d) paste(sprintf("%.10f", d$mean), sprintf("%.10f", d$sd))
     grm <- k(sd_region_data(l, u, n, rule = "integer", digits = dg))
-    for (rr in c("half_up", "half_down")) {
+    for (rr in c("up", "down")) {
       fwd <- k(sd_region_data(l, u, n, rule = "attainable",
                               round_digits = dg, rounding = rr))
       expect_true(all(fwd %in% grm))
@@ -235,4 +263,32 @@ test_that("umbrella_data's reporting grid is free of seq() drift", {
   expect_true(all(abs(um$mean * 10 - round(um$mean * 10)) < 1e-12))
   expect_true(all(abs(um$sd * 10 - round(um$sd * 10)) < 1e-12))
   expect_identical(sum(um$consistent), 1175L)   # 1167 before the fix
+})
+
+test_that("the alpha band is what sd_bounds() tests a report against", {
+  b <- sd_region_data(
+    1,
+    5,
+    30,
+    rule = "alpha",
+    n_items = 3,
+    alpha = 0.8,
+    by = 0.02
+  )
+  sb <- b$mean |>
+    lapply(\(mu) {
+      sd_bounds(
+        l = 1,
+        u = 5,
+        n = 30,
+        mean = mu,
+        Z = "quasiinteger",
+        scoring = "meanscored",
+        n_items = 3,
+        alpha = 0.8
+      )
+    }) |>
+    do.call(what = rbind)
+  expect_equal(b$min_sd, sb$min_sd, tolerance = 1e-12)
+  expect_equal(b$max_sd, sb$max_sd, tolerance = 1e-12)
 })

@@ -64,35 +64,25 @@
   hit <- get0(key, envir = .lattice_cache, inherits = FALSE)
   if (!is.null(hit)) return(hit)
   res <- .attainable_lattice(l, u, n, mg, max_cells = max_cells)
+  # ponytail: keeps at most 4 designs, dropping all at once; a lattice can
+  # take hundreds of MB. Use LRU eviction if callers alternate among more.
+  if (length(ls(.lattice_cache)) >= 4L)
+    rm(list = ls(.lattice_cache), envir = .lattice_cache)
   assign(key, res, envir = .lattice_cache)
   res
-}
-
-# Internal: map the forward rounding vocabulary used by the lattice
-# (.round_reported) onto the inverse-rounding vocabulary of unround_interval().
-.rounding_inverse <- function(rounding) {
-  switch(rounding,
-    half_up    = "up",
-    half_down  = "down",
-    native     = "even",
-    ceiling    = "ceiling",
-    floor      = "floor",
-    trunc      = "trunc",
-    anti_trunc = "anti_trunc",
-    stop("unknown rounding rule: ", rounding)
-  )
 }
 
 # Internal: the (S, Q) targets implied by one reported (mean, sd) under one
 # rounding rule. Returns NULL when the report admits no integer sum at all
 # (the GRIM condition failing), which is already a certificate of
 # impossibility. `mg` is the granularity multiplier from .scoring_geometry().
-.target_states <- function(l, u, n, mg, mean, sd, mean_digits, sd_digits,
+.target_states <- function(l, u, n, mg, mean, sd, digits_mean, digits_sd,
                            rounding) {
-  inv <- .rounding_inverse(rounding)
   W <- as.integer(round(mg * (u - l)))
-  iv_m <- unround_interval(mean, mean_digits, inv)
-  iv_s <- unround_interval(sd, sd_digits, inv)
+  # roundwork's intervals, so a reported 0 under "trunc" owns (-unit, unit),
+  # and "even" lets a tie round either way, as on the lattice route
+  iv_m <- .unround(mean, digits_mean, rounding, "mean", "digits_mean")
+  iv_s <- .unround(sd, digits_sd, rounding, "sd", "digits_sd")
 
   # S = n * mg * (mean - l) must be a whole number of grid steps. Endpoint
   # inclusion matters: a half-up report owns its lower endpoint but not its

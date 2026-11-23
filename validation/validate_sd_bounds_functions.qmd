@@ -136,7 +136,7 @@ res_round <- list()
 
 # envelope == brute scan (quasi-integer and continuous)
 for (Zi in c("quasiinteger", "continuous")) {
-  r <- sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
+  r <- sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
                  rounding = "up_or_down", Z = Zi)
   ms <- seq(2.965, 2.975, length.out = 5001)
   fl <- vapply(ms, function(m) sd_bounds(l = 1, u = 7, n = 30, mean = m, Z = Zi)$min_sd, 1)
@@ -147,9 +147,9 @@ for (Zi in c("quasiinteger", "continuous")) {
 
 # strict integer: GRIM means enumerated exactly; open endpoints respected
 # n = 20, mean 2.4 to 1 dp: candidates 2.35, 2.40, 2.45 sit ON the interval edges
-r_uod <- sd_bounds(n = 20, mean = 2.4, mean_digits = 1, rounding = "up_or_down", Z = "integer")
-r_up  <- sd_bounds(n = 20, mean = 2.4, mean_digits = 1, rounding = "up",         Z = "integer")
-r_dn  <- sd_bounds(n = 20, mean = 2.4, mean_digits = 1, rounding = "down",       Z = "integer")
+r_uod <- sd_bounds(n = 20, mean = 2.4, digits_mean = 1, rounding = "up_or_down", Z = "integer")
+r_up  <- sd_bounds(n = 20, mean = 2.4, digits_mean = 1, rounding = "up",         Z = "integer")
+r_dn  <- sd_bounds(n = 20, mean = 2.4, digits_mean = 1, rounding = "down",       Z = "integer")
 res_round[["closed endpoints (up_or_down)"]] <- abs(r_uod$min_sd - sd_min_integer(2.35, 20)) < 1e-9
 res_round[["open upper endpoint (up)"]]      <- abs(r_up$min_sd  - sd_min_integer(2.35, 20)) < 1e-9
 res_round[["open lower endpoint (down)"]]    <- abs(r_dn$min_sd  - sd_min_integer(2.40, 20)) < 1e-9
@@ -175,18 +175,18 @@ correctly admit it.
 ```{r}
 res_scr <- list()
 
-r <- sd_bounds(l = 0, u = 1, n = 200, mean = 0.03, mean_digits = 2,
-               sd = 0.18, sd_digits = 2, rounding = "up_or_down", Z = "integer")
+r <- sd_bounds(l = 0, u = 1, n = 200, mean = 0.03, digits_mean = 2,
+               sd = 0.18, digits_sd = 2, rounding = "up_or_down", Z = "integer")
 res_scr[["witness: feasible & sd_in_bounds TRUE"]] <- r$feasible && isTRUE(r$sd_in_bounds)
 res_scr[["witness: scrutiny grimmer FALSE (documented false flag)"]] <- isFALSE(r$grimmer)
 
 # GRIMMER is scale-free; the bounds check is the complementary test
-r2 <- sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
-                sd = 3.30, sd_digits = 2, rounding = "up_or_down", Z = "integer")
+r2 <- sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+                sd = 3.30, digits_sd = 2, rounding = "up_or_down", Z = "integer")
 res_scr[["sd above ceiling: sd_in_bounds FALSE"]] <- isFALSE(r2$sd_in_bounds)
 
 # divergence note fires when scrutiny disagrees with the internal enumeration
-r3 <- sd_bounds(l = 0, u = 1, n = 40, mean = 0.07, mean_digits = 2,
+r3 <- sd_bounds(l = 0, u = 1, n = 40, mean = 0.07, digits_mean = 2,
                 rounding = "up", Z = "integer")
 res_scr[["documented grim false pass surfaces divergence note"]] <-
   !r3$feasible && isTRUE(r3$grim) && grepl("disagrees", r3$note)
@@ -217,12 +217,12 @@ scrutiny_ver <- as.character(packageVersion("scrutiny"))
 witness <- c(rep(1, 9), 2, 2, 2)
 w_ok <- length(witness) == 12 && all(witness == round(witness) &
                                      witness >= 1 & witness <= 5)
-w_cert <- brimmest(l = 1, u = 5, n = 12, mean = 1.2, sd = 0.5, digits = 1)
+w_cert <- brimmest(l = 1, u = 5, n = 12, mean = 1.2, sd = 0.5, digits_mean = 1, digits_sd = 1)
 
 # how many cells does the installed scrutiny reject that brimmest() proves real?
 um_g <- umbrella_data(n = 12, l = 1, u = 5, digits = 1, Z = "integer")
 cert_g <- brimmest(l = 1, u = 5, n = 12, mean = um_g$mean, sd = um_g$sd,
-                  digits = 1)
+                  digits_mean = 1, digits_sd = 1)
 misses <- which(!um_g$consistent & cert_g$possible)
 
 cat(sprintf("installed scrutiny: %s\n", scrutiny_ver))
@@ -260,25 +260,25 @@ that is merely slow. See the TODO in `README.md`.
 paths <- tribble(
   ~scenario, ~call,
   "ordinary report (witnessed by c(rep(1,20), rep(7,9), 6))",
-    quote(brimmer(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
-                          sd = 2.83, sd_digits = 2, Z = "integer")),
+    quote(brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+                          sd = 2.83, digits_sd = 2, Z = "integer")),
   "SD below the quasi-integer floor",
-    quote(brimmer(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
-                          sd = 0.10, sd_digits = 2, Z = "quasiinteger")),
+    quote(brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+                          sd = 0.10, digits_sd = 2, Z = "quasiinteger")),
   "SD above the ceiling",
-    quote(brimmer(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
-                          sd = 3.30, sd_digits = 2, Z = "integer")),
+    quote(brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+                          sd = 3.30, digits_sd = 2, Z = "integer")),
   "GRIM-impossible mean",
-    quote(brimmer(l = 1, u = 7, n = 30, mean = 3.51, mean_digits = 2,
-                          sd = 1.00, sd_digits = 2, Z = "integer")),
+    quote(brimmer(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2,
+                          sd = 1.00, digits_sd = 2, Z = "integer")),
   "scrutiny false-flag witness (only grimmer fails)",
-    quote(brimmer(l = 0, u = 1, n = 200, mean = 0.03, mean_digits = 2,
-                          sd = 0.18, sd_digits = 2, Z = "integer")),
+    quote(brimmer(l = 0, u = 1, n = 200, mean = 0.03, digits_mean = 2,
+                          sd = 0.18, digits_sd = 2, Z = "integer")),
   "mean-free: SD at the parity ceiling",
-    quote(brimmer(l = 1, u = 7, n = 10, sd = 3.16, sd_digits = 2, Z = "integer")),
+    quote(brimmer(l = 1, u = 7, n = 10, sd = 3.16, digits_sd = 2, Z = "integer")),
   "attained extremes: SD below the two-pin floor",
-    quote(brimmer(a = 1, b = 7, n = 10, mean = 4.0, mean_digits = 1,
-                          sd = 1.20, sd_digits = 2, Z = "integer"))
+    quote(brimmer(a = 1, b = 7, n = 10, mean = 4.0, digits_mean = 1,
+                          sd = 1.20, digits_sd = 2, Z = "integer"))
 )
 verdicts <- paths |>
   rowwise() |>
@@ -408,7 +408,7 @@ half <- 0.005 + 1e-9
 # sweep all GRIM-consistent reported means, SDs across the envelope +/- margin
 rep_means <- sort(unique(round(unique(umbrella$mean), 2)))
 sweep <- map_dfr(rep_means, function(m2) {
-  r_env <- sd_bounds(l = l_u, u = u_u, n = n_u, mean = m2, mean_digits = 2,
+  r_env <- sd_bounds(l = l_u, u = u_u, n = n_u, mean = m2, digits_mean = 2,
                      rounding = "up_or_down", Z = "integer")
   if (!r_env$feasible) return(NULL)
   s2s <- seq(max(0, floor((r_env$min_sd - 0.03) * 100) / 100),
@@ -424,8 +424,8 @@ sweep <- sweep |>
     grimmer_p = isTRUE(as.logical(unname(scrutiny::grimmer(x = m2, sd = s2, n = n_u,
                                                            digits_x = 2, digits_sd = 2)))[1]),
     bchk    = list(brimmer(l = l_u, u = u_u, n = n_u,
-                                   mean = m2, mean_digits = 2,
-                                   sd = s2, sd_digits = 2, Z = "integer")),
+                                   mean = m2, digits_mean = 2,
+                                   sd = s2, digits_sd = 2, Z = "integer")),
     bounds_p = isTRUE(bchk$feasible) && isTRUE(bchk$sd_in_bounds)
   ) |>
   ungroup() |>
@@ -702,14 +702,14 @@ res_cert <- list()
 # (i) against the Part 2 composition enumeration: two different algorithms
 # (compositions of n over the scale points vs. a reachability DP) must induce
 # the same set of reportable tuples once rounded to the reporting grid
-enum_key <- unique(unlist(lapply(c("half_up", "half_down"), function(rr)
+enum_key <- unique(unlist(lapply(c("up", "down"), function(rr)
   paste(round(strait:::.round_reported(umbrella$mean, 1, rr) * 10),
         round(strait:::.round_reported(umbrella$sd,   1, rr) * 10)))))
 grid_c <- expand.grid(mean = seq(l_u, u_u, by = 0.1),
                       sd   = seq(0, ceiling(sd_max_span_n(l_u, u_u, n_u) * 10) / 10,
                                  by = 0.1))
 cert_c <- brimmest(l = l_u, u = u_u, n = n_u,
-                  mean = grid_c$mean, sd = grid_c$sd, digits = 1)
+                  mean = grid_c$mean, sd = grid_c$sd, digits_mean = 1, digits_sd = 1)
 res_cert[["brimmest() == composition enumeration, cell for cell"]] <-
   identical(cert_c$possible,
             paste(round(grid_c$mean * 10), round(grid_c$sd * 10)) %in% enum_key)
@@ -717,7 +717,7 @@ res_cert[["brimmest() == composition enumeration, cell for cell"]] <-
 # (ii) against CLOSURE, cell for cell, on a smaller design
 um_cl <- umbrella_data(n = 9, l = 1, u = 5, digits = 1, Z = "integer")
 cert_cl <- brimmest(l = 1, u = 5, n = 9, mean = um_cl$mean, sd = um_cl$sd,
-                   digits = 1)
+                   digits_mean = 1, digits_sd = 1)
 closure_cl <- vapply(seq_len(nrow(um_cl)), function(i) {
   r <- try(suppressWarnings(unsum::closure_generate(
     mean = sprintf("%.1f", um_cl$mean[i]), sd = sprintf("%.1f", um_cl$sd[i]),
@@ -807,7 +807,7 @@ route_cmp <- function(l, u, n, dig) {
   W <- u - l
   gr <- expand.grid(mean = seq(l, u, by = 10^-dig),
                     sd   = seq(0, (u - l) / 2, by = 10^-dig),
-                    rr   = c("half_up", "half_down"),
+                    rr   = c("up", "down"),
                     stringsAsFactors = FALSE)
   fast <- slow <- rep(NA, nrow(gr))
   for (i in seq_len(nrow(gr))) {
@@ -843,9 +843,9 @@ fast_sweep <- cached("fastpath_sweep.rds", {
       stp <- 10^-dig
       gr <- expand.grid(mean = seq(l, u, by = stp),
                         sd = seq(0, ceiling((u - l) / 2 * 10^dig) / 10^dig, by = stp))
-      for (rr in c("half_up", "half_down")) {
+      for (rr in c("up", "down")) {
         ref <- brimmest(l = l, u = u, n = n, mean = gr$mean, sd = gr$sd,
-                        digits = dig, rounding = rr)$possible
+                        digits_mean = dig, digits_sd = dig, rounding = rr)$possible
         got <- vapply(seq_len(nrow(gr)), function(i) {
           tg <- strait:::.target_states(l, u, n, 1, gr$mean[i], gr$sd[i],
                                         dig, dig, rr)
@@ -933,7 +933,7 @@ sweeping route will run at all.
 fast_bench <- cached("fastpath_bench.rds", {
   one <- function(l, u, n, m, s, dig, corridor = TRUE, reps = 25) {
     W <- u - l
-    tgs <- lapply(c("half_up", "half_down"),
+    tgs <- lapply(c("up", "down"),
                   function(rr) strait:::.target_states(l, u, n, 1, m, s, dig, dig, rr))
     md <- function(f) median(replicate(reps, { t0 <- Sys.time(); f()
       as.numeric(difftime(Sys.time(), t0, units = "secs")) })) * 1e3
@@ -1029,11 +1029,11 @@ exactly 1 at a witnessed maximum-SD configuration and exactly 0 at the floor.
 
 ```{r}
 # parity is linear and mean-independent
-p1 <- brimmer(l = 1, u = 7, n = 30, mean = 4, sd = 1.0, sd_digits = 6,
+p1 <- brimmer(l = 1, u = 7, n = 30, mean = 4, sd = 1.0, digits_sd = 6,
                       rounding = NULL, Z = "continuous")
-p2 <- brimmer(l = 1, u = 7, n = 30, mean = 4, sd = 2.0, sd_digits = 6,
+p2 <- brimmer(l = 1, u = 7, n = 30, mean = 4, sd = 2.0, digits_sd = 6,
                       rounding = NULL, Z = "continuous")
-p3 <- brimmer(l = 1, u = 7, n = 30, mean = 6, sd = 1.0, sd_digits = 6,
+p3 <- brimmer(l = 1, u = 7, n = 30, mean = 6, sd = 1.0, digits_sd = 6,
                       rounding = NULL, Z = "continuous")
 lin  <- abs(p2$pomp_sd_parity - 2 * p1$pomp_sd_parity) < 1e-9
 mind <- abs(p3$pomp_sd_parity - p1$pomp_sd_parity) < 1e-9   # same s, different mean
@@ -1041,9 +1041,9 @@ mind <- abs(p3$pomp_sd_parity - p1$pomp_sd_parity) < 1e-9   # same s, different 
 # sharp == 1 at the ceiling, 0 at the floor
 mxc <- sd_bounds(l = 1, u = 5, n = 9, mean = 3)$max_sd
 mnc <- sd_bounds(l = 1, u = 5, n = 9, mean = 2.44, Z = "quasiinteger")$min_sd
-sh1 <- brimmer(l = 1, u = 5, n = 9, mean = 3, sd = mxc, sd_digits = 9,
+sh1 <- brimmer(l = 1, u = 5, n = 9, mean = 3, sd = mxc, digits_sd = 9,
                        rounding = NULL, Z = "continuous")$pomp_sd_sharp
-sh0 <- brimmer(l = 1, u = 5, n = 9, mean = 2.44, sd = mnc, sd_digits = 9,
+sh0 <- brimmer(l = 1, u = 5, n = 9, mean = 2.44, sd = mnc, digits_sd = 9,
                        rounding = NULL, Z = "quasiinteger")$pomp_sd_sharp
 sharp_ok <- abs(sh1 - 1) < 1e-6 && abs(sh0 - 0) < 1e-6
 
@@ -1066,11 +1066,11 @@ an independent GRIM + GRIMMER + bounds screen.
 # check_multiple == row-wise, on a grid that includes duplicate tuples
 df <- expand.grid(mean = c(2.90, 2.97, 3.50), sd = c(0.10, 1.50, 2.83))
 df <- rbind(df, df[1:3, ])                       # force duplicates
-mult <- brimmer_multiple(df, l = 1, u = 7, n = 30, mean_digits = 2,
-                                 sd_digits = 2, Z = "integer")
+mult <- brimmer_multiple(df, l = 1, u = 7, n = 30, digits_mean = 2,
+                                 digits_sd = 2, Z = "integer")
 roww <- do.call(rbind, lapply(seq_len(nrow(df)), function(i)
-  brimmer(l = 1, u = 7, n = 30, mean = df$mean[i], mean_digits = 2,
-                  sd = df$sd[i], sd_digits = 2, Z = "integer")))
+  brimmer(l = 1, u = 7, n = 30, mean = df$mean[i], digits_mean = 2,
+                  sd = df$sd[i], digits_sd = 2, Z = "integer")))
 mult_ok <- isTRUE(all.equal(mult$consistent, roww$consistent)) &&
            isTRUE(all.equal(mult$min_sd, roww$min_sd)) &&
            isTRUE(all.equal(mult$pomp_sd_sharp, roww$pomp_sd_sharp))

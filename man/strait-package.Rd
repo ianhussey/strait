@@ -4,7 +4,7 @@
 \name{strait-package}
 \alias{strait}
 \alias{strait-package}
-\title{strait: Truncation-Induced Dependency among Summary Statistics}
+\title{strait: Bounds Checks for Reported Summary Statistics}
 \description{
 A forensic meta-science / trustworthiness-assessment toolkit for checking
 whether reported means, standard deviations and sample sizes measured on a
@@ -19,8 +19,8 @@ verdict and its percent-of-maximum-possible (POMP) transforms;
 \code{brimmer_multiple()} applies it across a data frame. Companion
 functions trace the feasible envelope (\code{sd_bounds_curve()}), build the
 jointly GRIM-, GRIMMER- and bounds-consistent grid (\code{umbrella_data()}),
-and visualise both on the native and POMP scales (\code{plot_sd_bounds()},
-\code{plot_sd_bounds_pomp()}, \code{plot_umbrella()}).
+and visualise both on the native and POMP scales (\code{sd_bounds_plot()},
+\code{sd_bounds_pomp_plot()}, \code{umbrella_plot()}).
 }
 \seealso{
 The package README and vignette (\code{vignette("strait")}) for a
@@ -28,6 +28,12 @@ worked example and the method background.
 }
 \author{
 \strong{Maintainer}: Ian Hussey \email{ian.hussey@unibe.ch} (\href{https://orcid.org/0000-0001-8906-7559}{ORCID})
+
+Other contributors:
+\itemize{
+  \item Lukas Jung [contributor]
+  \item Jamie Cummins [contributor]
+}
 
 }
 \keyword{internal}

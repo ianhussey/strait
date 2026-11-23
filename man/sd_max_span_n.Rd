@@ -9,10 +9,10 @@ sd_max_span_n(lower, upper, n)
 \arguments{
 \item{lower, upper}{Numeric scalars, the effective limits.}
 
-\item{n}{Integer scalar, sample size, \code{n >= 2}.}
+\item{n}{Integer vector, sample size(s), \code{n >= 2}.}
 }
 \value{
-Numeric scalar, the maximum sample SD.
+Numeric, the maximum sample SD.
 }
 \description{
 The mean-agnostic maximum for a given sample size: half the observations at

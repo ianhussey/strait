@@ -57,9 +57,10 @@ for (g in seq_len(nrow(grid))) {
     s <- sort(mc_s(pr, N, reps))
     for (pp in probs) {
       approx <- vapply(c("chisq2", "chisq3", "cf"), function(meth) {
+        # .sd_plaus_row(l, u, mean, n, p, ...) returns list(lower, upper)
         q <- strait:::.sd_plaus_row(0, m, m * mu, N, min(pp, 1 - pp), rho, 0,
                                     meth, FALSE, NULL, 1)
-        if (pp < 0.5) q[1] else q[2]
+        if (pp < 0.5) q$lower else q$upper
       }, numeric(1))
       cond <- strait:::.sd_plaus_row(0, m, m * mu, N, min(pp, 1 - pp), rho, 0,
                                      "chisq2", TRUE, NULL, 1)
@@ -73,7 +74,8 @@ for (g in seq_len(nrow(grid))) {
         exact = if (has_exact) exact_q(ex[[as.character(N)]], pp) else NA,
         exact_cond = if (has_exact) exact_q(exc[[as.character(N)]], pp) else NA,
         chisq2 = approx[["chisq2"]], chisq3 = approx[["chisq3"]],
-        cf = approx[["cf"]], chisq2_cond = cond[if (pp < 0.5) 1 else 2],
+        cf = approx[["cf"]],
+        chisq2_cond = if (pp < 0.5) cond$lower else cond$upper,
         sigma_binom = sigma_binom,
         p_below_binom_exact = if (has_exact) {
           d <- ex[[as.character(N)]]; sum(d$prob[sqrt(d$s2) < sigma_binom])

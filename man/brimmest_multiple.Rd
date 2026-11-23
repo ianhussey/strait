@@ -16,7 +16,7 @@ results; if FALSE, only the result columns (same row order), for drop-in
 use inside a \code{dplyr::mutate()} / \code{purrr} pipeline.}
 }
 \value{
-A data frame with \code{possible} (logical) and \code{rules} (the rounding
+A tibble with \code{possible} (logical) and \code{rules} (the rounding
 rules under which the row is reachable, comma-separated and \code{""} when
 none), optionally with \code{data} prepended. Unlike \code{\link[=brimmest]{brimmest()}}, the reported
 \code{mean} and \code{sd} are not echoed back: they are already columns of \code{data}
@@ -37,7 +37,7 @@ Repeated \verb{(mean, sd)} pairs within a design are computed once and reused.
 Row order is preserved.
 
 Recognised per row (column or constant): \code{l}, \code{u}, \code{n}, \code{mean}, \code{sd},
-\code{digits}, \code{mean_digits}, \code{sd_digits}, \code{scoring}, \code{n_items}.
+\code{digits_mean}, \code{digits_sd}, \code{scoring}, \code{n_items}.
 
 \code{rounding}, \code{max_cells}, \code{search_budget} and \code{engine} may be given only as
 constants, never as columns. \code{rounding} is a \emph{set} of admitted rules rather
@@ -51,13 +51,14 @@ reports <- data.frame(mean = c(3.0, 1.3, 2.5),
 # one design, one lattice. Rows 2 and 3 are both impossible, for different
 # reasons: row 3 already fails GRIM and GRIMMER, while row 2 clears every
 # closed-form screen and is caught only here.
-brimmest_multiple(reports, l = 1, u = 5, n = 9, digits = 1)
+brimmest_multiple(reports, l = 1, u = 5, n = 9, digits_mean = 1,
+                  digits_sd = 1)
 
 # designs may vary per row; rows sharing one are certified together
 mixed <- data.frame(mean = c(3.0, 1.3, 4.0),
                     sd   = c(1.0, 0.9, 1.5),
                     n    = c(9, 9, 12))
-brimmest_multiple(mixed, l = 1, u = 5, digits = 1,
+brimmest_multiple(mixed, l = 1, u = 5, digits_mean = 1, digits_sd = 1,
                   include_inputs = FALSE)
 }
 \seealso{

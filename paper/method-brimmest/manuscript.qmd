@@ -56,7 +56,7 @@ passes GRIM, and passes GRIMMER. No sample of nine integers between 1 and 5
 produces it:
 
 ```{r}
-brimmest(l = 1, u = 5, n = 9, mean = 1.3, sd = 0.9, digits = 1)
+brimmest(l = 1, u = 5, n = 9, mean = 1.3, sd = 0.9, digits_mean = 1, digits_sd = 1)
 ```
 
 This paper introduces the test that settles such cases. BRIMMEST (Bounds-Related
@@ -122,7 +122,7 @@ screen-passers into the truly possible and the blind spot.
 #| fig-width: 7
 #| fig-height: 4.5
 um <- umbrella_data(n = 9, l = 1, u = 5, digits = 1, Z = "integer")
-cert <- brimmest(l = 1, u = 5, n = 9, mean = um$mean, sd = um$sd, digits = 1)
+cert <- brimmest(l = 1, u = 5, n = 9, mean = um$mean, sd = um$sd, digits_mean = 1, digits_sd = 1)
 
 um$status <- ifelse(!um$consistent, "fails a screen",
              ifelse(cert$possible, "possible", "blind spot"))
@@ -672,7 +672,7 @@ entirely. The verdict is returned per report, together with the rounding rules
 under which it is reachable:
 
 ```{r}
-brimmest(l = 1, u = 5, n = 9, digits = 1,
+brimmest(l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
          mean = c(3.0, 1.3, 2.5, 2.0),
          sd   = c(1.0, 0.9, 1.2, 1.1))
 ```
@@ -700,7 +700,7 @@ lat  <- sd_region_data(l = 0, u = 3, n = 7, rule = "attainable")
 band <- sd_region_data(l = 0, u = 3, n = 7, rule = "quasi")
 
 ggplot() +
-  geom_ribbon(data = band, aes(x = mean, ymin = lo, ymax = hi),
+  geom_ribbon(data = band, aes(x = mean, ymin = min_sd, ymax = max_sd),
               fill = "grey88") +
   geom_point(data = lat, aes(mean, sd), size = 0.7, colour = "#1d4ed8") +
   labs(x = "mean", y = "SD") +
@@ -758,7 +758,7 @@ rounds to exactly this report under the named rule. Nothing is conditional.
 A **miss** proves impossibility only relative to the rounding rules admitted.
 A report unreachable under one convention may be reachable under another, and
 sources rarely state how they rounded. The default therefore admits both
-`half_up` and `half_down`, spanning the usual ambiguity about halves. The risk
+`up` and `down`, spanning the usual ambiguity about halves. The risk
 of narrowing is concrete:
 
 ```{r}
@@ -766,17 +766,17 @@ of narrowing is concrete:
 x <- c(rep(0, 9), 1, 1, 1)
 c(mean = mean(x), sd = sd(x))
 
-brimmest(l = 0, u = 6, n = 12, mean = 0.2, sd = 0.5, digits = 1)
+brimmest(l = 0, u = 6, n = 12, mean = 0.2, sd = 0.5, digits_mean = 1, digits_sd = 1)
 ```
 
 The exact mean is 0.25, which becomes "0.2" only when halves round down. A
-certification run with `rounding = "half_up"` alone would declare this real
+certification run with `rounding = "up"` alone would declare this real
 sample's report impossible. For forensic use the costly error is the false
 impossibility, so the rule set should be narrowed only when the source's
-convention is actually known. Note that `brimmest()` has no `"up_or_down"`
-option of the kind unrounding-based tests offer: the lattice is rounded
-forward, and forward rounding needs a definite direction; admitting several
-rules and taking the union plays the corresponding role.
+convention is actually known. The lattice is rounded forward, and forward
+rounding needs a definite direction, so the default `"up_or_down"` stands for
+the union of `"up"` and `"down"`, as `"ceiling_or_floor"` does for its two
+parts; `"even"` lets a tie go either way, as unrounding-based tests do.
 
 # Positioning: verdicts and witnesses
 
@@ -830,13 +830,13 @@ design. Reports sharing scale limits, $n$, and precision share a lattice, and
 the function vectorises over the reports:
 
 ```{r}
-brimmest(l = 1, u = 5, n = 9, digits = 1,
+brimmest(l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
          mean = c(3.0, 1.3, 2.5), sd = c(1.0, 0.9, 1.2))
 ```
 
-Precision can differ between the mean and SD (`mean_digits`, `sd_digits`),
-and `infer_digits()` recovers the reported precision from the printed strings
-when trailing zeros make it ambiguous.
+Precision can differ between the mean and SD (`digits_mean`, `digits_sd`),
+and `scrutiny::decimal_places()` recovers the reported precision from the
+printed strings when trailing zeros make it ambiguous.
 
 Multi-item composites are supported through `scoring` and `n_items`. Sum
 scores of $k$ items on $[a, b]$ are integers on $[ka, kb]$ and reduce to the
@@ -846,7 +846,7 @@ possible on the mean-score grid can be declared impossible by screens that
 mishandle the granularity of multi-item scales, an error class we return to
 in section 8.
 
-Rounding rules beyond the defaults (`native`, `ceiling`, `floor`, `trunc`,
+Rounding rules beyond the defaults (`even`, `ceiling`, `floor`, `trunc`,
 `anti_trunc`) are available when a source's convention is known or under
 audit. The `rules` column of the output names which admitted rules reach each
 report, which is itself diagnostic: a report reachable only under an unusual
@@ -863,8 +863,8 @@ software class needs oracle-based testing, and both error directions occurred.
 
 **Missed impossibles** (scrutiny issue #85). A conjunction bug in GRIMMER's
 second and third component tests accepts some impossible reports. Witness:
-mean 0.11, SD 0.87, $n = 64$ on 0--6 is impossible under `half_up`, yet
-returned consistent. The same tuple is attainable under `half_down`, which is
+mean 0.11, SD 0.87, $n = 64$ on 0--6 is impossible under `up`, yet
+returned consistent. The same tuple is attainable under `down`, which is
 exactly the distinction an exact, rounding-aware oracle keeps straight and a
 closed-form implementation blurred.
 

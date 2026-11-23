@@ -75,9 +75,10 @@ are genuine. The other three were chosen to fail GRIM.
 
 ```{r}
 paper <- data.frame(
-  x = c("3.39", "2.87", "4.12", "3.05", "2.65", "3.89",
-        "1.93", "4.45", "3.27", "2.14", "3.71", "5.06"),
-  n = c(28, 31, 45, 22, 37, 19, 26, 33, 41, 24, 150, 17)
+  x = c(3.39, 2.87, 4.12, 3.05, 2.65, 3.89,
+        1.93, 4.45, 3.27, 2.14, 3.71, 5.06),
+  n = c(28, 31, 45, 22, 37, 19, 26, 33, 41, 24, 150, 17),
+  digits_x = 2, items_averaged = 1
 )
 res <- grim_aggregate(paper)
 res
@@ -132,11 +133,12 @@ than $0.40$.
 #| fig-cap: "Exact GRIM pass rate at two decimals (points) against the closed-form approximation $\\min(1, N/100)$ (line). The points above the line are sample sizes whose means can land exactly on a rounding tie."
 #| fig-height: 3.5
 ns <- 5:120
-pr <- grim_aggregate(data.frame(x = "1.00", n = ns))$data
+pr <- grim_aggregate(data.frame(x = 1, n = ns), digits_x = 2,
+                     items_averaged = 1)$data
 ggplot(pr, aes(n, p_pass)) +
   geom_line(aes(y = pmin(1, n / 100)), colour = "grey60") +
   geom_point(size = 1) +
-  labs(x = "N (items = 1)", y = "pass rate p")
+  labs(x = "N (items_averaged = 1)", y = "pass rate p")
 ```
 
 With `items` $= m$, the relevant denominator is $N m$. A 4-item scale with
@@ -409,8 +411,8 @@ make_paper <- function(id, k, lambda) {
   fake <- runif(k) < lambda
   x_real <- vapply(n, function(nn) sample(nn:(5 * nn), 1) / nn, 0)
   x_fake <- sample(100:599, k, replace = TRUE) / 100
-  data.frame(paper = id, n = n,
-             x = formatC(ifelse(fake, x_fake, x_real), format = "f", digits = 2))
+  data.frame(paper = id, n = n, x = round(ifelse(fake, x_fake, x_real), 2),
+             digits_x = 2, items_averaged = 1)
 }
 lit <- do.call(rbind, Map(make_paper, LETTERS[1:6],
                           k = c(8, 15, 20, 10, 25, 12),
@@ -446,8 +448,9 @@ sim_design <- function(k, lambda, reps = 300) {
     fake <- runif(k) < lambda
     x_real <- vapply(n, function(nn) sample(nn:(5 * nn), 1) / nn, 0)
     x_fake <- sample(100:599, k, replace = TRUE) / 100
-    x <- formatC(ifelse(fake, x_fake, x_real), format = "f", digits = 2)
-    s <- grim_aggregate(data.frame(x = x, n = n))$summary
+    x <- round(ifelse(fake, x_fake, x_real), 2)
+    s <- grim_aggregate(data.frame(x = x, n = n), digits_x = 2,
+                        items_averaged = 1)$summary
     s$value[match(c("O_E", "lambda_mle"), s$quantity)]
   })
   data.frame(k = paste0("k = ", k), lambda = lambda,
@@ -481,7 +484,7 @@ ggplot(cal, aes(lambda, mean, colour = estimator)) +
 
 | Function | Returns |
 |---|---|
-| `grim_aggregate(data, items, rounding, g, eps, support_c, ci, conf_level)` | `summary` (long tibble, one row per quantity, in ladder order, with `assumptions` and `interpretation`) and `data` (input plus `consistency`, `f`, `p_pass`, `q`, `informative`, `flag_impossible`) |
+| `grim_aggregate(data, digits_x, items_averaged, rounding, threshold, symmetric, g, eps, support_c, ci, conf_level)` | `summary` (long tibble, one row per quantity, in ladder order, with `assumptions` and `interpretation`) and `data` (input plus `consistency`, `f`, `p_pass`, `q`, `informative`, `flag_impossible`) |
 | `grim_aggregate_by(data, by, ...)` | one wide row per group |
 | `grim_sensitivity(data, g_list, ...)` | $k$, $F$, $E$, $O/E$ and both tail probabilities under each counterfactual |
 
