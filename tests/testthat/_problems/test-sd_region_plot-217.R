@@ -9,15 +9,17 @@ bes <- sqrt(n / (n - 1))
 
 # test -------------------------------------------------------------------------
 for (cfg in list(c(4, 1, 5), c(5, 0, 3), c(7, 0, 6), c(6, 0, 2))) {
-    n <- cfg[1]; l <- cfg[2]; u <- cfg[3]
-    d <- strait:::.attainable_lattice(l, u, n, 1)
-    g <- multisets(l:u, n)
-    b <- unique(round(cbind(rowMeans(g), apply(g, 1, stats::sd)), 10))
-    b <- b[order(b[, 1], b[, 2]), , drop = FALSE]
-    a <- unique(round(as.matrix(d[c("mean", "sd")]), 10))
-    a <- a[order(a[, 1], a[, 2]), , drop = FALSE]
-    expect_equal(unname(a), unname(b), tolerance = 1e-9)
-  }
+  n <- cfg[1]
+  l <- cfg[2]
+  u <- cfg[3]
+  d <- strait:::.attainable_lattice(l, u, n, 1)
+  g <- multisets(l:u, n)
+  b <- unique(round(cbind(rowMeans(g), apply(g, 1, stats::sd)), 10))
+  b <- b[order(b[, 1], b[, 2]), , drop = FALSE]
+  a <- unique(round(as.matrix(d[c("mean", "sd")]), 10))
+  a <- a[order(a[, 1], a[, 2]), , drop = FALSE]
+  expect_equal(unname(a), unname(b), tolerance = 1e-9)
+}
 expect_equal(nrow(strait:::.attainable_lattice(0, 3, 7, 1)), 100L)
 expect_equal(nrow(strait:::.attainable_lattice(0, 6, 23, 1)), 8634L)
 d <- strait:::.attainable_lattice(0, 3, 6, 2)

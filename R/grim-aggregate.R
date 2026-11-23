@@ -55,7 +55,11 @@
     sep = "|"
   )
   todo <- unique(data.frame(key, digits, n, items)[
-    !vapply(key, exists, logical(1), envir = .grim_grid_cache,
+    !vapply(
+      key,
+      exists,
+      logical(1),
+      envir = .grim_grid_cache,
       inherits = FALSE
     ),
   ])
@@ -87,25 +91,41 @@
   } else if (is.function(g)) {
     wd <- g(0:9)
     if (!is.numeric(wd) || length(wd) != 10L) {
-      stop("`g` as a function must return 10 weights, one per final digit ",
-           "0-9, when called on 0:9.", call. = FALSE)
+      stop(
+        "`g` as a function must return 10 weights, one per final digit ",
+        "0-9, when called on 0:9.",
+        call. = FALSE
+      )
     }
     w <- wd[(0:(len - 1)) %% 10 + 1]
   } else if (is.numeric(g)) {
     if (length(g) != len) {
-      stop("`g` as a numeric vector must have one weight per grid value, ",
-           "i.e. length 10^d = ", len, " for values reported to ", d,
-           " decimals (got length ", length(g), "). Use a function of the ",
-           "final digit when decimal places vary.", call. = FALSE)
+      stop(
+        "`g` as a numeric vector must have one weight per grid value, ",
+        "i.e. length 10^d = ",
+        len,
+        " for values reported to ",
+        d,
+        " decimals (got length ",
+        length(g),
+        "). Use a function of the ",
+        "final digit when decimal places vary.",
+        call. = FALSE
+      )
     }
     w <- g
   } else {
-    stop("`g` must be NULL, a function of the final digit, or a numeric ",
-         "vector of grid weights.", call. = FALSE)
+    stop(
+      "`g` must be NULL, a function of the final digit, or a numeric ",
+      "vector of grid weights.",
+      call. = FALSE
+    )
   }
   if (anyNA(w) || any(!is.finite(w)) || any(w < 0) || sum(w) <= 0) {
-    stop("`g` weights must be finite, non-negative and not all zero.",
-         call. = FALSE)
+    stop(
+      "`g` weights must be finite, non-negative and not all zero.",
+      call. = FALSE
+    )
   }
   w / sum(w)
 }
@@ -114,15 +134,19 @@
 # Bernoulli(prob_i) trials, by dynamic programming. Element j + 1 is P(F = j).
 .poisbinom_pmf <- function(prob) {
   P <- 1
-  for (p in prob) P <- c(P * (1 - p), 0) + c(0, P * p)
+  for (p in prob) {
+    P <- c(P * (1 - p), 0) + c(0, P * p)
+  }
   P
 }
 
 # Internal: tails P(F' <= f) and P(F' >= f) of a Poisson binomial.
 .poisbinom_tails <- function(prob, f) {
   P <- .poisbinom_pmf(prob)
-  c(lower = min(1, sum(P[seq_len(f + 1)])),
-    upper = min(1, sum(P[(f + 1):length(P)])))
+  c(
+    lower = min(1, sum(P[seq_len(f + 1)])),
+    upper = min(1, sum(P[(f + 1):length(P)]))
+  )
 }
 
 # Internal: mixture log-likelihood and its maximiser on [0, 1].
@@ -133,12 +157,18 @@
 
 .lambda_mle <- function(f, q) {
   F <- sum(f)
-  if (F == 0) return(0)
-  if (F == length(f)) return(1)
+  if (F == 0) {
+    return(0)
+  }
+  if (F == length(f)) {
+    return(1)
+  }
   score <- function(l) F / l - sum((1 - f) * q / (1 - l * q))
   # the log-likelihood is concave, so a non-negative score at 1 means the
   # maximum on [0, 1] is at the boundary
-  if (score(1) >= 0) return(1)
+  if (score(1) >= 0) {
+    return(1)
+  }
   stats::uniroot(score, c(1e-12, 1), tol = 1e-12)$root
 }
 
@@ -147,10 +177,16 @@
   ll <- function(l) .lambda_loglik(l, f, q)
   thr <- ll(mle) - log(c)
   h <- function(l) ll(l) - thr
-  lower <- if (mle == 0 || h(1e-12) >= 0) 0 else
+  lower <- if (mle == 0 || h(1e-12) >= 0) {
+    0
+  } else {
     stats::uniroot(h, c(1e-12, mle), tol = 1e-12)$root
-  upper <- if (mle == 1 || h(1) >= 0) 1 else
+  }
+  upper <- if (mle == 1 || h(1) >= 0) {
+    1
+  } else {
     stats::uniroot(h, c(mle, 1), tol = 1e-12)$root
+  }
   c(lower, upper)
 }
 
@@ -173,8 +209,11 @@
     return(c(NA_real_, NA_real_))
   }
   lower <- if (F == 0) 0 else stats::uniroot(ge, c(0, 1), tol = 1e-10)$root
-  upper <- if (le(1) > 0) 1 else
+  upper <- if (le(1) > 0) {
+    1
+  } else {
     stats::uniroot(le, c(0, 1), tol = 1e-10)$root
+  }
   c(lower, upper)
 }
 
@@ -273,18 +312,26 @@
   .ga_check_whole(d, "digits_x", 0)
   .ga_check_whole(m, "items_averaged", 1)
   if (any(d > 6)) {
-    stop("Values reported to more than 6 decimal places are not supported ",
-         "(the pass-rate grid has 10^d points).", call. = FALSE)
+    stop(
+      "Values reported to more than 6 decimal places are not supported ",
+      "(the pass-rate grid has 10^d points).",
+      call. = FALSE
+    )
   }
   list(x = data$x, n = as.integer(data$n), m = as.integer(m), d = as.integer(d))
 }
 
 # Internal: resolve eps to one baseline failure probability per input row.
 .grim_agg_eps <- function(eps, q, n, d) {
-  if (is.function(eps)) eps <- eps(q = q, n = n, d = d)
+  if (is.function(eps)) {
+    eps <- eps(q = q, n = n, d = d)
+  }
   if (!is.numeric(eps) || !(length(eps) %in% c(1L, length(q)))) {
-    stop("`eps` must be a single probability, one per row of `data`, or a ",
-         "function(q, n, d) returning one of those.", call. = FALSE)
+    stop(
+      "`eps` must be a single probability, one per row of `data`, or a ",
+      "function(q, n, d) returning one of those.",
+      call. = FALSE
+    )
   }
   eps <- rep_len(eps, length(q))
   if (anyNA(eps) || any(eps < 0 | eps > 1)) {
@@ -294,11 +341,24 @@
 }
 
 # Internal: the summary tibble rows, in ladder order.
-.grim_agg_row <- function(step, quantity, value = NA_real_, lower = NA_real_,
-                          upper = NA_real_, assumptions, interpretation) {
-  tibble::tibble(step = step, quantity = quantity, value = value,
-                 lower = lower, upper = upper, assumptions = assumptions,
-                 interpretation = interpretation)
+.grim_agg_row <- function(
+  step,
+  quantity,
+  value = NA_real_,
+  lower = NA_real_,
+  upper = NA_real_,
+  assumptions,
+  interpretation
+) {
+  tibble::tibble(
+    step = step,
+    quantity = quantity,
+    value = value,
+    lower = lower,
+    upper = upper,
+    assumptions = assumptions,
+    interpretation = interpretation
+  )
 }
 
 #' Pool many GRIM tests into quantities tagged with their assumptions
@@ -433,7 +493,9 @@ grim_aggregate <- function(
   rounding = "up_or_down",
   threshold = 5,
   symmetric = FALSE,
-                           g = NULL, eps = NULL, support_c = c(8, 32),
+  g = NULL,
+  eps = NULL,
+  support_c = c(8, 32),
   ci = FALSE,
   conf_level = 0.90
 ) {
@@ -470,8 +532,10 @@ grim_aggregate <- function(
   # 1. pass rates, under g and (for the impossibility flag) uniform
   grids <- .grim_grid(d, n, m, set)
   p_unif <- vapply(grids, mean, numeric(1))
-  p_pass <- vapply(seq_along(grids), function(i) {
-    sum(.grid_weights(g, d[i]) * grids[[i]])
+  p_pass <- vapply(
+    seq_along(grids),
+    function(i) {
+      sum(.grid_weights(g, d[i]) * grids[[i]])
     },
     numeric(1)
   )
@@ -483,17 +547,27 @@ grim_aggregate <- function(
   # 2. informative values; impossible failures
   flag_impossible <- f == 1L & p_unif >= 1 - tol
   if (any(flag_impossible)) {
-    warning(sum(flag_impossible), " value(s) fail GRIM although every ",
-            "ending on the grid is consistent with their N (rows ",
-            paste(which(flag_impossible), collapse = ", "), "). This ",
-            "indicates an extraction or reporting error; they are flagged ",
-            "and excluded.", call. = FALSE)
+    warning(
+      sum(flag_impossible),
+      " value(s) fail GRIM although every ",
+      "ending on the grid is consistent with their N (rows ",
+      paste(which(flag_impossible), collapse = ", "),
+      "). This ",
+      "indicates an extraction or reporting error; they are flagged ",
+      "and excluded.",
+      call. = FALSE
+    )
   }
   bad_g <- f == 1L & !flag_impossible & q == 0
   if (any(bad_g)) {
-    stop("`g` gives zero weight to every inconsistent ending for failing ",
-         "row(s) ", paste(which(bad_g), collapse = ", "), ", so the ",
-         "counterfactual cannot produce the observed failure.", call. = FALSE)
+    stop(
+      "`g` gives zero weight to every inconsistent ending for failing ",
+      "row(s) ",
+      paste(which(bad_g), collapse = ", "),
+      ", so the ",
+      "counterfactual cannot produce the observed failure.",
+      call. = FALSE
+    )
   }
   informative <- q > 0 & !flag_impossible
   eps_all <- if (!is.null(eps)) .grim_agg_eps(eps, q, n, d)
@@ -513,23 +587,52 @@ grim_aggregate <- function(
 
   fi <- f[informative]
   qi <- q[informative]
-  k <- length(fi); F <- sum(fi)
+  k <- length(fi)
+  F <- sum(fi)
 
   rows <- list(
-    .grim_agg_row(0, "n_values", nrow(data), assumptions = "none",
-                  interpretation = "values GRIM-tested"),
-    .grim_agg_row(1, "mean_q", mean(q), assumptions = "none",
-                  interpretation = "mean fail rate q over tested values"),
-    .grim_agg_row(2, "n_uninformative", sum(!informative & !flag_impossible),
-                  assumptions = "none",
-                  interpretation = "values that cannot fail (q = 0); excluded"),
-    .grim_agg_row(2, "n_flagged_impossible", sum(flag_impossible),
-                  assumptions = "none",
-                  interpretation = "failures with q = 0: extraction errors; excluded"),
-    .grim_agg_row(2, "k", k, assumptions = "none",
-                  interpretation = "informative values"),
-    .grim_agg_row(2, "F", F, assumptions = "none",
-                  interpretation = "GRIM failures among informative values")
+    .grim_agg_row(
+      0,
+      "n_values",
+      nrow(data),
+      assumptions = "none",
+      interpretation = "values GRIM-tested"
+    ),
+    .grim_agg_row(
+      1,
+      "mean_q",
+      mean(q),
+      assumptions = "none",
+      interpretation = "mean fail rate q over tested values"
+    ),
+    .grim_agg_row(
+      2,
+      "n_uninformative",
+      sum(!informative & !flag_impossible),
+      assumptions = "none",
+      interpretation = "values that cannot fail (q = 0); excluded"
+    ),
+    .grim_agg_row(
+      2,
+      "n_flagged_impossible",
+      sum(flag_impossible),
+      assumptions = "none",
+      interpretation = "failures with q = 0: extraction errors; excluded"
+    ),
+    .grim_agg_row(
+      2,
+      "k",
+      k,
+      assumptions = "none",
+      interpretation = "informative values"
+    ),
+    .grim_agg_row(
+      2,
+      "F",
+      F,
+      assumptions = "none",
+      interpretation = "GRIM failures among informative values"
+    )
   )
   settings <- c(set, list(g = g, eps = !is.null(eps)))
 
@@ -540,39 +643,89 @@ grim_aggregate <- function(
         data = out_data,
         settings = settings
       ),
-      class = "grim_aggregate"))
+      class = "grim_aggregate"
+    ))
   }
 
   E <- sum(qi)
   tails <- .poisbinom_tails(qi, F)
   mle <- .lambda_mle(fi, qi)
 
-  rows <- c(rows, list(
-    .grim_agg_row(3, "theta", lower = F / k, upper = 1, assumptions = "A0",
-                  interpretation = "share of informative values that are non-genuine"),
-    .grim_agg_row(4, "E", E, assumptions = "A0, U",
-                  interpretation = "failures expected if every value were random"),
-    .grim_agg_row(5, "O_E", F / E, assumptions = "A0, U",
-                  interpretation = "0 none; <1 fewer than random; 1 as random; >1 misfit"),
-    .grim_agg_row(6, "var_F", sum(qi * (1 - qi)), assumptions = "A0, U, I",
-                  interpretation = "variance of F if every value were random"),
-    .grim_agg_row(6, "p_fewer_than_random", tails[["lower"]],
-                  assumptions = "A0, U, I",
-                  interpretation = "P(F' <= F): evidence against all-random"),
-    .grim_agg_row(6, "p_more_than_random", tails[["upper"]],
-                  assumptions = "A0, U, I",
-                  interpretation = "P(F' >= F): misfit of the random model"),
-    .grim_agg_row(7, "lambda_moment", F / E, assumptions = "A0, U, I, M",
-                  interpretation = "non-genuine rate, moment estimate (unbounded)"),
-    .grim_agg_row(7, "lambda_mle", mle, assumptions = "A0, U, I, M",
-                  interpretation = "non-genuine rate, MLE on [0, 1]")
-  ))
+  rows <- c(
+    rows,
+    list(
+      .grim_agg_row(
+        3,
+        "theta",
+        lower = F / k,
+        upper = 1,
+        assumptions = "A0",
+        interpretation = "share of informative values that are non-genuine"
+      ),
+      .grim_agg_row(
+        4,
+        "E",
+        E,
+        assumptions = "A0, U",
+        interpretation = "failures expected if every value were random"
+      ),
+      .grim_agg_row(
+        5,
+        "O_E",
+        F / E,
+        assumptions = "A0, U",
+        interpretation = "0 none; <1 fewer than random; 1 as random; >1 misfit"
+      ),
+      .grim_agg_row(
+        6,
+        "var_F",
+        sum(qi * (1 - qi)),
+        assumptions = "A0, U, I",
+        interpretation = "variance of F if every value were random"
+      ),
+      .grim_agg_row(
+        6,
+        "p_fewer_than_random",
+        tails[["lower"]],
+        assumptions = "A0, U, I",
+        interpretation = "P(F' <= F): evidence against all-random"
+      ),
+      .grim_agg_row(
+        6,
+        "p_more_than_random",
+        tails[["upper"]],
+        assumptions = "A0, U, I",
+        interpretation = "P(F' >= F): misfit of the random model"
+      ),
+      .grim_agg_row(
+        7,
+        "lambda_moment",
+        F / E,
+        assumptions = "A0, U, I, M",
+        interpretation = "non-genuine rate, moment estimate (unbounded)"
+      ),
+      .grim_agg_row(
+        7,
+        "lambda_mle",
+        mle,
+        assumptions = "A0, U, I, M",
+        interpretation = "non-genuine rate, MLE on [0, 1]"
+      )
+    )
+  )
   for (cc in support_c) {
     si <- .lambda_support(fi, qi, mle, cc)
-    rows <- c(rows, list(.grim_agg_row(
-      8, paste0("lambda_support_", cc), lower = si[1], upper = si[2],
-      assumptions = "A0, U, I, M",
-      interpretation = paste0("1/", cc, " likelihood support interval"))))
+    rows <- c(
+      rows,
+      list(.grim_agg_row(
+        8,
+        paste0("lambda_support_", cc),
+        lower = si[1],
+        upper = si[2],
+        assumptions = "A0, U, I, M",
+        interpretation = paste0("1/", cc, " likelihood support interval")
+      ))
+    )
   }
   if (isTRUE(ci)) {
     lc <- .lambda_ci(fi, qi, conf_level)
@@ -583,7 +736,8 @@ grim_aggregate <- function(
         8,
         paste0("lambda_ci_", pct),
         lower = lc[1],
-      upper = lc[2], assumptions = "A0, U, I, M",
+        upper = lc[2],
+        assumptions = "A0, U, I, M",
         interpretation = paste0(pct, "% confidence interval (tail inversion)")
       ))
     )
@@ -592,14 +746,30 @@ grim_aggregate <- function(
   if (!is.null(eps)) {
     ei <- eps_all[informative]
     E_A <- sum(ei)
-    rows <- c(rows, list(
-      .grim_agg_row(9, "E_A", E_A, assumptions = "B",
-                    interpretation = "failures expected from authentic values"),
-      .grim_agg_row(9, "SIR", F / E_A, assumptions = "B",
-                    interpretation = "standardized inconsistency ratio F / E_A"),
-      .grim_agg_row(9, "p_vs_baseline", .poisbinom_tails(ei, F)[["upper"]],
-                    assumptions = "B, I",
-                    interpretation = "P(F' >= F) if every value were authentic")
+    rows <- c(
+      rows,
+      list(
+        .grim_agg_row(
+          9,
+          "E_A",
+          E_A,
+          assumptions = "B",
+          interpretation = "failures expected from authentic values"
+        ),
+        .grim_agg_row(
+          9,
+          "SIR",
+          F / E_A,
+          assumptions = "B",
+          interpretation = "standardized inconsistency ratio F / E_A"
+        ),
+        .grim_agg_row(
+          9,
+          "p_vs_baseline",
+          .poisbinom_tails(ei, F)[["upper"]],
+          assumptions = "B, I",
+          interpretation = "P(F' >= F) if every value were authentic"
+        )
       )
     )
   }
@@ -645,33 +815,60 @@ grim_aggregate <- function(
 print.grim_aggregate <- function(x, digits = 3, ...) {
   s <- x$summary
   cf <- if (is.null(x$settings$g)) "uniform" else "custom g"
-  cat("GRIM aggregation  (rounding = ", x$settings$rounding,
-      ", counterfactual = ", cf, ")\n", sep = "")
+  cat(
+    "GRIM aggregation  (rounding = ",
+    x$settings$rounding,
+    ", counterfactual = ",
+    cf,
+    ")\n",
+    sep = ""
+  )
   fmt <- function(v) formatC(v, digits = digits, format = "fg", flag = "#")
   shown <- ifelse(
     is.na(s$value),
     paste0("[", fmt(s$lower), ", ", fmt(s$upper), "]"),
-    ifelse(s$quantity %in% c("n_values", "n_uninformative",
-                             "n_flagged_impossible", "k", "F"),
-           as.character(s$value), fmt(s$value)))
+    ifelse(
+      s$quantity %in%
+        c("n_values", "n_uninformative", "n_flagged_impossible", "k", "F"),
+      as.character(s$value),
+      fmt(s$value)
+    )
+  )
   shown <- gsub("\\s+", "", shown)
-  tab <- data.frame(step = s$step, quantity = s$quantity, value = shown,
-                    assumptions = s$assumptions,
-                    interpretation = s$interpretation)
-  w_q <- max(nchar(tab$quantity)); w_v <- max(nchar(tab$value))
+  tab <- data.frame(
+    step = s$step,
+    quantity = s$quantity,
+    value = shown,
+    assumptions = s$assumptions,
+    interpretation = s$interpretation
+  )
+  w_q <- max(nchar(tab$quantity))
+  w_v <- max(nchar(tab$value))
   w_a <- max(nchar(tab$assumptions))
   last <- -1
   for (i in seq_len(nrow(tab))) {
     step <- if (tab$step[i] != last) format(tab$step[i], width = 2) else "  "
     last <- tab$step[i]
-    cat(step, "  ", formatC(tab$quantity[i], width = -w_q), "  ",
-        formatC(tab$value[i], width = w_v), "  ",
-        formatC(tab$assumptions[i], width = -w_a), "  ",
-        tab$interpretation[i], "\n", sep = "")
+    cat(
+      step,
+      "  ",
+      formatC(tab$quantity[i], width = -w_q),
+      "  ",
+      formatC(tab$value[i], width = w_v),
+      "  ",
+      formatC(tab$assumptions[i], width = -w_a),
+      "  ",
+      tab$interpretation[i],
+      "\n",
+      sep = ""
+    )
   }
   if (any(s$step == 8)) {
-    cat("Note: lambda is a process parameter; prefer steps 0-6 as the ",
-        "headline for a single paper.\n", sep = "")
+    cat(
+      "Note: lambda is a process parameter; prefer steps 0-6 as the ",
+      "headline for a single paper.\n",
+      sep = ""
+    )
   }
   invisible(x)
 }

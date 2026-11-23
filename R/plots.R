@@ -1,16 +1,30 @@
 # ggplot2 visualisations of the SD bounds, POMP-normalised bounds, and umbrella.
 
 .bounds_point_layer <- function(pts, xvar, yvar) {
-  if (is.null(pts[["consistent"]])) pts$consistent <- NA
+  if (is.null(pts[["consistent"]])) {
+    pts$consistent <- NA
+  }
   pts$.consistent <- as.character(pts$consistent)
   list(
-    ggplot2::geom_point(data = pts,
-      ggplot2::aes(x = .data[[xvar]], y = .data[[yvar]], fill = .data$.consistent),
-      shape = 21, colour = "black", size = 2.4, na.rm = TRUE),
+    ggplot2::geom_point(
+      data = pts,
+      ggplot2::aes(
+        x = .data[[xvar]],
+        y = .data[[yvar]],
+        fill = .data$.consistent
+      ),
+      shape = 21,
+      colour = "black",
+      size = 2.4,
+      na.rm = TRUE
+    ),
     ggplot2::scale_fill_manual(
       values = c("TRUE" = "#0047ff", "FALSE" = "#ff2a00"),
-      na.value = "grey50", name = "Consistent",
-      labels = c("TRUE" = "consistent", "FALSE" = "inconsistent")))
+      na.value = "grey50",
+      name = "Consistent",
+      labels = c("TRUE" = "consistent", "FALSE" = "inconsistent")
+    )
+  )
 }
 
 #' Plot SD bounds on the native scale
@@ -56,9 +70,15 @@
 #' # the previous look, with the feasible band filled
 #' sd_bounds_plot(curve, reports = checked, shade = "inside")
 #' @export
-sd_bounds_plot <- function(data, reports = NULL, title = NULL,
-                           fill = "grey85", line_colour = "grey30",
-                           shade = c("outside", "inside"), expand = 0.03) {
+sd_bounds_plot <- function(
+  data,
+  reports = NULL,
+  title = NULL,
+  fill = "grey85",
+  line_colour = "grey30",
+  shade = c("outside", "inside"),
+  expand = 0.03
+) {
   shade <- match.arg(shade)
   cur <- .band_mask(data)
 
@@ -76,8 +96,10 @@ sd_bounds_plot <- function(data, reports = NULL, title = NULL,
   p <- ggplot2::ggplot(cur, ggplot2::aes(x = .data$mean))
   if (shade == "inside") {
     p <- p +
-      ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$min_sd, ymax = .data$max_sd),
-                           fill = fill)
+      ggplot2::geom_ribbon(
+        ggplot2::aes(ymin = .data$min_sd, ymax = .data$max_sd),
+        fill = fill
+      )
   } else {
     # Shade the whole panel, then knock the feasible rings out of it. Doing it
     # this way rather than assembling the grey from side rectangles and ribbons
@@ -89,23 +111,46 @@ sd_bounds_plot <- function(data, reports = NULL, title = NULL,
     # genuine one; see .band_step().
     rings <- band_polygon(cur, by = .band_step(data))
     p <- p +
-      ggplot2::annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf,
-                        ymax = Inf, fill = "grey10", alpha = 0.12)
-    if (!is.null(rings))
-      p <- p + ggplot2::geom_polygon(data = rings,
-        ggplot2::aes(x = .data$mean, y = .data$y, group = .data$ring),
-        inherit.aes = FALSE, fill = "white")
+      ggplot2::annotate(
+        "rect",
+        xmin = -Inf,
+        xmax = Inf,
+        ymin = -Inf,
+        ymax = Inf,
+        fill = "grey10",
+        alpha = 0.12
+      )
+    if (!is.null(rings)) {
+      p <- p +
+        ggplot2::geom_polygon(
+          data = rings,
+          ggplot2::aes(x = .data$mean, y = .data$y, group = .data$ring),
+          inherit.aes = FALSE,
+          fill = "white"
+        )
+    }
   }
   p <- p +
-    ggplot2::geom_line(ggplot2::aes(y = .data$max_sd), colour = line_colour,
-                       na.rm = TRUE) +
-    ggplot2::geom_line(ggplot2::aes(y = .data$min_sd), colour = line_colour,
-                       na.rm = TRUE) +
-    ggplot2::coord_cartesian(xlim = c(lo_m - pad, hi_m + pad),
-                             ylim = c(-pad, y_hi + pad), expand = FALSE) +
+    ggplot2::geom_line(
+      ggplot2::aes(y = .data$max_sd),
+      colour = line_colour,
+      na.rm = TRUE
+    ) +
+    ggplot2::geom_line(
+      ggplot2::aes(y = .data$min_sd),
+      colour = line_colour,
+      na.rm = TRUE
+    ) +
+    ggplot2::coord_cartesian(
+      xlim = c(lo_m - pad, hi_m + pad),
+      ylim = c(-pad, y_hi + pad),
+      expand = FALSE
+    ) +
     ggplot2::labs(x = "Mean", y = "SD", title = title) +
     ggplot2::theme_minimal()
-  if (!is.null(reports)) p <- p + .bounds_point_layer(reports, "mean", "sd")
+  if (!is.null(reports)) {
+    p <- p + .bounds_point_layer(reports, "mean", "sd")
+  }
   p
 }
 
@@ -135,38 +180,73 @@ sd_bounds_plot <- function(data, reports = NULL, title = NULL,
 #' # "parity" is a linear rescaling, so the umbrella keeps its shape
 #' sd_bounds_pomp_plot(curve, reference = "parity")
 #' @export
-sd_bounds_pomp_plot <- function(data, reports = NULL,
-                                reference = c("sharp", "parity"),
-                                title = NULL) {
+sd_bounds_pomp_plot <- function(
+  data,
+  reports = NULL,
+  reference = c("sharp", "parity"),
+  title = NULL
+) {
   reference <- match.arg(reference)
   if (reference == "parity") {
     cur <- .band_mask(data)
     p <- ggplot2::ggplot(cur, ggplot2::aes(x = .data$pomp_mean)) +
-      ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$floor_parity,
-                                        ymax = .data$ceil_parity), fill = "grey85") +
-      ggplot2::geom_line(ggplot2::aes(y = .data$ceil_parity), colour = "grey30",
-                         na.rm = TRUE) +
-      ggplot2::geom_line(ggplot2::aes(y = .data$floor_parity), colour = "grey30",
-                         na.rm = TRUE) +
-      ggplot2::labs(x = "Relative location (POMP mean)",
-                    y = "Relative dispersion (parity-normalised SD)", title = title)
-    if (!is.null(reports)) p <- p + .bounds_point_layer(reports, "pomp_mean", "pomp_sd_parity")
+      ggplot2::geom_ribbon(
+        ggplot2::aes(ymin = .data$floor_parity, ymax = .data$ceil_parity),
+        fill = "grey85"
+      ) +
+      ggplot2::geom_line(
+        ggplot2::aes(y = .data$ceil_parity),
+        colour = "grey30",
+        na.rm = TRUE
+      ) +
+      ggplot2::geom_line(
+        ggplot2::aes(y = .data$floor_parity),
+        colour = "grey30",
+        na.rm = TRUE
+      ) +
+      ggplot2::labs(
+        x = "Relative location (POMP mean)",
+        y = "Relative dispersion (parity-normalised SD)",
+        title = title
+      )
+    if (!is.null(reports)) {
+      p <- p + .bounds_point_layer(reports, "pomp_mean", "pomp_sd_parity")
+    }
   } else {
     shade <- data.frame(
-      xmin = c(-Inf, 1, 0, 0), xmax = c(0, Inf, 1, 1),
-      ymin = c(-Inf, -Inf, 1, -Inf), ymax = c(Inf, Inf, Inf, 0))
+      xmin = c(-Inf, 1, 0, 0),
+      xmax = c(0, Inf, 1, 1),
+      ymin = c(-Inf, -Inf, 1, -Inf),
+      ymax = c(Inf, Inf, Inf, 0)
+    )
     p <- ggplot2::ggplot() +
-      ggplot2::geom_rect(data = shade,
-        ggplot2::aes(xmin = .data$xmin, xmax = .data$xmax,
-                     ymin = .data$ymin, ymax = .data$ymax),
-        fill = "grey10", alpha = 0.12) +
-      ggplot2::geom_rect(data = data.frame(x = 0),
+      ggplot2::geom_rect(
+        data = shade,
+        ggplot2::aes(
+          xmin = .data$xmin,
+          xmax = .data$xmax,
+          ymin = .data$ymin,
+          ymax = .data$ymax
+        ),
+        fill = "grey10",
+        alpha = 0.12
+      ) +
+      ggplot2::geom_rect(
+        data = data.frame(x = 0),
         ggplot2::aes(xmin = 0, xmax = 1, ymin = 0, ymax = 1),
-        fill = NA, colour = "black", linewidth = 0.3) +
+        fill = NA,
+        colour = "black",
+        linewidth = 0.3
+      ) +
       ggplot2::coord_cartesian(xlim = c(0, 1), ylim = c(-0.1, 1.1)) +
-      ggplot2::labs(x = "Relative location (POMP mean)",
-                    y = "Position in sharp SD band", title = title)
-    if (!is.null(reports)) p <- p + .bounds_point_layer(reports, "pomp_mean", "pomp_sd_sharp")
+      ggplot2::labs(
+        x = "Relative location (POMP mean)",
+        y = "Position in sharp SD band",
+        title = title
+      )
+    if (!is.null(reports)) {
+      p <- p + .bounds_point_layer(reports, "pomp_mean", "pomp_sd_sharp")
+    }
   }
   p + ggplot2::theme_minimal()
 }
@@ -248,62 +328,114 @@ sd_bounds_pomp_plot <- function(data, reports = NULL,
 #' # the same without kinks: its edges are smooth arcs
 #' umbrella_plot(sd_region_data(l = 1, u = 3, n = 12, rule = "mean_naive_floor"))
 #' @export
-umbrella_plot <- function(data, bounds = NULL, title = NULL,
-                          style = c("points", "tiles"), fill = "grey30",
-                          point_colour = "black", point_size = NULL,
-                          reference_colour = "grey35", expand = 0.03) {
+umbrella_plot <- function(
+  data,
+  bounds = NULL,
+  title = NULL,
+  style = c("points", "tiles"),
+  fill = "grey30",
+  point_colour = "black",
+  point_size = NULL,
+  reference_colour = "grey35",
+  expand = 0.03
+) {
   style <- match.arg(style)
   is_band <- !"sd" %in% names(data)
-  if (is_band && !all(c("min_sd", "max_sd") %in% names(data)))
-    stop("`data` needs `mean` and `sd` (a lattice) or `mean`, `min_sd`, and `max_sd` (a band)")
-  if (is_band && style == "tiles")
+  if (is_band && !all(c("min_sd", "max_sd") %in% names(data))) {
+    stop(
+      "`data` needs `mean` and `sd` (a lattice) or `mean`, `min_sd`, and `max_sd` (a band)"
+    )
+  }
+  if (is_band && style == "tiles") {
     stop("style = 'tiles' needs a lattice from umbrella_data(), not a band")
+  }
 
   bnd <- if (!is.null(bounds)) .band_mask(bounds)
   bounds_layers <- if (!is.null(bnd)) {
-    lapply(c("max_sd", "min_sd"), function(col)
-      ggplot2::geom_line(data = bnd, ggplot2::aes(.data$mean, .data[[col]]),
-                         inherit.aes = FALSE, colour = reference_colour,
-                         linetype = "dashed", linewidth = 0.35, na.rm = TRUE))
+    lapply(c("max_sd", "min_sd"), function(col) {
+      ggplot2::geom_line(
+        data = bnd,
+        ggplot2::aes(.data$mean, .data[[col]]),
+        inherit.aes = FALSE,
+        colour = reference_colour,
+        linetype = "dashed",
+        linewidth = 0.35,
+        na.rm = TRUE
+      )
+    })
   }
 
   if (style == "tiles") {
-    if (!all(c("consistent", "in_bounds", "grimmer") %in% names(data)))
-      stop("style = 'tiles' needs the full umbrella_data() output, with `consistent`, `in_bounds`, and `grimmer`")
-    data$category <- ifelse(data$consistent, "consistent",
-      ifelse(data$in_bounds & !is.na(data$grimmer) & !data$grimmer,
-             "GRIMMER-inconsistent", "out of bounds"))
-    return(ggplot2::ggplot(data,
-        ggplot2::aes(x = .data$mean, y = .data$sd, fill = .data$category)) +
-      ggplot2::geom_tile() +
-      ggplot2::scale_fill_manual(values = c(
-        "consistent" = "#0047ff", "GRIMMER-inconsistent" = "#ff2a00",
-        "out of bounds" = "grey80"), name = NULL) +
-      bounds_layers +
-      ggplot2::labs(x = "Mean", y = "SD", title = title) +
-      ggplot2::theme_minimal())
+    if (!all(c("consistent", "in_bounds", "grimmer") %in% names(data))) {
+      stop(
+        "style = 'tiles' needs the full umbrella_data() output, with `consistent`, `in_bounds`, and `grimmer`"
+      )
+    }
+    data$category <- ifelse(
+      data$consistent,
+      "consistent",
+      ifelse(
+        data$in_bounds & !is.na(data$grimmer) & !data$grimmer,
+        "GRIMMER-inconsistent",
+        "out of bounds"
+      )
+    )
+    return(
+      ggplot2::ggplot(
+        data,
+        ggplot2::aes(x = .data$mean, y = .data$sd, fill = .data$category)
+      ) +
+        ggplot2::geom_tile() +
+        ggplot2::scale_fill_manual(
+          values = c(
+            "consistent" = "#0047ff",
+            "GRIMMER-inconsistent" = "#ff2a00",
+            "out of bounds" = "grey80"
+          ),
+          name = NULL
+        ) +
+        bounds_layers +
+        ggplot2::labs(x = "Mean", y = "SD", title = title) +
+        ggplot2::theme_minimal()
+    )
   }
 
   if (is_band) {
     cur <- .band_mask(data)
-    region <- ggplot2::geom_ribbon(data = cur,
+    region <- ggplot2::geom_ribbon(
+      data = cur,
       ggplot2::aes(x = .data$mean, ymin = .data$min_sd, ymax = .data$max_sd),
-      fill = fill)
+      fill = fill
+    )
     means <- range(cur$mean[!is.na(cur$max_sd)])
     y_hi <- max(c(cur$max_sd, bnd$max_sd), na.rm = TRUE)
   } else {
     pts <- if ("consistent" %in% names(data)) {
-      data[!is.na(data$consistent) & data$consistent, c("mean", "sd"),
-           drop = FALSE]
+      data[
+        !is.na(data$consistent) & data$consistent,
+        c("mean", "sd"),
+        drop = FALSE
+      ]
     } else {
       data[, c("mean", "sd"), drop = FALSE]
     }
-    if (is.null(point_size))
-      point_size <- if (nrow(pts) > 12000) 0.045 else
-                    if (nrow(pts) > 2000) 0.12 else 0.35
-    region <- ggplot2::geom_point(data = pts,
-      ggplot2::aes(.data$mean, .data$sd), colour = point_colour,
-      size = point_size, shape = 16, na.rm = TRUE)
+    if (is.null(point_size)) {
+      point_size <- if (nrow(pts) > 12000) {
+        0.045
+      } else if (nrow(pts) > 2000) {
+        0.12
+      } else {
+        0.35
+      }
+    }
+    region <- ggplot2::geom_point(
+      data = pts,
+      ggplot2::aes(.data$mean, .data$sd),
+      colour = point_colour,
+      size = point_size,
+      shape = 16,
+      na.rm = TRUE
+    )
     means <- range(data$mean)
     y_hi <- max(c(pts$sd, bnd$max_sd), na.rm = TRUE)
   }
@@ -311,12 +443,22 @@ umbrella_plot <- function(data, bounds = NULL, title = NULL,
 
   ggplot2::ggplot() +
     # the panel is infeasible everywhere except where the umbrella is drawn
-    ggplot2::annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf,
-                      fill = "grey10", alpha = 0.12) +
+    ggplot2::annotate(
+      "rect",
+      xmin = -Inf,
+      xmax = Inf,
+      ymin = -Inf,
+      ymax = Inf,
+      fill = "grey10",
+      alpha = 0.12
+    ) +
     region +
     bounds_layers +
-    ggplot2::coord_cartesian(xlim = means + c(-pad, pad),
-                             ylim = c(-pad, y_hi + pad), expand = FALSE) +
+    ggplot2::coord_cartesian(
+      xlim = means + c(-pad, pad),
+      ylim = c(-pad, y_hi + pad),
+      expand = FALSE
+    ) +
     ggplot2::labs(x = "Mean", y = "Sample standard deviation", title = title) +
     ggplot2::theme_minimal() +
     ggplot2::theme(panel.grid.minor = ggplot2::element_blank())

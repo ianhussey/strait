@@ -8,10 +8,15 @@
 # where the band does not exist.
 .band_mask <- function(d) {
   ok <- is.finite(d$min_sd) & is.finite(d$max_sd)
-  if (!is.null(d[["feasible"]])) ok <- ok & d$feasible
-  for (col in intersect(c("min_sd", "max_sd", "floor_parity", "ceil_parity"),
-                        names(d)))
+  if (!is.null(d[["feasible"]])) {
+    ok <- ok & d$feasible
+  }
+  for (col in intersect(
+    c("min_sd", "max_sd", "floor_parity", "ceil_parity"),
+    names(d)
+  )) {
     d[[col]][!ok] <- NA_real_
+  }
   d
 }
 
@@ -26,8 +31,13 @@
 # built by hand, whose uniform grid makes it right.
 .band_step <- function(d) {
   step <- attr(d, "step")
-  if (!is.null(step)) step
-  else if (nrow(d) > 1) stats::median(diff(d$mean)) else 1
+  if (!is.null(step)) {
+    step
+  } else if (nrow(d) > 1) {
+    stats::median(diff(d$mean))
+  } else {
+    1
+  }
 }
 
 #' A feasible region as closed rings
@@ -75,15 +85,22 @@
 #' @export
 band_polygon <- function(d, by) {
   d <- d[is.finite(d$min_sd) & is.finite(d$max_sd), , drop = FALSE]
-  if (!nrow(d)) return(NULL)
+  if (!nrow(d)) {
+    return(NULL)
+  }
   d <- d[order(d$mean), , drop = FALSE]
   run <- c(0, cumsum(diff(d$mean) > by * 1.5))
-  out <- do.call(rbind, lapply(unique(run), function(k) {
-    g <- d[run == k, , drop = FALSE]
-    data.frame(mean = c(g$mean, rev(g$mean), g$mean[1]),
-               y    = c(g$max_sd,   rev(g$min_sd),   g$max_sd[1]),
-               ring = k)
-  }))
+  out <- do.call(
+    rbind,
+    lapply(unique(run), function(k) {
+      g <- d[run == k, , drop = FALSE]
+      data.frame(
+        mean = c(g$mean, rev(g$mean), g$mean[1]),
+        y = c(g$max_sd, rev(g$min_sd), g$max_sd[1]),
+        ring = k
+      )
+    })
+  )
   rownames(out) <- NULL
   out
 }
@@ -139,7 +156,7 @@ sd_delta <- function(mean, n, lower, upper, tol = 1e-9) {
   R <- upper - lower
   nl <- n * (upper - mean) / R
   nu <- n * (mean - lower) / R
-  muil <- n * (upper - mean) * (mean - lower)   # SS of the uncorrected bound
-  ss <- muil - frac(nl, tol) * frac(nu, tol) * R^2  # SS of the sharp bound
+  muil <- n * (upper - mean) * (mean - lower) # SS of the uncorrected bound
+  ss <- muil - frac(nl, tol) * frac(nu, tol) * R^2 # SS of the sharp bound
   ifelse(muil <= 0, 1, pmax(0, ss) / muil)
 }

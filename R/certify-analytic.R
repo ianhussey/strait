@@ -32,10 +32,14 @@
 # n * cap (no such sample exists). The count-free .q_max_int() is not enough
 # inside the recursion, where the remaining slots genuinely run out.
 .q_max_cnt <- function(S, cap, n) {
-  if (cap <= 0) return(if (S == 0) 0 else NA_real_)
+  if (cap <= 0) {
+    return(if (S == 0) 0 else NA_real_)
+  }
   a <- S %/% cap
   b <- S - a * cap
-  if (a > n || (a == n && b > 0)) return(NA_real_)
+  if (a > n || (a == n && b > 0)) {
+    return(NA_real_)
+  }
   a * cap * cap + b * b
 }
 
@@ -45,23 +49,41 @@
 # place below the ceiling among n_j = n - (a - j) slots, contributing an
 # offset deficit d_off plus, recursively, a deficit of the capped subproblem.
 .hit_deficit <- function(S, cap, n, dlo, dhi) {
-  if (S == 0) return(dlo <= 0 && 0 <= dhi)
-  if (cap <= 0 || n <= 0 || dhi < 0) return(FALSE)
-  if (cap > S) cap <- S
+  if (S == 0) {
+    return(dlo <= 0 && 0 <= dhi)
+  }
+  if (cap <= 0 || n <= 0 || dhi < 0) {
+    return(FALSE)
+  }
+  if (cap > S) {
+    cap <- S
+  }
   Qx <- .q_max_cnt(S, cap, n)
-  if (is.na(Qx)) return(FALSE)
-  if (dlo > Qx - .q_min_int(S, n)) return(FALSE)
-  if (dlo <= 0 && 0 <= dhi) return(TRUE)
+  if (is.na(Qx)) {
+    return(FALSE)
+  }
+  if (dlo > Qx - .q_min_int(S, n)) {
+    return(FALSE)
+  }
+  if (dlo <= 0 && 0 <= dhi) {
+    return(TRUE)
+  }
   a <- S %/% cap
   b <- S - a * cap
   for (j in 0:a) {
     S_j <- j * cap + b
     n_j <- n - (a - j)
-    if (n_j <= 0) next
+    if (n_j <= 0) {
+      next
+    }
     qx <- .q_max_cnt(S_j, cap - 1, n_j)
-    if (is.na(qx)) next
+    if (is.na(qx)) {
+      next
+    }
     d_off <- j * cap * cap + b * b - qx
-    if (d_off > dhi) next
+    if (d_off > dhi) {
+      next
+    }
     if (.hit_deficit(S_j, cap - 1, n_j, dlo - d_off, dhi - d_off)) return(TRUE)
   }
   FALSE
@@ -84,18 +106,30 @@
     k_hi <- k_hi + shift
   }
   Qx <- .q_max_cnt(S, W, n)
-  if (is.na(Qx)) return(FALSE)
+  if (is.na(Qx)) {
+    return(FALSE)
+  }
   Qn <- .q_min_int(S, n)
   k_lo <- max(k_lo, Qn)
   k_hi <- min(k_hi, Qx)
-  if ((k_lo - S) %% 2 != 0) k_lo <- k_lo + 1
-  if ((k_hi - S) %% 2 != 0) k_hi <- k_hi - 1
-  if (k_lo > k_hi) return(FALSE)
-  if (k_hi == Qx || k_lo == Qn) return(TRUE)
+  if ((k_lo - S) %% 2 != 0) {
+    k_lo <- k_lo + 1
+  }
+  if ((k_hi - S) %% 2 != 0) {
+    k_hi <- k_hi - 1
+  }
+  if (k_lo > k_hi) {
+    return(FALSE)
+  }
+  if (k_hi == Qx || k_lo == Qn) {
+    return(TRUE)
+  }
   if (k_lo - Qn < Qx - k_hi) {
     got <- .witness_search(W, n, S, k_lo, k_hi, budget = witness_budget)
-    if (isTRUE(got$possible)) return(TRUE)
-    if (isFALSE(got$possible)) return(FALSE)  # tree exhausted: a proof
+    if (isTRUE(got$possible)) {
+      return(TRUE)
+    }
+    if (isFALSE(got$possible)) return(FALSE) # tree exhausted: a proof
   }
   .hit_deficit(S, W, n, Qx - k_hi, Qx - k_lo)
 }
@@ -104,11 +138,22 @@
 # rule. Same contract as .certify_fast() -- takes .target_states() rows --
 # but total: always TRUE or FALSE, never NA.
 .certify_analytic <- function(W, n, tg) {
-  if (is.null(tg) || !nrow(tg)) return(FALSE)
+  if (is.null(tg) || !nrow(tg)) {
+    return(FALSE)
+  }
   for (i in seq_len(nrow(tg))) {
-    kw <- .k_window(tg$S[i], tg$Q_lo[i], tg$Q_hi[i],
-                    tg$lo_incl[i], tg$hi_incl[i], n, W)
-    if (is.null(kw)) next
+    kw <- .k_window(
+      tg$S[i],
+      tg$Q_lo[i],
+      tg$Q_hi[i],
+      tg$lo_incl[i],
+      tg$hi_incl[i],
+      n,
+      W
+    )
+    if (is.null(kw)) {
+      next
+    }
     if (.analytic_window(W, n, tg$S[i], kw[1], kw[2])) return(TRUE)
   }
   FALSE

@@ -24,8 +24,12 @@
 # the family); rho >= 1 is the limit with all mass at the two endpoints.
 .bb_pmf <- function(m, mu, rho) {
   x <- 0:m
-  if (rho <= 1e-10) return(stats::dbinom(x, m, mu))
-  if (rho >= 1) return(c(1 - mu, rep(0, m - 1), mu))
+  if (rho <= 1e-10) {
+    return(stats::dbinom(x, m, mu))
+  }
+  if (rho >= 1) {
+    return(c(1 - mu, rep(0, m - 1), mu))
+  }
   phi <- 1 / rho - 1
   a <- mu * phi
   b <- (1 - mu) * phi
@@ -38,13 +42,21 @@
   x <- seq_along(pr) - 1
   mean <- sum(pr * x)
   cm <- vapply(2:6, function(r) sum(pr * (x - mean)^r), numeric(1))
-  m2 <- cm[1]; m3 <- cm[2]; m4 <- cm[3]; m5 <- cm[4]; m6 <- cm[5]
+  m2 <- cm[1]
+  m3 <- cm[2]
+  m4 <- cm[3]
+  m5 <- cm[4]
+  m6 <- cm[5]
   k4 <- m4 - 3 * m2^2
   list(
-    mean = mean, k2 = m2, k3 = m3, k4 = k4,
+    mean = mean,
+    k2 = m2,
+    k3 = m3,
+    k4 = k4,
     k5 = m5 - 10 * m3 * m2,
     k6 = m6 - 15 * m4 * m2 - 10 * m3^2 + 30 * m2^3,
-    g1 = m3 / m2^1.5, g2 = k4 / m2^2
+    g1 = m3 / m2^1.5,
+    g2 = k4 / m2^2
   )
 }
 
@@ -73,11 +85,19 @@ bb_cumulants <- function(m, mu, rho) {
 # sample mean equals the population mean, removing the part of Var(S^2) that
 # Cov(xbar, S^2) = kappa_3 / N explains.
 .s2_cumulants <- function(cu, N, conditional = FALSE) {
-  k2 <- cu$k2; k3 <- cu$k3; k4 <- cu$k4; k6 <- cu$k6
+  k2 <- cu$k2
+  k3 <- cu$k3
+  k4 <- cu$k4
+  k6 <- cu$k6
   v <- k2^2 * (2 / (N - 1) + cu$g2 / N)
-  if (conditional) v <- v - k3^2 / (N * k2)
-  t3 <- k6 / N^2 + 12 * k2 * k4 / (N * (N - 1)) +
-    4 * (N - 2) * k3^2 / (N * (N - 1)^2) + 8 * k2^3 / (N - 1)^2
+  if (conditional) {
+    v <- v - k3^2 / (N * k2)
+  }
+  t3 <- k6 /
+    N^2 +
+    12 * k2 * k4 / (N * (N - 1)) +
+    4 * (N - 2) * k3^2 / (N * (N - 1)^2) +
+    8 * k2^3 / (N - 1)^2
   list(k1 = k2, k2 = v, k3 = t3)
 }
 
@@ -86,13 +106,16 @@ bb_cumulants <- function(m, mu, rho) {
 # Internal: CDF of S at s for one rho, under an approximation of S^2.
 .cdf_s_approx <- function(s, sc, method) {
   s2 <- s^2
-  switch(method,
+  switch(
+    method,
     chisq2 = {
       nu <- 2 * sc$k1^2 / sc$k2
       stats::pchisq(s2 * nu / sc$k1, nu)
     },
     chisq3 = {
-      if (sc$k3 <= 0) return(.cdf_s_approx(s, sc, "chisq2"))
+      if (sc$k3 <= 0) {
+        return(.cdf_s_approx(s, sc, "chisq2"))
+      }
       b <- sc$k3 / (4 * sc$k2)
       nu <- 8 * sc$k2^3 / sc$k3^2
       a <- sc$k1 - b * nu
@@ -103,10 +126,15 @@ bb_cumulants <- function(m, mu, rho) {
       # for z; the + root is the monotone branch
       w <- (s2 - sc$k1) / sqrt(sc$k2)
       h <- sc$k3 / sc$k2^1.5 / 6
-      if (abs(h) < 1e-8) return(stats::pnorm(w))
+      if (abs(h) < 1e-8) {
+        return(stats::pnorm(w))
+      }
       disc <- 1 + 4 * h * (h + w)
-      z <- ifelse(disc < 0, if (h > 0) -Inf else Inf,
-                  (-1 + sqrt(pmax(disc, 0))) / (2 * h))
+      z <- ifelse(
+        disc < 0,
+        if (h > 0) -Inf else Inf,
+        (-1 + sqrt(pmax(disc, 0))) / (2 * h)
+      )
       stats::pnorm(z)
     },
     stop("unknown method: ", method)
@@ -118,12 +146,16 @@ bb_cumulants <- function(m, mu, rho) {
 # Internal: minimum and maximum of sum x^2 over n integers in [0, m] summing
 # to s.
 .q_min <- function(n, s) {
-  if (n == 0) return(0)
-  a <- s %/% n; r <- s %% n
+  if (n == 0) {
+    return(0)
+  }
+  a <- s %/% n
+  r <- s %% n
   (n - r) * a^2 + r * (a + 1)^2
 }
 .q_max <- function(n, s, m) {
-  k <- s %/% m; rem <- s %% m
+  k <- s %/% m
+  rem <- s %% m
   k * m^2 + rem^2
 }
 
@@ -135,8 +167,13 @@ bb_cumulants <- function(m, mu, rho) {
 # joint distribution is returned (all <= N), so one run serves several N.
 .sq_joint <- function(pr, N, keep = N, prune = 1e-17, max_cells = 4e7) {
   m <- length(pr) - 1
-  cells <- sum(vapply(0:(N * m), function(s)
-    .q_max(N, s, m) - .q_min(N, s) + 1, numeric(1)))
+  cells <- sum(vapply(
+    0:(N * m),
+    function(s) {
+      .q_max(N, s, m) - .q_min(N, s) + 1
+    },
+    numeric(1)
+  ))
   if (cells > max_cells) {
     stop(
       "The exact method needs about ",
@@ -154,7 +191,7 @@ bb_cumulants <- function(m, mu, rho) {
     )
   }
   xs <- which(pr >= prune) - 1
-  state <- list(1)                     # n = 0: s = 0, q = 0
+  state <- list(1) # n = 0: s = 0, q = 0
   lost <- 0
   out <- list()
   for (n in 0:(N - 1)) {
@@ -165,10 +202,16 @@ bb_cumulants <- function(m, mu, rho) {
       v <- NULL
       for (x in xs) {
         s <- s2 - x
-        if (s < 0 || s > n * m) next
+        if (s < 0 || s > n * m) {
+          next
+        }
         o <- state[[s + 1]]
-        if (is.null(o)) next
-        if (is.null(v)) v <- numeric(.q_max(n + 1, s2, m) - base + 1)
+        if (is.null(o)) {
+          next
+        }
+        if (is.null(v)) {
+          v <- numeric(.q_max(n + 1, s2, m) - base + 1)
+        }
         idx <- .q_min(n, s) + x^2 - base + seq_along(o)
         v[idx] <- v[idx] + pr[x + 1] * o
       }
@@ -189,19 +232,25 @@ bb_cumulants <- function(m, mu, rho) {
 # the sums in `sums` (conditioning on the sample mean). Returns a data frame
 # (s2, prob) sorted by s2, with prob normalised within the condition.
 .s2_from_joint <- function(j, sums = NULL) {
-  N <- j$N; st <- j$state
+  N <- j$N
+  st <- j$state
   ss <- which(!vapply(st, is.null, logical(1))) - 1
-  if (!is.null(sums)) ss <- intersect(ss, sums)
-  if (length(ss) == 0) {
-    stop("No attainable sample has a mean in the conditioning set.",
-         call. = FALSE)
+  if (!is.null(sums)) {
+    ss <- intersect(ss, sums)
   }
-  num <- list(); pr <- list()
+  if (length(ss) == 0) {
+    stop(
+      "No attainable sample has a mean in the conditioning set.",
+      call. = FALSE
+    )
+  }
+  num <- list()
+  pr <- list()
   for (s in ss) {
     v <- st[[s + 1]]
     nz <- which(v > 0)
     q <- .q_min(N, s) + nz - 1
-    num[[length(num) + 1]] <- N * q - s^2   # N (N - 1) S^2, an integer
+    num[[length(num) + 1]] <- N * q - s^2 # N (N - 1) S^2, an integer
     pr[[length(pr) + 1]] <- v[nz]
   }
   agg <- rowsum(unlist(pr), unlist(num), reorder = TRUE)
@@ -294,7 +343,9 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
 
 # Internal: rho nodes of N(rho, tau^2) truncated to [0, 1), equal weights.
 .rho_nodes <- function(rho, tau, K) {
-  if (tau <= 0) return(rho)
+  if (tau <= 0) {
+    return(rho)
+  }
   pa <- stats::pnorm(0, rho, tau)
   pb <- stats::pnorm(1, rho, tau)
   u <- (seq_len(K) - 0.5) / K
@@ -314,7 +365,9 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
   tau,
   method,
   conditional,
-                          digits, K) {
+  digits,
+  K
+) {
   m <- u - l
   mu <- (mean - l) / m
   rhos <- .rho_nodes(rho, tau, K)
@@ -348,13 +401,19 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
   } else {
     scs <- lapply(rhos, function(r) {
       .s2_cumulants(.cumulants_from_pmf(.bb_pmf(m, mu, r)), n, conditional)
-  })
-  cdf <- function(s) mean(vapply(scs, function(sc) .cdf_s_approx(s, sc, method),
-                                 numeric(1)))
-  hi <- 2 * sqrt(max(vapply(scs, `[[`, numeric(1), "k1"))) + 1
-  q <- function(pp) {
-    if (cdf(0) >= pp) return(0)
-    stats::uniroot(function(s) cdf(s) - pp, c(0, hi), extendInt = "upX",
+    })
+    cdf <- function(s) {
+      mean(vapply(scs, function(sc) .cdf_s_approx(s, sc, method), numeric(1)))
+    }
+    hi <- 2 * sqrt(max(vapply(scs, `[[`, numeric(1), "k1"))) + 1
+    q <- function(pp) {
+      if (cdf(0) >= pp) {
+        return(0)
+      }
+      stats::uniroot(
+        function(s) cdf(s) - pp,
+        c(0, hi),
+        extendInt = "upX",
         tol = 1e-10
       )$root
     }
@@ -468,7 +527,7 @@ sd_plausibility <- function(
   rho = NULL,
   tau = 0,
   p = 0.01,
-                            method = c("chisq2", "chisq3", "cf", "exact"),
+  method = c("chisq2", "chisq3", "cf", "exact"),
   condition_on_mean = TRUE,
   digits_mean = NULL,
   K = 41
@@ -558,19 +617,25 @@ sd_plausibility <- function(
       conditional = condition_on_mean,
       mu = mu,
       rho = rho_in[i],
-                  tau = tau[i], sigma = NA_real_, hard_min = NA_real_,
-                  hard_max = NA_real_, lower = NA_real_, upper = NA_real_,
-                  clipped = NA_character_, note = NA_character_)
-      note <- character(0)
+      tau = tau[i],
+      sigma = NA_real_,
+      hard_min = NA_real_,
+      hard_max = NA_real_,
+      lower = NA_real_,
+      upper = NA_real_,
+      clipped = NA_character_,
+      note = NA_character_
+    )
+    note <- character(0)
     if (
       anyNA(c(mean[i], n[i], tau[i])) ||
         (is.na(rho_in[i]) && is.na(sd_in[i]))
     ) {
-        res$note <- "missing input"
+      res$note <- "missing input"
     } else if (mean[i] < l || mean[i] > u) {
       res$note <- "mean outside [l, u]"
     } else if (mean[i] == l || mean[i] == u) {
-        res[c("sigma", "hard_min", "hard_max", "lower", "upper")] <- 0
+      res[c("sigma", "hard_min", "hard_max", "lower", "upper")] <- 0
       res$clipped <- "none"
       res$note <- "mean at a scale limit: every score equals it"
     } else {
@@ -618,7 +683,8 @@ sd_plausibility <- function(
       lo_clip <- q$lower < hb[1] - 1e-12
       hi_clip <- q$upper > hb[2] + 1e-12
       res$sigma <- sqrt(.cumulants_from_pmf(.bb_pmf(m, mu, rho_i))$k2)
-        res$hard_min <- hb[1]; res$hard_max <- hb[2]
+      res$hard_min <- hb[1]
+      res$hard_max <- hb[2]
       res$lower <- pmax(q$lower, hb[1])
       res$upper <- pmin(q$upper, hb[2])
       res$clipped <- ifelse(
@@ -738,15 +804,19 @@ rho_from_summary <- function(l, u, n, mean, sd, ..., rho_var = NULL) {
   mu <- (mean - l) / m
   rho_hat <- (sd^2 / (m * mu * (1 - mu)) - 1) / (m - 1)
   rv <- if (is.null(rho_var)) pmax(0, rho_hat) else rep_len(rho_var, len)
-  var_rho <- vapply(seq_len(len), function(i) {
+  var_rho <- vapply(
+    seq_len(len),
+    function(i) {
       if (
         anyNA(c(mu[i], rv[i], n[i])) || mu[i] <= 0 || mu[i] >= 1 || n[i] < 2
       ) {
-      return(NA_real_)
-    }
+        return(NA_real_)
+      }
       cu <- .cumulants_from_pmf(.bb_pmf(m, mu[i], min(max(rv[i], 0), 1)))
       .s2_cumulants(cu, n[i])$k2 / (m * (m - 1) * mu[i] * (1 - mu[i]))^2
-  }, numeric(1))
+    },
+    numeric(1)
+  )
   tibble::tibble(mu_hat = mu, rho_hat = rho_hat, var_rho = var_rho)
 }
 
@@ -811,7 +881,7 @@ rho_corpus_fit <- function(corpus, df = 3, iterate = TRUE, ...) {
   d <- d[stats::complete.cases(d[c("mu_hat", "rho_hat", "var_rho")]), ]
   basis <- splines::ns(d$mu_hat, df = df)
   fit_once <- function(v) {
-    metafor::rma(yi = d$rho_hat, vi = v, mods = ~ basis, ...)
+    metafor::rma(yi = d$rho_hat, vi = v, mods = ~basis, ...)
   }
   fit <- fit_once(d$var_rho)
   if (iterate) {
@@ -819,9 +889,15 @@ rho_corpus_fit <- function(corpus, df = 3, iterate = TRUE, ...) {
     d$var_rho <- .rho_corpus_rows(d, rho_var = pred)$var_rho
     fit <- fit_once(d$var_rho)
   }
-  structure(list(fit = fit, basis = basis, data = tibble::as_tibble(d),
-                 tau = sqrt(fit$tau2)),
-            class = "rho_corpus")
+  structure(
+    list(
+      fit = fit,
+      basis = basis,
+      data = tibble::as_tibble(d),
+      tau = sqrt(fit$tau2)
+    ),
+    class = "rho_corpus"
+  )
 }
 
 #' Predict rho and tau from a corpus fit
@@ -837,15 +913,26 @@ rho_corpus_fit <- function(corpus, df = 3, iterate = TRUE, ...) {
 predict.rho_corpus <- function(object, mu, ...) {
   X <- stats::predict(object$basis, mu)
   pr <- stats::predict(object$fit, newmods = X)
-  tibble::tibble(mu = mu, rho = as.numeric(pr$pred), se = as.numeric(pr$se),
-                 tau = object$tau,
-                 tau_total = sqrt(object$tau^2 + as.numeric(pr$se)^2))
+  tibble::tibble(
+    mu = mu,
+    rho = as.numeric(pr$pred),
+    se = as.numeric(pr$se),
+    tau = object$tau,
+    tau_total = sqrt(object$tau^2 + as.numeric(pr$se)^2)
+  )
 }
 
 #' @export
 print.rho_corpus <- function(x, ...) {
-  cat("Corpus meta-regression of rho on mu (", nrow(x$data), " studies, ",
-      "natural spline df = ", ncol(x$basis), ")\n", sep = "")
+  cat(
+    "Corpus meta-regression of rho on mu (",
+    nrow(x$data),
+    " studies, ",
+    "natural spline df = ",
+    ncol(x$basis),
+    ")\n",
+    sep = ""
+  )
   cat("  tau (between-study SD of rho): ", signif(x$tau, 3), "\n", sep = "")
   invisible(x)
 }

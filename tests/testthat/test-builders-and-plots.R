@@ -119,9 +119,13 @@ test_that("sd_region_plot() draws only the consistent tuples of a lattice", {
 # the white knock-out rings sd_bounds_plot() builds under shade = "outside"
 n_rings <- function(p) {
   for (ly in p$layers) {
-    if (inherits(ly$geom, "GeomPolygon") &&
-        is.data.frame(ly$data) && "ring" %in% names(ly$data))
+    if (
+      inherits(ly$geom, "GeomPolygon") &&
+        is.data.frame(ly$data) &&
+        "ring" %in% names(ly$data)
+    ) {
       return(length(unique(ly$data$ring)))
+    }
   }
   NA_integer_
 }

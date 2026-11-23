@@ -16,3 +16,4 @@
 ^CITATION\.cff$
 ^TODO\.md$
 ^\.claude$
+^air\.toml$
