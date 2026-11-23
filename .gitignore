@@ -7,3 +7,5 @@
 /Meta/
 .Rproj.user
 *.dcf
+tests/testthat/_problems/
+tests/testthat/testthat-problems.rds
