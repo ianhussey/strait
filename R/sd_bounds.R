@@ -38,7 +38,7 @@
   # feasibility: mean inside the band implied by walls/pins
   if (!is.null(mean) && (!is.null(lower) || !is.null(upper))) {
     band <- feasible_mean_band(lower, upper, lower_att, upper_att, n)
-    if (mean < band[1] - 1e-9 || mean > band[2] + 1e-9) {
+    if (mean < band[1] - TOLERANCE || mean > band[2] + TOLERANCE) {
       return(fail(
         if (lower_att || upper_att) {
           sprintf(
@@ -54,7 +54,9 @@
   }
   # feasibility: GRIM under strict integer
   if (
-    identical(granularity, "integer") && !is.null(mean) && !is_grim_consistent(mean, n)
+    identical(granularity, "integer") &&
+      !is.null(mean) &&
+      !is_grim_consistent(mean, n)
   ) {
     return(fail(
       "mean is GRIM-inconsistent: no strictly integer sample has this mean"
@@ -95,7 +97,7 @@
 
   # floor: max over applicable floors
   bump <- function(candidate, rule) {
-    if (candidate > res$min_sd + 1e-12) {
+    if (candidate > res$min_sd + TOLERANCE_TIGHT) {
       res$min_sd <<- candidate
       res$min_rule <<- rule
     }
@@ -131,7 +133,7 @@
     }
   }
 
-  if (res$min_sd > res$max_sd + 1e-9) {
+  if (res$min_sd > res$max_sd + TOLERANCE) {
     return(fail("floor exceeds ceiling: no sample satisfies all constraints"))
   }
   res
@@ -157,7 +159,7 @@
       call. = FALSE
     )
   }
-  if (whole && abs(x - round(x)) > 1e-9) {
+  if (whole && abs(x - round(x)) > TOLERANCE) {
     stop(
       sprintf("`%s` must be a whole number, not %s", name, format(x)),
       call. = FALSE
@@ -175,10 +177,10 @@
 # Internal: candidate exact means inside [m_lo, m_hi] for the envelope —
 # a dense grid plus every analytic breakpoint of the piecewise bounds
 # (multiples of 1/n, where both floors and Structure S can kink).
-.candidate_means <- function(m_lo, m_hi, n, grid_n = 401) {
+.candidate_means <- function(m_lo, m_hi, n, grid_n = ENVELOPE_GRID_POINTS) {
   cand <- seq(m_lo, m_hi, length.out = grid_n)
   if (!is.null(n)) {
-    t_range <- ceiling(n * m_lo - 1e-9):floor(n * m_hi + 1e-9)
+    t_range <- ceiling(n * m_lo - TOLERANCE):floor(n * m_hi + TOLERANCE)
     if (length(t_range) && length(t_range) <= 5000) {
       cand <- c(
         cand,
@@ -368,7 +370,7 @@ sd_bounds <- function(
     is.null(n_items) ||
       length(n_items) != 1 ||
       n_items < 1 ||
-      abs(n_items - round(n_items)) > 1e-9
+      abs(n_items - round(n_items)) > TOLERANCE
   ) {
     stop("n_items must be a positive whole number")
   }
@@ -423,7 +425,7 @@ sd_bounds <- function(
   # 1/n_items lattice of a mean-scored composite (w = m * x maps it to them)
   if (granularity %in% c("integer", "quasiinteger")) {
     lims <- c(l, u, a, b) * m
-    if (length(lims) && any(abs(lims - round(lims)) > 1e-9)) {
+    if (length(lims) && any(abs(lims - round(lims)) > TOLERANCE)) {
       stop(
         "integer/quasiinteger constraints require limits on the response ",
         "grid (whole numbers, or multiples of 1/n_items for mean-scored ",
@@ -515,9 +517,9 @@ sd_bounds <- function(
     }
     if (!is.null(rounding) && !is.null(digits_sd)) {
       iv <- .unround(sd, digits_sd, rounding, "sd", "digits_sd")
-      iv$hi >= min_sd - 1e-9 && iv$lo <= max_sd + 1e-9
+      iv$hi >= min_sd - TOLERANCE && iv$lo <= max_sd + TOLERANCE
     } else {
-      sd >= min_sd - 1e-9 && sd <= max_sd + 1e-9
+      sd >= min_sd - TOLERANCE && sd <= max_sd + TOLERANCE
     }
   }
   finish <- function(r, extra_note = NULL) {
@@ -547,7 +549,7 @@ sd_bounds <- function(
   band <- feasible_mean_band(lower, upper, lower_att, upper_att, n)
   m_lo2 <- max(m_lo, band[1])
   m_hi2 <- min(m_hi, band[2])
-  if (m_lo2 > m_hi2 + 1e-12) {
+  if (m_lo2 > m_hi2 + TOLERANCE_TIGHT) {
     return(finish(list(
       min_sd = NA_real_,
       max_sd = NA_real_,
@@ -570,16 +572,16 @@ sd_bounds <- function(
     # 1/n_items mean grid a mean is GRIM-consistent when n * m * mean is an
     # integer, so enumerate over nm = n * m.
     nm <- n * m
-    t_range <- ceiling(nm * m_lo2 - 1e-9):floor(nm * m_hi2 + 1e-9)
+    t_range <- ceiling(nm * m_lo2 - TOLERANCE):floor(nm * m_hi2 + TOLERANCE)
     cand <- t_range[
-      t_range >= nm * m_lo2 - 1e-9 & t_range <= nm * m_hi2 + 1e-9
+      t_range >= nm * m_lo2 - TOLERANCE & t_range <= nm * m_hi2 + TOLERANCE
     ] /
       nm
     if (!iv$lo_incl) {
-      cand <- cand[abs(cand - m_lo) > 1e-9]
+      cand <- cand[abs(cand - m_lo) > TOLERANCE]
     }
     if (!iv$hi_incl) {
-      cand <- cand[abs(cand - m_hi) > 1e-9]
+      cand <- cand[abs(cand - m_hi) > TOLERANCE]
     }
     # surface any disagreement with scrutiny's deferred GRIM verdict
     if (!is.na(grim_v) && grim_v != (length(cand) > 0)) {
@@ -700,7 +702,7 @@ sd_bounds <- function(
       !is.na(min_sd) &&
       !is.na(max_sd) &&
       is.finite(max_sd) &&
-      (max_sd - min_sd) > 1e-12
+      (max_sd - min_sd) > TOLERANCE_TIGHT
   ) {
     (sd - min_sd) / (max_sd - min_sd)
   } else {

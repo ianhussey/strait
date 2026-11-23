@@ -249,8 +249,8 @@ brimmest <- function(
   g <- .scoring_geometry(scoring, k, l, u)
   # both routes work on the integer grid y = mg * (x - l) in 0..W
   if (
-    abs(g$mg * l - round(g$mg * l)) > 1e-9 ||
-      abs(g$mg * u - round(g$mg * u)) > 1e-9 ||
+    abs(g$mg * l - round(g$mg * l)) > TOLERANCE ||
+      abs(g$mg * u - round(g$mg * u)) > TOLERANCE ||
       u <= l
   ) {
     stop(

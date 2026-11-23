@@ -42,23 +42,25 @@ sd_bounds_sample <- function(
   if (is.null(n) || n < 2) {
     stop("n must be >= 2")
   }
-  if (mean < l - 1e-9 || mean > u + 1e-9) {
+  if (mean < l - TOLERANCE || mean > u + TOLERANCE) {
     stop("mean must lie in [l, u]")
   }
-  if (granularity == "integer" && abs(n * mean - round(n * mean)) > 1e-9) {
-    stop("granularity = 'integer' requires a GRIM-consistent mean (n * mean an integer)")
+  if (granularity == "integer" && abs(n * mean - round(n * mean)) > TOLERANCE) {
+    stop(
+      "granularity = 'integer' requires a GRIM-consistent mean (n * mean an integer)"
+    )
   }
 
   if (which == "max") {
     R <- u - l
     S_excess <- n * (mean - l)
-    n_u <- pmin(floor(S_excess / R + 1e-9), n - 1)
+    n_u <- pmin(floor(S_excess / R + TOLERANCE), n - 1)
     x_r <- l + (S_excess - n_u * R)
     n_l <- n - n_u - 1
     c(rep(l, n_l), x_r, rep(u, n_u))
   } else {
     v <- floor(mean)
-    n_hi <- pmin(floor(n * (mean - v) + 1e-9), n - 1) # observations at v + 1
+    n_hi <- pmin(floor(n * (mean - v) + TOLERANCE), n - 1) # observations at v + 1
     x_r <- n * mean - n_hi * (v + 1) - (n - n_hi - 1) * v # the free remainder
     c(rep(v, n - n_hi - 1), x_r, rep(v + 1, n_hi))
   }

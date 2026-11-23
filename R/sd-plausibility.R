@@ -314,7 +314,7 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
     }
     return(as.integer(t))
   }
-  h <- 0.5 * 10^-digits + 1e-9
+  h <- 0.5 * 10^-digits + TOLERANCE
   lo <- ceiling(n * (mean - l - h))
   hi <- floor(n * (mean - l + h))
   if (hi < lo) {
@@ -349,7 +349,7 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
   pa <- stats::pnorm(0, rho, tau)
   pb <- stats::pnorm(1, rho, tau)
   u <- (seq_len(K) - 0.5) / K
-  pmin(stats::qnorm(pa + (pb - pa) * u, rho, tau), 1 - 1e-9)
+  pmin(stats::qnorm(pa + (pb - pa) * u, rho, tau), 1 - TOLERANCE)
 }
 
 # Internal: lower and upper quantiles of S for one row, at every tail
@@ -397,7 +397,7 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
     )
     s <- sqrt(as.numeric(rownames(agg)) / (n * (n - 1)))
     cdf <- cumsum(agg[, 1])
-    q <- function(pp) s[which(cdf >= pp - 1e-12)[1]]
+    q <- function(pp) s[which(cdf >= pp - TOLERANCE_TIGHT)[1]]
   } else {
     scs <- lapply(rhos, function(r) {
       .s2_cumulants(.cumulants_from_pmf(.bb_pmf(m, mu, r)), n, conditional)
@@ -680,8 +680,8 @@ sd_plausibility <- function(
         digits_i,
         K
       )
-      lo_clip <- q$lower < hb[1] - 1e-12
-      hi_clip <- q$upper > hb[2] + 1e-12
+      lo_clip <- q$lower < hb[1] - TOLERANCE_TIGHT
+      hi_clip <- q$upper > hb[2] + TOLERANCE_TIGHT
       res$sigma <- sqrt(.cumulants_from_pmf(.bb_pmf(m, mu, rho_i))$k2)
       res$hard_min <- hb[1]
       res$hard_max <- hb[2]
@@ -744,7 +744,7 @@ sd_plausibility <- function(
     stop("`l` and `u` must be single finite numbers with u > l.", call. = FALSE)
   }
   m <- u - l
-  if (abs(m - round(m)) > 1e-9) {
+  if (abs(m - round(m)) > TOLERANCE) {
     stop(
       "`u - l` must be a whole number: the beta-binomial model is for ",
       "integer scores. For a mean-scored scale, convert to sum scores ",

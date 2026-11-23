@@ -19,7 +19,7 @@
       na.rm = TRUE
     ),
     ggplot2::scale_fill_manual(
-      values = c("TRUE" = "#0047ff", "FALSE" = "#ff2a00"),
+      values = c("TRUE" = COLOUR_CONSISTENT, "FALSE" = COLOUR_INCONSISTENT),
       na.value = "grey50",
       name = "Consistent",
       labels = c("TRUE" = "consistent", "FALSE" = "inconsistent")
@@ -411,8 +411,8 @@ umbrella_plot <- function(
         ggplot2::geom_tile() +
         ggplot2::scale_fill_manual(
           values = c(
-            "consistent" = "#0047ff",
-            "GRIMMER-inconsistent" = "#ff2a00",
+            "consistent" = COLOUR_CONSISTENT,
+            "GRIMMER-inconsistent" = COLOUR_INCONSISTENT,
             "out of bounds" = "grey80"
           ),
           name = NULL

@@ -19,5 +19,4 @@
 #' @seealso The package README and vignette (\code{vignette("strait")}) for a
 #'   worked example and the method background.
 #' @keywords internal
-#' @importFrom ggplot2 .data
 "_PACKAGE"

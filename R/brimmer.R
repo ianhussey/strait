@@ -173,7 +173,7 @@ brimmer <- function(
     r$sd_in_bounds <- if (is.na(r$min_sd)) {
       NA
     } else {
-      (iv$hi >= r$min_sd - 1e-9 && iv$lo <= r$max_sd + 1e-9)
+      (iv$hi >= r$min_sd - TOLERANCE && iv$lo <= r$max_sd + TOLERANCE)
     }
   }
 
@@ -206,7 +206,8 @@ brimmer <- function(
     } else {
       .unround(mean, digits_mean, rounding, "mean", "digits_mean")
     }
-    in_scale_range <- (iv$hi >= band[1] - 1e-9 && iv$lo <= band[2] + 1e-9)
+    in_scale_range <- (iv$hi >= band[1] - TOLERANCE &&
+      iv$lo <= band[2] + TOLERANCE)
   }
 
   failed <- character(0)
@@ -540,7 +541,7 @@ sd_bounds_curve <- function(
 ) {
   m <- if (scoring == "meanscored") n_items else 1L
   if (is.null(by)) {
-    by <- (u - l) / 1000
+    by <- (u - l) / MEAN_GRID_DIVISIONS
   }
   nm <- n * m
   kinks <- unique(c(
@@ -662,7 +663,7 @@ umbrella_data <- function(
     sds <- round(seq(0, ceiling(d$max_sd / step) * step, by = step), digits)
     # each SD's own rounding interval, as sd_bounds() unrounds a reported SD
     iv <- .unround(sds, digits, rounding, "sd", "digits")
-    in_bounds <- iv$hi >= d$min_sd - 1e-9 & iv$lo <= d$max_sd + 1e-9
+    in_bounds <- iv$hi >= d$min_sd - TOLERANCE & iv$lo <= d$max_sd + TOLERANCE
     # GRIMMER (the expensive per-tuple test) runs only where the SD is inside
     # the sharp bounds; outside, the tuple is already inconsistent and the
     # verdict is left NA.

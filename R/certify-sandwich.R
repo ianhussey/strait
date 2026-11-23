@@ -78,7 +78,7 @@
 # The window arrives as the real interval implied by the reported SD, with
 # endpoint inclusion flags, so an endpoint that the rounding rule excludes
 # must not be admitted even when it lands exactly on an integer.
-.k_window <- function(S, Q_lo, Q_hi, lo_incl, hi_incl, n, W, tol = 1e-9) {
+.k_window <- function(S, Q_lo, Q_hi, lo_incl, hi_incl, n, W, tol = TOLERANCE) {
   k_lo <- ceiling(Q_lo - tol)
   if (!lo_incl && abs(k_lo - Q_lo) < tol) {
     k_lo <- k_lo + 1
@@ -107,7 +107,7 @@
 # Returns a list with `possible` (TRUE, FALSE, or NA when the node budget was
 # reached before the tree was exhausted), `witness` (a non-increasing integer
 # vector on the shifted scale when possible), and `nodes` (the search cost).
-.witness_search <- function(W, n, S, k_lo, k_hi, budget = 2e5) {
+.witness_search <- function(W, n, S, k_lo, k_hi, budget = SEARCH_BUDGET) {
   # Build from the nearer wall. Under y -> W - y the sum becomes n*W - S and
   # the sum of squares shifts by n*W^2 - 2*W*S, so the window travels with it.
   flip <- 2 * S > n * W
@@ -302,7 +302,7 @@
 #
 # Returns TRUE / FALSE / NA, with NA meaning "no verdict within budget" --
 # the caller then falls back to .attainable_target().
-.certify_fast <- function(W, n, tg, budget = 2e5) {
+.certify_fast <- function(W, n, tg, budget = SEARCH_BUDGET) {
   if (is.null(tg) || !nrow(tg)) {
     return(FALSE)
   }

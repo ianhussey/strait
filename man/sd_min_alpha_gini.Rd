@@ -4,7 +4,7 @@
 \alias{sd_min_alpha_gini}
 \title{Sharp alpha-conditional composite floor via the Gini mean difference}
 \usage{
-sd_min_alpha_gini(l, u, n, mean, m, max_profiles = 5e+05)
+sd_min_alpha_gini(l, u, n, mean, m, max_profiles = MAX_GINI_PROFILES)
 }
 \arguments{
 \item{l, u}{Integer scalars, sum-score limits.}
@@ -15,7 +15,7 @@ sd_min_alpha_gini(l, u, n, mean, m, max_profiles = 5e+05)
 
 \item{m}{Numeric scalar, the reported design factor \eqn{1/(1 - c\alpha)}, \eqn{\ge 1}.}
 
-\item{max_profiles}{Numeric, enumeration budget (default 5e5).}
+\item{max_profiles}{Numeric, enumeration budget (default \code{MAX_GINI_PROFILES}).}
 }
 \value{
 Numeric scalar, the exact floor in sum-score SD units, or \code{NULL}.

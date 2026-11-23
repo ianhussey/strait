@@ -44,7 +44,7 @@
 # integer grid at all.
 .lattice_cells <- function(l, u, n, mg) {
   W <- mg * (u - l)
-  if (abs(W - round(W)) > 1e-9) {
+  if (abs(W - round(W)) > TOLERANCE) {
     return(NA_real_)
   }
   W <- as.integer(round(W))
@@ -65,7 +65,7 @@
 # the common case when screening a table of reports.
 .lattice_cache <- new.env(parent = emptyenv())
 
-.lattice_cached <- function(l, u, n, mg, max_cells = 2e7) {
+.lattice_cached <- function(l, u, n, mg, max_cells = MAX_LATTICE_CELLS) {
   key <- paste(l, u, n, mg, sep = "\r")
   hit <- get0(key, envir = .lattice_cache, inherits = FALSE)
   if (!is.null(hit)) {
@@ -107,8 +107,8 @@
   # upper, and an S sitting exactly on an excluded endpoint is not admissible.
   s_lo <- n * mg * (iv_m$lo - l)
   s_hi <- n * mg * (iv_m$hi - l)
-  s_from <- as.integer(ceiling(s_lo - 1e-9))
-  s_to <- as.integer(floor(s_hi + 1e-9))
+  s_from <- as.integer(ceiling(s_lo - TOLERANCE))
+  s_to <- as.integer(floor(s_hi + TOLERANCE))
   # seq.int() counts DOWN when from > to, so an empty range has to be caught
   # explicitly; otherwise a mean admitting no integer sum yields two phantoms
   if (s_to < s_from) {
@@ -116,10 +116,10 @@
   }
   S <- seq.int(s_from, s_to)
   if (!iv_m$lo_incl) {
-    S <- S[S > s_lo + 1e-9]
+    S <- S[S > s_lo + TOLERANCE]
   }
   if (!iv_m$hi_incl) {
-    S <- S[S < s_hi - 1e-9]
+    S <- S[S < s_hi - TOLERANCE]
   }
   S <- S[S >= 0L & S <= n * W]
   if (!length(S)) {
@@ -153,7 +153,7 @@
 # Internal: can n integers in [0, W] realise any of the given (S, Q-window)
 # targets? Exact in both directions. Returns TRUE / FALSE, or NA when the
 # corridor would still exceed max_cells (caller falls back to the lattice).
-.attainable_target <- function(W, n, tg, max_cells = 2e7) {
+.attainable_target <- function(W, n, tg, max_cells = MAX_LATTICE_CELLS) {
   if (is.null(tg) || !nrow(tg)) {
     return(FALSE)
   }
@@ -168,11 +168,11 @@
 
   # R = W*S - Q, on the same reduced axis the full lattice uses. Every term
   # y(W - y) is divisible by g, so R always is.
-  r_lo <- ceiling((W * tg$S - tg$Q_hi) / g - 1e-9)
-  r_hi <- floor((W * tg$S - tg$Q_lo) / g + 1e-9)
+  r_lo <- ceiling((W * tg$S - tg$Q_hi) / g - TOLERANCE)
+  r_hi <- floor((W * tg$S - tg$Q_lo) / g + TOLERANCE)
   # a strictly excluded SD endpoint cannot supply a target state exactly on it
-  ex_hi <- !tg$hi_incl & abs((W * tg$S - tg$Q_hi) / g - r_lo) < 1e-9
-  ex_lo <- !tg$lo_incl & abs((W * tg$S - tg$Q_lo) / g - r_hi) < 1e-9
+  ex_hi <- !tg$hi_incl & abs((W * tg$S - tg$Q_hi) / g - r_lo) < TOLERANCE
+  ex_lo <- !tg$lo_incl & abs((W * tg$S - tg$Q_lo) / g - r_hi) < TOLERANCE
   r_lo <- r_lo + ex_hi
   r_hi <- r_hi - ex_lo
   keep <- r_hi >= 0 & r_lo <= n * pm & r_lo <= r_hi

@@ -61,7 +61,7 @@ bessel_factor <- function(n) sqrt(n / (n - 1))
 #' @param tol Numeric tolerance for snapping to the nearest integer.
 #' @return `x - floor(x)`, in `[0, 1)`, dust near either integer snapped to 0.
 #' @keywords internal
-frac <- function(x, tol = 1e-9) {
+frac <- function(x, tol = TOLERANCE) {
   r <- x - floor(x)
   ifelse(r < tol | r > 1 - tol, 0, r)
 }
@@ -76,7 +76,7 @@ frac <- function(x, tol = 1e-9) {
 #' @param tol Numeric tolerance on `n * mean`'s distance from an integer.
 #' @return Logical scalar.
 #' @keywords internal
-is_grim_consistent <- function(mean, n, tol = 1e-9) {
+is_grim_consistent <- function(mean, n, tol = TOLERANCE) {
   abs(n * mean - round(n * mean)) < tol
 }
 
@@ -185,7 +185,7 @@ sd_max_muilwijk <- function(mean, n, lower, upper) {
 sd_max_structure_s <- function(mean, n, lower, upper) {
   R <- upper - lower
   S_excess <- n * (mean - lower)
-  n_u <- pmin(floor(S_excess / R + 1e-9), n - 1)
+  n_u <- pmin(floor(S_excess / R + TOLERANCE), n - 1)
   n_l <- n - n_u - 1
   # deviations from the mean, each found from e = mean - lower: the sum of
   # squares is tiny next to a wall, and as a difference of squared raw values,
@@ -419,10 +419,10 @@ v_max_alpha <- function(mean_sum, k, n, item_l, item_u) {
   h <- (item_u - item_l) / n
   T_ <- (mean_sum - k * item_l) / h
   x <- T_ / k
-  j <- pmin(floor(x + 1e-12), n - 1)
+  j <- pmin(floor(x + TOLERANCE_TIGHT), n - 1)
   th <- x - j
-  phi <- T_ - floor(T_ + 1e-12)
-  phi <- ifelse(phi > 1 - 1e-9, 0, phi)
+  phi <- T_ - floor(T_ + TOLERANCE_TIGHT)
+  phi <- ifelse(phi > 1 - TOLERANCE, 0, phi)
   A <- function(jj) h^2 * jj * (n - jj)
   pmax(
     0,
@@ -467,12 +467,19 @@ v_max_alpha <- function(mean_sum, k, n, item_l, item_u) {
 #' @param n Integer scalar, sample size.
 #' @param mean Numeric scalar, sum-score mean (with \eqn{n \cdot mean} an integer).
 #' @param m Numeric scalar, the reported design factor \eqn{1/(1 - c\alpha)}, \eqn{\ge 1}.
-#' @param max_profiles Numeric, enumeration budget (default 5e5).
+#' @param max_profiles Numeric, enumeration budget (default `MAX_GINI_PROFILES`).
 #' @return Numeric scalar, the exact floor in sum-score SD units, or `NULL`.
 #' @keywords internal
-sd_min_alpha_gini <- function(l, u, n, mean, m, max_profiles = 5e5) {
+sd_min_alpha_gini <- function(
+  l,
+  u,
+  n,
+  mean,
+  m,
+  max_profiles = MAX_GINI_PROFILES
+) {
   N <- round(n * mean)
-  if (abs(n * mean - N) > 1e-9) {
+  if (abs(n * mean - N) > TOLERANCE) {
     return(NULL)
   } # no integer composite
   target <- N - n * l # required sum of (value - l)
@@ -496,7 +503,7 @@ sd_min_alpha_gini <- function(l, u, n, mean, m, max_profiles = 5e5) {
 # decides which profiles can support the reported alpha.
 .gini_envelope_cache <- new.env(parent = emptyenv())
 
-.alpha_gini_envelope <- function(l, u, n, m, max_profiles = 5e5) {
+.alpha_gini_envelope <- function(l, u, n, m, max_profiles = MAX_GINI_PROFILES) {
   key <- paste(l, u, n, signif(m, 12), max_profiles, sep = "|")
   hit <- .gini_envelope_cache[[key]]
   if (!is.null(hit)) {
@@ -523,7 +530,7 @@ sd_min_alpha_gini <- function(l, u, n, mean, m, max_profiles = 5e5) {
     }
   }
   mmax <- ifelse(G2 > 0, n * SS / G2, 0) # m_max(S) = n SS / (n V_min)
-  ok <- mmax >= m - 1e-9 & SS > 1e-12 # non-constant, supports alpha
+  ok <- mmax >= m - TOLERANCE & SS > TOLERANCE_TIGHT # non-constant, supports alpha
   res <- if (!any(ok)) {
     list(target = integer(0), ss = numeric(0))
   } else {
@@ -568,7 +575,7 @@ sd_bounds_alpha <- function(l, u, n, mean, granularity, alpha, k_items) {
   k <- k_items
   cc <- (k - 1) / k
   D <- 1 - cc * alpha # k - (k-1) alpha = k * D
-  if (D <= 1e-12) {
+  if (D <= TOLERANCE_TIGHT) {
     stop("alpha too high for this k: 1 - alpha*(k-1)/k must be positive")
   }
 
@@ -594,7 +601,7 @@ sd_bounds_alpha <- function(l, u, n, mean, granularity, alpha, k_items) {
       env <- sd_min_alpha_gini(l, u, n, mean, m = 1 / D)
       if (is.null(env)) {
         note <- "exact alpha floor (Theorem H5) not evaluated (n*mean non-integer or composite window over budget); proven amplified floor used, conservative near whole-number means"
-      } else if (env > floor_ + 1e-12) {
+      } else if (env > floor_ + TOLERANCE_TIGHT) {
         floor_ <- env
         floor_rule <- "alpha-conditional Gini envelope floor (Theorem H5)"
       }
@@ -603,7 +610,7 @@ sd_bounds_alpha <- function(l, u, n, mean, granularity, alpha, k_items) {
   list(
     min_sd = floor_,
     max_sd = ceiling,
-    feasible = floor_ <= ceiling + 1e-9,
+    feasible = floor_ <= ceiling + TOLERANCE,
     min_rule = floor_rule,
     note = note
   )
@@ -673,7 +680,7 @@ ROUNDING_METHODS <- c(
 # exactly as scrutiny does. Vectorised over `x`. `arg` and `arg_digits` name
 # the arguments in errors.
 .unround <- function(x, digits, rounding, arg = "x", arg_digits = "digits") {
-  if (any(abs(x - round(x, digits)) > 1e-9 * pmax(1, abs(x)))) {
+  if (any(abs(x - round(x, digits)) > TOLERANCE * pmax(1, abs(x)))) {
     stop(
       sprintf(
         "`%s` has more decimal places than `%s` states (%s)",

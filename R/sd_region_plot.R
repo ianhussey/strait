@@ -35,7 +35,8 @@
     ),
     sumscored = {
       if (
-        abs(l / k - round(l / k)) > 1e-9 || abs(u / k - round(u / k)) > 1e-9
+        abs(l / k - round(l / k)) > TOLERANCE ||
+          abs(u / k - round(u / k)) > TOLERANCE
       ) {
         stop(
           "scoring = 'sumscored' needs l and u divisible by n_items ",
@@ -105,9 +106,15 @@
 #
 # Shifted whole-block ORs are used rather than scattering into which(...)
 # indices: the block form is what lets (3) and (4) restrict the work.
-.attainable_lattice <- function(l, u, n, mg = 1, max_cells = 2e7) {
+.attainable_lattice <- function(
+  l,
+  u,
+  n,
+  mg = 1,
+  max_cells = MAX_LATTICE_CELLS
+) {
   W <- mg * (u - l)
-  if (abs(W - round(W)) > 1e-9) {
+  if (abs(W - round(W)) > TOLERANCE) {
     stop("l, u and n_items must put the scale limits on the integer grid")
   }
   W <- as.integer(round(W))
@@ -384,7 +391,9 @@ sd_region_data <- function(
       )
       out <- merge(out, bd, by = "mean")
       out <- out[
-        out$ok & out$sd >= out$min_sd - 1e-9 & out$sd <= out$max_sd + 1e-9,
+        out$ok &
+          out$sd >= out$min_sd - TOLERANCE &
+          out$sd <= out$max_sd + TOLERANCE,
         c("mean", "sd"),
         drop = FALSE
       ]
@@ -397,7 +406,7 @@ sd_region_data <- function(
   }
 
   if (is.null(by)) {
-    by <- (u - l) / 1000
+    by <- (u - l) / MEAN_GRID_DIVISIONS
   }
   m <- seq(l, u, by = by)
   q <- .quasi_band(m, n, l, u, g$mg)
@@ -430,7 +439,7 @@ sd_region_data <- function(
       if (k < 2) {
         stop("rule = 'alpha' needs n_items >= 2 (alpha is inert at one item)")
       }
-      if (D <= 1e-12) {
+      if (D <= TOLERANCE_TIGHT) {
         stop("alpha too high for this n_items")
       }
       ceil_a <- sqrt(
@@ -447,7 +456,7 @@ sd_region_data <- function(
     }
   )
   # an empty band (floor above ceiling) is infeasible, not a negative region
-  bad <- d$min_sd > d$max_sd + 1e-12
+  bad <- d$min_sd > d$max_sd + TOLERANCE_TIGHT
   d$min_sd[bad] <- NA_real_
   d$max_sd[bad] <- NA_real_
   d <- tibble::as_tibble(d)

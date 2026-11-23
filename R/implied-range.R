@@ -146,7 +146,7 @@ implied_range <- function(
   # ok(0) is known to hold. In grid steps for granular data.
   first_failure <- function(ok, d_max) {
     if (granular) {
-      k_max <- floor(d_max / unit + 1e-9)
+      k_max <- floor(d_max / unit + TOLERANCE)
       if (k_max < 1 || ok(k_max * unit)) {
         return(NA)
       }
@@ -174,11 +174,11 @@ implied_range <- function(
   # observation lies that far in: on the grid of integer data, the bound is
   # the grid value just outside d.
   d_room <- function(to_mean) {
-    min(to_mean, span - if (granular) unit else 1e-9 * span)
+    min(to_mean, span - if (granular) unit else TOLERANCE * span)
   }
   back <- if (granularity == "integer") unit else 0
   # where nothing is forced, the mean's interval, snapped inward to that grid
-  snap <- function(d) if (back > 0) floor(d / back + 1e-9) * back else d
+  snap <- function(d) if (back > 0) floor(d / back + TOLERANCE) * back else d
 
   min_at_most <- if (!is.null(a)) {
     a
