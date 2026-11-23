@@ -68,15 +68,17 @@ implied_range <- function(
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1
 ) {
-  granularity <- match.arg(granularity)
-  scoring <- match.arg(scoring)
+  granularity <- rlang::arg_match(granularity)
+  scoring <- rlang::arg_match(scoring)
   if (is.null(sd)) {
-    stop("implied_range() needs a reported sd")
+    cli::cli_abort("{.fn implied_range} needs a reported {.arg sd}")
   }
   lower <- if (!is.null(a)) a else l
   upper <- if (!is.null(b)) b else u
   if (is.null(lower) || is.null(upper)) {
-    stop("implied_range() needs both scale limits (l or a, and u or b)")
+    cli::cli_abort(
+      "{.fn implied_range} needs both scale limits ({.arg l} or {.arg a}, and {.arg u} or {.arg b})"
+    )
   }
 
   consistent <- function(l, u, a, b) {
@@ -129,7 +131,7 @@ implied_range <- function(
     ))
   }
 
-  iv <- if (is.null(mean)) {
+  interval <- if (is.null(mean)) {
     list(lo = lower, hi = upper)
   } else if (is.null(rounding)) {
     list(lo = mean, hi = mean)
@@ -185,18 +187,18 @@ implied_range <- function(
   } else {
     d <- first_failure(
       function(d) consistent(lower + d, u, NULL, b),
-      d_room(iv$hi - lower)
+      d_room(interval$hi - lower)
     )
-    if (is.na(d)) lower + snap(iv$hi - lower) else lower + d - back
+    if (is.na(d)) lower + snap(interval$hi - lower) else lower + d - back
   }
   max_at_least <- if (!is.null(b)) {
     b
   } else {
     d <- first_failure(
       function(d) consistent(l, upper - d, a, NULL),
-      d_room(upper - iv$lo)
+      d_room(upper - interval$lo)
     )
-    if (is.na(d)) upper - snap(upper - iv$lo) else upper - d + back
+    if (is.na(d)) upper - snap(upper - interval$lo) else upper - d + back
   }
   result(min_at_most, max_at_least)
 }

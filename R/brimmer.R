@@ -112,10 +112,12 @@ brimmer <- function(
   alpha = NULL
 ) {
   if (is.null(sd) && is.null(mean)) {
-    stop("brimmer() needs a reported sd, a reported mean, or both")
+    cli::cli_abort(
+      "{.fn brimmer} needs a reported sd, a reported mean, or both"
+    )
   }
   if (is.null(n)) {
-    stop("brimmer() requires n")
+    cli::cli_abort("{.fn brimmer} requires {.arg n}")
   }
 
   # scrutiny's NA rule: a missing input gives a missing verdict, rather than a
@@ -133,12 +135,9 @@ brimmer <- function(
     n_items = n_items,
     alpha = alpha
   )
-  na_in <- names(supplied)[vapply(
+  na_in <- names(supplied)[purrr::map_lgl(
     supplied,
-    function(v) {
-      length(v) == 1L && is.na(v)
-    },
-    logical(1)
+    \(value) length(value) == 1L && is.na(value)
   )]
   if (length(na_in)) {
     return(brimmer_na(paste("missing input:", paste(na_in, collapse = ", "))))
@@ -146,7 +145,7 @@ brimmer <- function(
 
   # a mean-free check is legitimate (e.g. sd vs the parity ceiling), but
   # rounding then applies to the sd only
-  r <- sd_bounds(
+  bounds <- sd_bounds(
     l = l,
     u = u,
     a = a,
@@ -167,13 +166,16 @@ brimmer <- function(
   # the sd's own interval if rounding is in force
   if (is.null(mean) && !is.null(rounding)) {
     if (is.null(digits_sd)) {
-      stop("rounding requires digits_sd for the reported sd")
+      cli::cli_abort(
+        "{.arg rounding} requires {.arg digits_sd} for the reported sd"
+      )
     }
-    iv <- unround_reported(sd, digits_sd, rounding, "sd", "digits_sd")
-    r$sd_in_bounds <- if (is.na(r$min_sd)) {
+    interval <- unround_reported(sd, digits_sd, rounding, "sd", "digits_sd")
+    bounds$sd_in_bounds <- if (is.na(bounds$min_sd)) {
       NA
     } else {
-      (iv$hi >= r$min_sd - TOLERANCE && iv$lo <= r$max_sd + TOLERANCE)
+      (interval$hi >= bounds$min_sd - TOLERANCE &&
+        interval$lo <= bounds$max_sd + TOLERANCE)
     }
   }
 
@@ -201,36 +203,36 @@ brimmer <- function(
       upper_attained = !is.null(b),
       n = n
     )
-    iv <- if (is.null(rounding)) {
+    interval <- if (is.null(rounding)) {
       list(lo = mean, hi = mean)
     } else {
       unround_reported(mean, digits_mean, rounding, "mean", "digits_mean")
     }
-    in_scale_range <- (iv$hi >= band[1] - TOLERANCE &&
-      iv$lo <= band[2] + TOLERANCE)
+    in_scale_range <- (interval$hi >= band[1] - TOLERANCE &&
+      interval$lo <= band[2] + TOLERANCE)
   }
 
   failed <- character(0)
   if (isFALSE(in_scale_range)) {
     failed <- c(failed, "in_scale_range")
   }
-  if (isFALSE(r$sd_in_bounds)) {
+  if (isFALSE(bounds$sd_in_bounds)) {
     failed <- c(failed, "bounds")
   }
-  if (isFALSE(r$grim)) {
+  if (isFALSE(bounds$grim)) {
     failed <- c(failed, "grim")
   }
-  if (isFALSE(r$grimmer)) {
+  if (isFALSE(bounds$grimmer)) {
     failed <- c(failed, "grimmer")
   }
   # `feasibility` is now the residual: the constraint set admits no sample for
   # a reason none of the named tests above already accounts for (e.g. an alpha
   # floor exceeding the alpha ceiling, or a GRIM divergence from scrutiny).
-  if (!isTRUE(r$feasible) && !length(failed)) {
+  if (!isTRUE(bounds$feasible) && !length(failed)) {
     failed <- c(failed, "feasibility")
   }
 
-  note <- r$note
+  note <- bounds$note
   if (identical(failed, "grimmer")) {
     caveat <- "only GRIMMER failed while feasibility and bounds pass; scrutiny's GRIMMER has documented false-flag cases - verify before flagging"
     note <- if (is.na(note)) caveat else paste(note, caveat, sep = "; ")
@@ -239,8 +241,8 @@ brimmer <- function(
   pomp <- pomp_cols(
     mean,
     sd,
-    r$min_sd,
-    r$max_sd,
+    bounds$min_sd,
+    bounds$max_sd,
     eff_lower,
     eff_upper,
     n,
@@ -252,13 +254,13 @@ brimmer <- function(
     list(
       consistent = length(failed) == 0,
       failed_tests = paste(failed, collapse = ","),
-      min_sd = r$min_sd,
-      max_sd = r$max_sd,
-      feasible = r$feasible,
+      min_sd = bounds$min_sd,
+      max_sd = bounds$max_sd,
+      feasible = bounds$feasible,
       in_scale_range = in_scale_range,
-      grim = r$grim,
-      grimmer = r$grimmer,
-      sd_in_bounds = r$sd_in_bounds,
+      grim = bounds$grim,
+      grimmer = bounds$grimmer,
+      sd_in_bounds = bounds$sd_in_bounds,
       pomp_mean = pomp$pomp_mean,
       pomp_sd_parity = pomp$pomp_sd_parity,
       pomp_sd_sharp = pomp$pomp_sd_sharp,
@@ -341,12 +343,12 @@ brim <- function(
   n_items = 1
 ) {
   if (is.null(mean)) {
-    stop("brim() checks a reported mean: mean is required")
+    cli::cli_abort("{.fn brim} checks a reported mean: mean is required")
   }
   # sd = NULL, not NA: NULL is this package's "not supplied", whereas an NA
   # would propagate through the bounds arithmetic instead of switching the
   # SD-side tests off
-  r <- brimmer(
+  checked <- brimmer(
     l = l,
     u = u,
     a = a,
@@ -372,9 +374,14 @@ brim <- function(
   )
   tibble::new_tibble(
     c(
-      as.list(r[c("consistent", "failed_tests", "in_scale_range", "grim")]),
+      as.list(checked[c(
+        "consistent",
+        "failed_tests",
+        "in_scale_range",
+        "grim"
+      )]),
       list(band_lo = band[1], band_hi = band[2]),
-      as.list(r[c("pomp_mean", "note")])
+      as.list(checked[c("pomp_mean", "note")])
     ),
     nrow = 1L
   )
@@ -416,7 +423,7 @@ brim <- function(
 #' @export
 brimmer_map <- function(data, ..., include_inputs = TRUE) {
   if (!is.data.frame(data)) {
-    stop("data must be a data frame")
+    cli::cli_abort("{.arg data} must be a data frame")
   }
   arg_names <- c(
     "l",
@@ -437,64 +444,63 @@ brimmer_map <- function(data, ..., include_inputs = TRUE) {
   consts <- list(...)
   unknown <- setdiff(names(consts), arg_names)
   if (length(unknown)) {
-    stop("unknown constant argument(s): ", paste(unknown, collapse = ", "))
+    cli::cli_abort("unknown constant argument(s): {.arg {unknown}}")
   }
-  N <- nrow(data)
-  resolve <- function(nm) {
-    incol <- nm %in% names(data)
-    incon <- nm %in% names(consts) && !is.null(consts[[nm]])
-    if (incol && incon) {
-      stop(sprintf("'%s' supplied as both a column and a constant", nm))
+  n_rows <- nrow(data)
+  error_call <- rlang::current_env()
+  resolve <- function(name) {
+    in_data <- name %in% names(data)
+    in_consts <- name %in% names(consts) && !is.null(consts[[name]])
+    if (in_data && in_consts) {
+      cli::cli_abort(
+        "{.val {name}} supplied as both a column and a constant",
+        call = error_call
+      )
     }
-    v <- if (incol) {
-      data[[nm]]
-    } else if (incon) {
-      rep(consts[[nm]], length.out = N)
+    values <- if (in_data) {
+      data[[name]]
+    } else if (in_consts) {
+      rep(consts[[name]], length.out = n_rows)
     }
-    if (is.factor(v)) as.character(v) else v
+    if (is.factor(values)) as.character(values) else values
   }
-  cols <- lapply(arg_names, resolve)
-  names(cols) <- arg_names
-  present <- arg_names[!vapply(cols, is.null, logical(1))]
+  cols <- purrr::map(rlang::set_names(arg_names), resolve)
+  present <- arg_names[!purrr::map_lgl(cols, is.null)]
   # a constant given as NULL on purpose, such as rounding = NULL for exact
   # inputs, is passed on rather than replaced by brimmer()'s default
-  null_consts <- names(consts)[vapply(consts, is.null, logical(1))]
+  null_consts <- names(consts)[purrr::map_lgl(consts, is.null)]
   if (!("sd" %in% present)) {
-    stop("a reported sd is required (as a column of data or a constant)")
+    cli::cli_abort(
+      "a reported {.arg sd} is required (as a column of data or a constant)"
+    )
   }
 
   # de-duplicate identical input tuples; compute once per unique tuple
-  key <- do.call(
-    paste,
-    c(
-      lapply(present, function(nm) {
-        format(cols[[nm]], nsmall = 6, trim = TRUE)
-      }),
-      sep = "\r"
-    )
+  formatted <- purrr::map(
+    unname(cols[present]),
+    \(column) format(column, nsmall = 6, trim = TRUE)
   )
-  uk_idx <- which(!duplicated(key))
-  back <- match(key, key[uk_idx])
-  res_uni <- do.call(
-    rbind,
-    lapply(uk_idx, function(i) {
-      args <- lapply(present, function(nm) cols[[nm]][i])
-      names(args) <- present
+  key <- do.call(paste, c(formatted, sep = "\r"))
+  unique_rows <- which(!duplicated(key))
+  back <- match(key, key[unique_rows])
+  results_unique <- unique_rows |>
+    purrr::map(\(i) {
+      args <- purrr::map(cols[present], \(column) column[i])
       args[null_consts] <- list(NULL)
       do.call(brimmer, args)
-    })
-  )
-  res <- res_uni[back, , drop = FALSE]
-  if (include_inputs) bind_inputs(data, res) else res
+    }) |>
+    dplyr::bind_rows()
+  out <- results_unique[back, , drop = FALSE]
+  if (include_inputs) bind_inputs(data, out) else out
 }
 
 # Internal: the inputs, then the results, as one tibble. Names are kept as
 # they are, so an input column that shares a result's name stays visible.
-bind_inputs <- function(data, res) {
-  tibble::as_tibble(
-    cbind(as.data.frame(data), as.data.frame(res)),
-    .name_repair = "minimal"
-  )
+bind_inputs <- function(data, results) {
+  data |>
+    as.data.frame() |>
+    dplyr::bind_cols(results, .name_repair = "minimal") |>
+    tibble::as_tibble(.name_repair = "minimal")
 }
 
 # ---- Layer 7: bound curves, umbrella grid, and plots -------------------------
@@ -548,34 +554,34 @@ sd_bounds_curve <- function(
     seq(ceiling(l * nm), floor(u * nm)) / nm,
     seq(ceiling(l * m), floor(u * m)) / m
   ))
-  means <- sort(unique(pmin(
-    u,
-    pmax(l, c(seq(l, u, by = by), kinks, kinks + 1e-9, kinks - 1e-9))
-  )))
+  means <- c(seq(l, u, by = by), kinks, kinks + 1e-9, kinks - 1e-9) |>
+    pmax(l) |>
+    pmin(u) |>
+    unique() |>
+    sort()
   # one row per mean, collected column-wise: binding thousands of one-row
   # tables took longer than computing the bounds
   rows <- means |>
-    lapply(\(mu) {
+    purrr::map(\(mean_current) {
       sd_bounds(
         l = l,
         u = u,
         n = n,
-        mean = mu,
+        mean = mean_current,
         granularity = granularity,
         scoring = scoring,
         n_items = n_items,
         alpha = alpha
       )
     })
-  pick <- \(name, type) vapply(rows, \(d) d[[name]], type)
-  min_sd <- pick("min_sd", numeric(1))
-  max_sd <- pick("max_sd", numeric(1))
+  min_sd <- purrr::map_dbl(rows, "min_sd")
+  max_sd <- purrr::map_dbl(rows, "max_sd")
   parity_max <- sd_max_span_n(l, u, n)
   out <- tibble::tibble(
     mean = means,
     min_sd = min_sd,
     max_sd = max_sd,
-    feasible = pick("feasible", logical(1)),
+    feasible = purrr::map_lgl(rows, "feasible"),
     pomp_mean = (means - l) / (u - l),
     parity_max = parity_max,
     ceil_parity = max_sd / parity_max,
@@ -640,16 +646,15 @@ umbrella_data <- function(
   # items averaged per observation, as in sd_bounds()
   m <- if (scoring == "meanscored") n_items else 1L
   use_grimmer <- granularity == "integer"
-  rows <- list()
-  for (mu in means) {
+  rows <- purrr::map(means, \(mean_current) {
     # sd_bounds() embeds the rounding-aware GRIM prefilter: a mean whose
     # rounding interval admits no integer sum is infeasible under strict granularity,
     # so none of its SDs need testing.
-    d <- sd_bounds(
+    bounds <- sd_bounds(
       l = l,
       u = u,
       n = n,
-      mean = mu,
+      mean = mean_current,
       digits_mean = digits,
       rounding = rounding,
       granularity = granularity,
@@ -657,20 +662,22 @@ umbrella_data <- function(
       n_items = n_items,
       alpha = alpha
     )
-    if (!isTRUE(d$feasible) || is.na(d$max_sd)) {
-      next
+    if (!isTRUE(bounds$feasible) || is.na(bounds$max_sd)) {
+      return(NULL)
     }
-    sds <- round(seq(0, ceiling(d$max_sd / step) * step, by = step), digits)
+    sds <- seq(0, ceiling(bounds$max_sd / step) * step, by = step) |>
+      round(digits)
     # each SD's own rounding interval, as sd_bounds() unrounds a reported SD
-    iv <- unround_reported(sds, digits, rounding, "sd", "digits")
-    in_bounds <- iv$hi >= d$min_sd - TOLERANCE & iv$lo <= d$max_sd + TOLERANCE
+    interval <- unround_reported(sds, digits, rounding, "sd", "digits")
+    in_bounds <- interval$hi >= bounds$min_sd - TOLERANCE &
+      interval$lo <= bounds$max_sd + TOLERANCE
     # GRIMMER (the expensive per-tuple test) runs only where the SD is inside
     # the sharp bounds; outside, the tuple is already inconsistent and the
     # verdict is left NA.
     grimmer <- rep(NA, length(sds))
     if (use_grimmer && any(in_bounds)) {
       grimmer[in_bounds] <- as.logical(scrutiny::grimmer(
-        x = mu,
+        x = mean_current,
         sd = sds[in_bounds],
         n = n,
         digits_x = digits,
@@ -682,17 +689,15 @@ umbrella_data <- function(
     }
     consistent <- in_bounds &
       (if (use_grimmer) !is.na(grimmer) & grimmer else TRUE)
-    rows[[length(rows) + 1]] <- data.frame(
-      mean = mu,
+    tibble::tibble(
+      mean = mean_current,
       sd = sds,
-      min_sd = d$min_sd,
-      max_sd = d$max_sd,
+      min_sd = bounds$min_sd,
+      max_sd = bounds$max_sd,
       in_bounds = in_bounds,
       grimmer = grimmer,
       consistent = consistent
     )
-  }
-  tibble::as_tibble(do.call(rbind, rows))
+  })
+  dplyr::bind_rows(rows)
 }
-
-# Internal: shared point layer (green/red outlined dots)

@@ -37,17 +37,17 @@ sd_bounds_sample <- function(
   which = c("max", "min"),
   granularity = c("quasiinteger", "integer")
 ) {
-  which <- match.arg(which)
-  granularity <- match.arg(granularity)
+  which <- rlang::arg_match(which)
+  granularity <- rlang::arg_match(granularity)
   if (is.null(n) || n < 2) {
-    stop("n must be >= 2")
+    cli::cli_abort("{.arg n} must be >= 2")
   }
   if (mean < l - TOLERANCE || mean > u + TOLERANCE) {
-    stop("mean must lie in [l, u]")
+    cli::cli_abort("{.arg mean} must lie in [l, u]")
   }
   if (granularity == "integer" && abs(n * mean - round(n * mean)) > TOLERANCE) {
-    stop(
-      "granularity = 'integer' requires a GRIM-consistent mean (n * mean an integer)"
+    cli::cli_abort(
+      "{.code granularity = 'integer'} requires a GRIM-consistent mean (n * mean an integer)"
     )
   }
 

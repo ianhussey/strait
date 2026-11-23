@@ -62,8 +62,8 @@ bessel_factor <- function(n) sqrt(n / (n - 1))
 #' @return `x - floor(x)`, in `[0, 1)`, dust near either integer snapped to 0.
 #' @keywords internal
 frac <- function(x, tol = TOLERANCE) {
-  r <- x - floor(x)
-  ifelse(r < tol | r > 1 - tol, 0, r)
+  fractional <- x - floor(x)
+  dplyr::if_else(fractional < tol | fractional > 1 - tol, 0, fractional)
 }
 
 #' Is a mean GRIM-consistent?
@@ -125,7 +125,7 @@ sd_max_span <- function(lower, upper) (upper - lower) / sqrt(2)
 sd_max_span_n <- function(lower, upper, n) {
   (upper - lower) /
     2 *
-    ifelse(n %% 2 == 0, sqrt(n / (n - 1)), sqrt((n + 1) / n))
+    dplyr::if_else(n %% 2 == 0, sqrt(n / (n - 1)), sqrt((n + 1) / n))
 }
 
 #' Smooth mean-conditional maximum SD (Muilwijk / Bhatia-Davis)
@@ -328,6 +328,7 @@ sd_min_one_pin <- function(
   granularity = "continuous",
   side = c("max", "min")
 ) {
+  # match.arg(), not rlang::arg_match(): a hot path, run per mean by sd_bounds()
   side <- match.arg(side)
   # reflect the observed-minimum case onto the observed-maximum formulas
   if (side == "min") {
@@ -422,7 +423,7 @@ v_max_alpha <- function(mean_sum, k, n, item_l, item_u) {
   j <- pmin(floor(x + TOLERANCE_TIGHT), n - 1)
   th <- x - j
   phi <- T_ - floor(T_ + TOLERANCE_TIGHT)
-  phi <- ifelse(phi > 1 - TOLERANCE, 0, phi)
+  phi <- dplyr::if_else(phi > 1 - TOLERANCE, 0, phi)
   A <- function(jj) h^2 * jj * (n - jj)
   pmax(
     0,
@@ -436,12 +437,12 @@ count_vectors <- function(slots, total) {
   if (slots == 1L) {
     return(matrix(total, ncol = 1))
   }
-  do.call(
-    rbind,
-    lapply(0:total, function(k) {
-      cbind(k, count_vectors(slots - 1L, total - k))
-    })
-  )
+  # matrices, so base rbind() rather than dplyr::bind_rows()
+  0:total |>
+    purrr::map(\(count_first) {
+      cbind(count_first, count_vectors(slots - 1L, total - count_first))
+    }) |>
+    do.call(what = rbind)
 }
 
 #' Sharp alpha-conditional composite floor via the Gini mean difference
@@ -483,15 +484,15 @@ sd_min_alpha_gini <- function(
     return(NULL)
   } # no integer composite
   target <- N - n * l # required sum of (value - l)
-  env <- alpha_gini_envelope(l, u, n, m, max_profiles)
-  if (is.null(env)) {
+  envelope <- alpha_gini_envelope(l, u, n, m, max_profiles)
+  if (is.null(envelope)) {
     return(NULL)
   } # over budget -> fall back
-  i <- match(target, env$target)
+  i <- match(target, envelope$target)
   if (is.na(i)) {
     return(NULL)
   }
-  sqrt(env$ss[i] / (n - 1))
+  sqrt(envelope$ss[i] / (n - 1))
 }
 
 # Internal: the whole Gini envelope in ONE enumeration pass, memoized.
@@ -510,35 +511,35 @@ alpha_gini_envelope <- function(l, u, n, m, max_profiles = MAX_GINI_PROFILES) {
     return(if (identical(hit, NA)) NULL else hit)
   }
   W <- as.integer(round(u - l)) # composite spread
-  if (
-    W < 1L ||
-      !is.finite(suppressWarnings(choose(n + W, W))) ||
-      choose(n + W, W) > max_profiles
-  ) {
+  n_profiles <- suppressWarnings(choose(n + W, W))
+  if (W < 1L || !is.finite(n_profiles) || n_profiles > max_profiles) {
     assign(key, NA, envir = gini_envelope_cache)
     return(NULL)
   }
-  vals <- 0:W # deviations above l
-  cv <- count_vectors(W + 1L, n)
-  tot <- as.vector(cv %*% vals)
-  SS <- as.vector(cv %*% (vals^2)) - tot^2 / n # SS_S (shift-invariant)
+  values <- 0:W # deviations above l
+  counts <- count_vectors(W + 1L, n)
+  totals <- as.vector(counts %*% values)
+  SS <- as.vector(counts %*% (values^2)) - totals^2 / n # SS_S (shift-invariant)
   # Gini double-sum over unordered value pairs: sum_{a<b} c_a c_b (v_b - v_a)
-  G2 <- numeric(nrow(cv))
+  G2 <- numeric(nrow(counts))
   for (a in seq_len(W)) {
     for (b in (a + 1L):(W + 1L)) {
-      G2 <- G2 + cv[, a] * cv[, b] * (vals[b] - vals[a])
+      G2 <- G2 + counts[, a] * counts[, b] * (values[b] - values[a])
     }
   }
-  mmax <- ifelse(G2 > 0, n * SS / G2, 0) # m_max(S) = n SS / (n V_min)
+  mmax <- dplyr::if_else(G2 > 0, n * SS / G2, 0) # m_max(S) = n SS / (n V_min)
   ok <- mmax >= m - TOLERANCE & SS > TOLERANCE_TIGHT # non-constant, supports alpha
-  res <- if (!any(ok)) {
+  out <- if (!any(ok)) {
     list(target = integer(0), ss = numeric(0))
   } else {
-    agg <- tapply(SS[ok], tot[ok], min)
-    list(target = as.integer(names(agg)), ss = as.numeric(agg))
+    min_ss_by_total <- tapply(SS[ok], totals[ok], min)
+    list(
+      target = as.integer(names(min_ss_by_total)),
+      ss = as.numeric(min_ss_by_total)
+    )
   }
-  assign(key, res, envir = gini_envelope_cache)
-  res
+  assign(key, out, envir = gini_envelope_cache)
+  out
 }
 
 #' SD bounds for a k-item composite with reported Cronbach's alpha
@@ -576,14 +577,16 @@ sd_bounds_alpha <- function(l, u, n, mean, granularity, alpha, k_items) {
   cc <- (k - 1) / k
   D <- 1 - cc * alpha # k - (k-1) alpha = k * D
   if (D <= TOLERANCE_TIGHT) {
-    stop("alpha too high for this k: 1 - alpha*(k-1)/k must be positive")
+    cli::cli_abort(
+      "{.arg alpha} too high for this k: 1 - alpha*(k-1)/k must be positive"
+    )
   }
 
   ceil_free <- sd_max_structure_s(mean, n, l, u) # alpha-free sharp ceiling
   ceil_smooth <- bessel_factor(n) *
     sqrt(pmax(0, (u - mean) * (mean - l)) / (k * D))
-  ceiling <- min(ceil_free, ceil_smooth)
-  floor_ <- 0
+  ceiling_sd <- min(ceil_free, ceil_smooth)
+  floor_sd <- 0
   floor_rule <- "s >= 0"
   note <- NA_character_
   if (granularity %in% c("integer", "quasiinteger")) {
@@ -592,25 +595,25 @@ sd_bounds_alpha <- function(l, u, n, mean, granularity, alpha, k_items) {
     ceil_vmax <- sqrt(
       (n / (n - 1)) * v_max_alpha(mean, k, n, item_l, item_u) / D
     )
-    ceiling <- min(ceiling, ceil_vmax)
-    floor_ <- sd_min_quasi_integer(mean, n) / sqrt(D) # proven amplified floor
+    ceiling_sd <- min(ceiling_sd, ceil_vmax)
+    floor_sd <- sd_min_quasi_integer(mean, n) / sqrt(D) # proven amplified floor
     floor_rule <- "alpha-amplified quasi-integer floor"
     # sharpen with the exact Gini envelope for strictly integer composites; it
     # is >= the amplified floor and strictly positive at whole-number means.
     if (granularity == "integer" && alpha > 0) {
-      env <- sd_min_alpha_gini(l, u, n, mean, m = 1 / D)
-      if (is.null(env)) {
+      gini_floor <- sd_min_alpha_gini(l, u, n, mean, m = 1 / D)
+      if (is.null(gini_floor)) {
         note <- "exact alpha floor (Theorem H5) not evaluated (n*mean non-integer or composite window over budget); proven amplified floor used, conservative near whole-number means"
-      } else if (env > floor_ + TOLERANCE_TIGHT) {
-        floor_ <- env
+      } else if (gini_floor > floor_sd + TOLERANCE_TIGHT) {
+        floor_sd <- gini_floor
         floor_rule <- "alpha-conditional Gini envelope floor (Theorem H5)"
       }
     }
   }
   list(
-    min_sd = floor_,
-    max_sd = ceiling,
-    feasible = floor_ <= ceiling + TOLERANCE,
+    min_sd = floor_sd,
+    max_sd = ceiling_sd,
+    feasible = floor_sd <= ceiling_sd + TOLERANCE,
     min_rule = floor_rule,
     note = note
   )
@@ -634,7 +637,8 @@ ROUNDING_METHODS <- c(
 check_rounding <- function(
   rounding,
   allowed = ROUNDING_METHODS,
-  several = FALSE
+  several = FALSE,
+  call = rlang::caller_env()
 ) {
   old <- c(half_up = "up", half_down = "down", native = "even")
   if (
@@ -642,34 +646,23 @@ check_rounding <- function(
       !length(rounding) ||
       (!several && length(rounding) != 1L)
   ) {
-    stop(
-      "`rounding` must be ",
-      if (several) {
-        "a character vector"
-      } else {
-        "a single string"
-      },
-      " naming a rounding method",
-      call. = FALSE
+    expected <- if (several) "a character vector" else "a single string"
+    cli::cli_abort(
+      "{.arg rounding} must be {expected} naming a rounding method",
+      call = call
     )
   }
   bad <- setdiff(rounding, allowed)
   if (length(bad)) {
     hint <- intersect(bad, names(old))
-    stop(
-      "unknown rounding method(s): ",
-      paste(bad, collapse = ", "),
-      ". ",
-      if (length(hint)) {
-        paste0(
-          "strait now uses scrutiny's names: ",
-          paste0('"', hint, '" is "', old[hint], '"', collapse = ", "),
-          ". "
-        )
-      },
-      "Choose from: ",
-      paste(allowed, collapse = ", "),
-      call. = FALSE
+    renamed <- paste0('"', hint, '" is "', old[hint], '"', collapse = ", ")
+    cli::cli_abort(
+      c(
+        "unknown rounding method(s): {.val {bad}}",
+        "i" = if (length(hint)) "strait now uses scrutiny's names: {renamed}",
+        "i" = "Choose from: {.val {allowed}}"
+      ),
+      call = call
     )
   }
   rounding
@@ -684,28 +677,25 @@ unround_reported <- function(
   digits,
   rounding,
   arg = "x",
-  arg_digits = "digits"
+  arg_digits = "digits",
+  call = rlang::caller_env()
 ) {
   if (any(abs(x - round(x, digits)) > TOLERANCE * pmax(1, abs(x)))) {
-    stop(
-      sprintf(
-        "`%s` has more decimal places than `%s` states (%s)",
-        arg,
-        arg_digits,
-        paste(digits, collapse = ", ")
-      ),
-      call. = FALSE
+    digits_stated <- paste(digits, collapse = ", ")
+    cli::cli_abort(
+      "{.arg {arg}} has more decimal places than {.arg {arg_digits}} states ({digits_stated})",
+      call = call
     )
   }
-  r <- roundwork::unround(
+  interval <- roundwork::unround(
     round(x, digits),
     rounding = rounding,
     digits = digits
   )
   list(
-    lo = r$lower,
-    hi = r$upper,
-    lo_incl = r$incl_lower,
-    hi_incl = r$incl_upper
+    lo = interval$lower,
+    hi = interval$upper,
+    lo_incl = interval$incl_lower,
+    hi_incl = interval$incl_upper
   )
 }
