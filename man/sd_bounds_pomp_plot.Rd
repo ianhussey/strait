@@ -16,7 +16,7 @@ sd_bounds_pomp_plot(
 
 \item{reports}{Optional data frame of reported values, with \code{pomp_mean} and
 \code{pomp_sd_parity} / \code{pomp_sd_sharp} and \code{consistent} (e.g. from
-\code{\link[=brimmer_multiple]{brimmer_multiple()}}).}
+\code{\link[=brimmer_map]{brimmer_map()}}).}
 
 \item{reference}{\code{"sharp"} (default) or \code{"parity"}.}
 

@@ -38,25 +38,25 @@ For a reported mean `M`, sample size `n` and scale limits `l`, `u`, `sd_bounds()
 - scale limits `l`, `u` give the largest possible SD (observations pushed to the two extremes);
 - adding `n`, then the mean, sharpens the ceiling further;
 - **attained extremes** `a`, `b` (an observation is known to equal each) create a nonzero floor;
-- **granularity** `Z` (`"integer"` or the GRIM-free `"quasiinteger"`) adds the floor below which no discrete data can sit;
+- **granularity** `granularity` (`"integer"` or the GRIM-free `"quasiinteger"`) adds the floor below which no discrete data can sit;
 - a reported **Cronbach's alpha** tightens the bounds of a multi-item composite.
 
 The two tests mirror the GRIM / GRIMMER pair, and nest the same way:
 
-- **`brim()`** — the mean-side test. Can the reported mean be attained at all, given the scale limits, `n`, and any reported attained extremes? Bounds only, so it applies to continuous data too. Under `Z = "integer"` it also runs GRIM (deferred to `scrutiny`), but never GRIMMER.
+- **`brim()`** — the mean-side test. Can the reported mean be attained at all, given the scale limits, `n`, and any reported attained extremes? Bounds only, so it applies to continuous data too. Under `granularity = "integer"` it also runs GRIM (deferred to `scrutiny`), but never GRIMMER.
 - **`brimmer()`** — the SD-side test, nested on top of `brim()`: it applies the mean-side check and then asks whether the reported SD lies inside `[min_sd, max_sd]`.
 
 Each failure is named separately in `failed_tests`, so an out-of-range mean (`in_scale_range`) is never confused with a granularity-impossible one (`grim`):
 
 ```r
-brim(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2, Z = "integer")
+brim(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2, granularity = "integer")
 #> # A tibble: 1 × 8
 #>   consistent failed_tests in_scale_range grim  band_lo band_hi pomp_mean note
 #>   <lgl>      <chr>        <lgl>          <lgl>   <dbl>   <dbl>     <dbl> <chr>
 #> 1 FALSE      grim         TRUE           FALSE       1       7     0.418 no GRI…
 ```
 
-`brimmer()` also adds Percent-Of-Maximum-Possible (POMP) transforms of the mean and SD so results from different scales can be compared on one axis. `brimmer_multiple()` applies it across a data frame.
+`brimmer()` also adds Percent-Of-Maximum-Possible (POMP) transforms of the mean and SD so results from different scales can be compared on one axis. `brimmer_map()` applies it across a data frame.
 
 `umbrella_data()` builds the full grid of reported means and SDs for a design, tagging each as consistent, GRIMMER-inconsistent or out of bounds, which `umbrella_plot()` renders as the characteristic "umbrella" of feasible values.
 
@@ -107,19 +107,19 @@ the repository for exact certification and how it compares with CLOSURE.
 library(strait)
 
 # The feasible SD range for a reported mean on a 1-5 integer scale
-sd_bounds(l = 1, u = 5, n = 30, mean = 3.2, Z = "integer")
+sd_bounds(l = 1, u = 5, n = 30, mean = 3.2, granularity = "integer")
 
 # Check a reported mean alone: is it attainable within the scale at all?
-brim(l = 1, u = 5, n = 30, mean = 3.20, digits_mean = 2, Z = "integer")
+brim(l = 1, u = 5, n = 30, mean = 3.20, digits_mean = 2, granularity = "integer")
 
 # Check a reported mean and SD (as printed in a paper: value + decimal places)
 brimmer(l = 1, u = 5, n = 30, mean = 3.20, digits_mean = 2,
-        sd = 0.80, digits_sd = 2, Z = "integer")
+        sd = 0.80, digits_sd = 2, granularity = "integer")
 ```
 
 ### Checking a table of reported statistics
 
-`brimmer_multiple()` applies the check row-by-row over a data frame, taking per-row values from columns of the same name and broadcasting anything passed as a constant:
+`brimmer_map()` applies the check row-by-row over a data frame, taking per-row values from columns of the same name and broadcasting anything passed as a constant:
 
 ```r
 dat <- data.frame(
@@ -129,17 +129,17 @@ dat <- data.frame(
   u    = c(  7,   7,   5,   7)
 )
 
-brimmer_multiple(dat, l = 1, digits_mean = 1, digits_sd = 1, Z = "integer")
+brimmer_map(dat, l = 1, digits_mean = 1, digits_sd = 1, granularity = "integer")
 ```
 
 ### Visualising the feasible region
 
 ```r
 # The SD-bounds envelope for a single design, with reported points overlaid
-curve  <- sd_bounds_curve(l = 1, u = 7, n = 15, Z = "quasiinteger")
-points <- brimmer_multiple(
+curve  <- sd_bounds_curve(l = 1, u = 7, n = 15, granularity = "quasiinteger")
+points <- brimmer_map(
   data.frame(mean = 5.07, sd = 2.92),
-  l = 1, u = 7, n = 15, digits_mean = 2, digits_sd = 2, Z = "quasiinteger")
+  l = 1, u = 7, n = 15, digits_mean = 2, digits_sd = 2, granularity = "quasiinteger")
 sd_bounds_plot(curve, reports = points)
 
 # The same on a standardised POMP scale so different designs can be pooled
@@ -154,12 +154,12 @@ umbrella_data(l = 1, u = 7, n = 14, digits = 2) |>
 
 | function | purpose |
 |---|---|
-| `sd_bounds(l, u, a, b, n, mean, Z, scoring, n_items, alpha, ...)` | the smallest and largest sample SD consistent with the constraints supplied, in closed form |
-| `brim(l, u, a, b, n, mean, digits_mean, Z, ...)` | the mean-side test: is the reported mean attainable within the scale limits (and, under `Z = "integer"`, GRIM)? |
+| `sd_bounds(l, u, a, b, n, mean, granularity, scoring, n_items, alpha, ...)` | the smallest and largest sample SD consistent with the constraints supplied, in closed form |
+| `brim(l, u, a, b, n, mean, digits_mean, granularity, ...)` | the mean-side test: is the reported mean attainable within the scale limits (and, under `granularity = "integer"`, GRIM)? |
 | `brimmer(...)` | the SD-side test, nested on `brim()`: turn the bounds into a consistent/inconsistent verdict with POMP transforms; defers GRIM/GRIMMER to `scrutiny` |
-| `brimmer_multiple(data, ...)` | apply `brimmer()` to each row of a data frame |
+| `brimmer_map(data, ...)` | apply `brimmer()` to each row of a data frame |
 | `brimmest(l, u, n, mean, sd, digits_mean, digits_sd, ...)` | exact possible / impossible certificate for reported tuples, by analytic enumeration of the attainable lattice (no dataset reconstruction) |
-| `brimmest_multiple(data, ...)` | the same certificate across a data frame, grouping rows by design so one lattice serves them all |
+| `brimmest_map(data, ...)` | the same certificate across a data frame, grouping rows by design so one lattice serves them all |
 | `sd_bounds_curve(l, u, n, ...)` | trace the floor and ceiling of the SD across the mean (hole-free under `"quasiinteger"`) |
 | `umbrella_data(l, u, n, ...)` | build the grid of reported (mean, SD) pairs with their consistency verdicts |
 | `sd_bounds_plot(data, ...)` | plot the SD-bounds envelope on the native scale, with reported values |

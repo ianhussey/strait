@@ -464,7 +464,7 @@ brimmest <- function(
 #' Applies [brimmest()] to each row of a data frame. Columns of `data` whose
 #' names match [brimmest()] arguments are taken per row; any argument given in
 #' `...` is a constant broadcast to every row. Supplying one name both ways is
-#' an error. The counterpart of [brimmer_multiple()] for the exact test.
+#' an error. The counterpart of [brimmer_map()] for the exact test.
 #'
 #' Rows are **grouped by design** and each group certified in a single
 #' [brimmest()] call, which is the whole point of the function: one attainable
@@ -491,7 +491,7 @@ brimmest <- function(
 #'   none), optionally with `data` prepended. Unlike [brimmest()], the reported
 #'   `mean` and `sd` are not echoed back: they are already columns of `data`
 #'   when supplied that way, and repeating them would collide.
-#' @seealso [brimmest()] for one design at a time, [brimmer_multiple()] for the
+#' @seealso [brimmest()] for one design at a time, [brimmer_map()] for the
 #'   closed-form screen to run first.
 #' @examples
 #' reports <- data.frame(mean = c(3.0, 1.3, 2.5),
@@ -500,17 +500,17 @@ brimmest <- function(
 #' # one design, one lattice. Rows 2 and 3 are both impossible, for different
 #' # reasons: row 3 already fails GRIM and GRIMMER, while row 2 clears every
 #' # closed-form screen and is caught only here.
-#' brimmest_multiple(reports, l = 1, u = 5, n = 9, digits_mean = 1,
+#' brimmest_map(reports, l = 1, u = 5, n = 9, digits_mean = 1,
 #'                   digits_sd = 1)
 #'
 #' # designs may vary per row; rows sharing one are certified together
 #' mixed <- data.frame(mean = c(3.0, 1.3, 4.0),
 #'                     sd   = c(1.0, 0.9, 1.5),
 #'                     n    = c(9, 9, 12))
-#' brimmest_multiple(mixed, l = 1, u = 5, digits_mean = 1, digits_sd = 1,
+#' brimmest_map(mixed, l = 1, u = 5, digits_mean = 1, digits_sd = 1,
 #'                   include_inputs = FALSE)
 #' @export
-brimmest_multiple <- function(data, ..., include_inputs = TRUE) {
+brimmest_map <- function(data, ..., include_inputs = TRUE) {
   if (!is.data.frame(data)) {
     stop("data must be a data frame")
   }

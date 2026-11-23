@@ -85,7 +85,7 @@ this shows the shape of the umbrella.
 
 A band, with \code{min_sd} and \code{max_sd} instead of \code{sd}, is the umbrella itself,
 filled in \code{fill}. \code{\link[=sd_bounds_curve]{sd_bounds_curve()}} gives the sharp one: under its default
-\code{Z = "quasiinteger"}, every \verb{(mean, SD)} of \code{n} values in \verb{[l, u]} that are
+\code{granularity = "quasiinteger"}, every \verb{(mean, SD)} of \code{n} values in \verb{[l, u]} that are
 whole numbers, except possibly one, which lets the mean take any value. The
 tuples of a lattice are this region rounded to the reporting grid and
 thinned by GRIM and GRIMMER, so the region is their outline, free of the

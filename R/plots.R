@@ -44,7 +44,7 @@
 #'   "outside"`; a band built by hand, without that attribute, should be on a
 #'   uniform grid, from which the spacing is inferred.
 #' @param reports Optional data frame of reported values, with `mean`, `sd`,
-#'   and (optionally) `consistent`; e.g. the output of [brimmer_multiple()].
+#'   and (optionally) `consistent`; e.g. the output of [brimmer_map()].
 #' @param title Optional plot title.
 #' @param fill,line_colour Band fill and outline colours. `fill` is used only
 #'   by `shade = "inside"`; the infeasible shading has its own fixed grey.
@@ -63,7 +63,7 @@
 #' # overlay reported values, coloured by consistency (the second is
 #' # above the ceiling, so it plots as inconsistent)
 #' reports <- data.frame(mean = c(2.97, 3.51), sd = c(2.83, 3.50))
-#' checked <- brimmer_multiple(reports, l = 1, u = 7, n = 30,
+#' checked <- brimmer_map(reports, l = 1, u = 7, n = 30,
 #'                             digits_mean = 2, digits_sd = 2)
 #' sd_bounds_plot(curve, reports = checked)
 #'
@@ -167,7 +167,7 @@ sd_bounds_plot <- function(
 #' @param data Output of [sd_bounds_curve()] (used for the parity band).
 #' @param reports Optional data frame of reported values, with `pomp_mean` and
 #'   `pomp_sd_parity` / `pomp_sd_sharp` and `consistent` (e.g. from
-#'   [brimmer_multiple()]).
+#'   [brimmer_map()]).
 #' @param reference `"sharp"` (default) or `"parity"`.
 #' @param title Optional plot title.
 #' @return A ggplot object.
@@ -280,7 +280,7 @@ sd_bounds_pomp_plot <- function(
 #'
 #' A band, with `min_sd` and `max_sd` instead of `sd`, is the umbrella itself,
 #' filled in `fill`. [sd_bounds_curve()] gives the sharp one: under its default
-#' `Z = "quasiinteger"`, every `(mean, SD)` of `n` values in `[l, u]` that are
+#' `granularity = "quasiinteger"`, every `(mean, SD)` of `n` values in `[l, u]` that are
 #' whole numbers, except possibly one, which lets the mean take any value. The
 #' tuples of a lattice are this region rounded to the reporting grid and
 #' thinned by GRIM and GRIMMER, so the region is their outline, free of the

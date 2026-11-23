@@ -12,7 +12,7 @@
   upper_att,
   n,
   mean,
-  Z,
+  granularity,
   alpha,
   k_items
 ) {
@@ -54,7 +54,7 @@
   }
   # feasibility: GRIM under strict integer
   if (
-    identical(Z, "integer") && !is.null(mean) && !is_grim_consistent(mean, n)
+    identical(granularity, "integer") && !is.null(mean) && !is_grim_consistent(mean, n)
   ) {
     return(fail(
       "mean is GRIM-inconsistent: no strictly integer sample has this mean"
@@ -63,7 +63,7 @@
 
   # alpha branch (walls only; enforced by the dispatcher)
   if (!is.null(alpha)) {
-    ab <- sd_bounds_alpha(lower, upper, n, mean, Z, alpha, k_items)
+    ab <- sd_bounds_alpha(lower, upper, n, mean, granularity, alpha, k_items)
     if (!ab$feasible) {
       return(fail(
         "alpha floor exceeds alpha ceiling: no sample satisfies all constraints"
@@ -100,18 +100,18 @@
       res$min_rule <<- rule
     }
   }
-  if (Z %in% c("integer", "quasiinteger") && !is.null(mean)) {
-    fl <- if (Z == "integer") {
+  if (granularity %in% c("integer", "quasiinteger") && !is.null(mean)) {
+    fl <- if (granularity == "integer") {
       sd_min_integer(mean, n)
     } else {
       sd_min_quasi_integer(mean, n)
     }
-    bump(fl, sprintf("%s floor (range-free)", Z))
+    bump(fl, sprintf("%s floor (range-free)", granularity))
   }
   if (!is.null(n)) {
     if (lower_att && upper_att) {
       bump(
-        sd_min_two_pin(lower, upper, n, mean, Z),
+        sd_min_two_pin(lower, upper, n, mean, granularity),
         if (is.null(mean)) {
           "two-pin floor W/sqrt(2(n-1))"
         } else {
@@ -120,12 +120,12 @@
       )
     } else if (upper_att && !is.null(mean)) {
       bump(
-        sd_min_one_pin(upper, n, mean, Z, side = "max"),
+        sd_min_one_pin(upper, n, mean, granularity, side = "max"),
         "one-pin attained floor (max)"
       )
     } else if (lower_att && !is.null(mean)) {
       bump(
-        sd_min_one_pin(lower, n, mean, Z, side = "min"),
+        sd_min_one_pin(lower, n, mean, granularity, side = "min"),
         "one-pin attained floor (min)"
       )
     }
@@ -215,14 +215,14 @@
 #'   such as `"up_or_down"`, `"up"`, `"even"` or `"trunc"` (see
 #'   [roundwork::unround()]; requires `digits_mean`). The returned bounds
 #'   are then the ENVELOPE over all exact means consistent with the report,
-#'   intersected with the feasible mean band. Under `Z = "integer"` the
+#'   intersected with the feasible mean band. Under `granularity = "integer"` the
 #'   envelope enumerates the GRIM-consistent means in the interval exactly.
 #' * `sd`, `digits_sd` — optionally, the reported SD and its decimal places.
 #'   The SD never changes the bounds; it enables the report-consistency
 #'   columns: `sd_in_bounds` (does the SD's own rounding interval overlap
-#'   `[min_sd, max_sd]`?) and, under `Z = "integer"` with `rounding` set, the
+#'   `[min_sd, max_sd]`?) and, under `granularity = "integer"` with `rounding` set, the
 #'   GRIMMER verdict.
-#' * `Z` — granularity: `"continuous"` (none; the default), `"integer"` (all
+#' * `granularity` — granularity: `"continuous"` (none; the default), `"integer"` (all
 #'   observations on the grid), or `"quasiinteger"` (all but one on the grid;
 #'   defined at every mean, the GRIM-free relaxation). For mean-scored data the
 #'   grid is the 1/`n_items` mean-score lattice, not the integers.
@@ -241,7 +241,7 @@
 #'
 #' GRIM and GRIMMER verdicts are DEFERRED to the scrutiny package
 #' (`scrutiny::grim()`, `scrutiny::grimmer()`) rather than reimplemented:
-#' under `Z = "integer"` with `rounding` set, the `grim` column carries
+#' under `granularity = "integer"` with `rounding` set, the `grim` column carries
 #' scrutiny's verdict on the mean and (when `sd` is supplied) the `grimmer`
 #' column scrutiny's verdict on the (mean, sd) pair. The bounds themselves are
 #' computed from this package's own enumeration of GRIM-consistent means; when
@@ -267,7 +267,7 @@
 #'   scrutiny: `"up_or_down"`, `"ceiling_or_floor"`, `"up"`, `"down"`,
 #'   `"even"`, `"ceiling"`, `"floor"`, `"trunc"`, `"anti_trunc"`, or one of
 #'   the `"ties_*"` methods. See [roundwork::unround()].
-#' @param Z "continuous" (default), "integer", or "quasiinteger".
+#' @param granularity "continuous" (default), "integer", or "quasiinteger".
 #' @param scoring "singleitem" (default), "sumscored", or "meanscored".
 #' @param n_items Positive whole number of response items (default 1). Must be
 #'   1 for `scoring = "singleitem"`.
@@ -285,26 +285,26 @@
 #' sd_bounds(l = 1, u = 5)                         # range-only ceiling
 #' sd_bounds(l = 1, u = 5, n = 9)                  # parity ceiling
 #' sd_bounds(l = 1, u = 5, n = 9, mean = 2)        # sharp mean-conditional
-#' sd_bounds(l = 1, u = 5, n = 9, mean = 2.44, Z = "quasiinteger")
-#' sd_bounds(a = 2, b = 4, n = 9, mean = 2.44, Z = "integer")   # attained
-#' sd_bounds(l = 1, b = 4, n = 9, mean = 3.5, Z = "integer")    # mixed
+#' sd_bounds(l = 1, u = 5, n = 9, mean = 2.44, granularity = "quasiinteger")
+#' sd_bounds(a = 2, b = 4, n = 9, mean = 2.44, granularity = "integer")   # attained
+#' sd_bounds(l = 1, b = 4, n = 9, mean = 3.5, granularity = "integer")    # mixed
 #'
 #' # reported mean rounded to 2 dp: envelope over [2.965, 2.975];
 #' # GRIM verdict deferred to scrutiny
 #' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'           rounding = "up_or_down", Z = "integer")
+#'           rounding = "up_or_down", granularity = "integer")
 #' # with a reported SD: adds scrutiny's GRIMMER verdict and the bounds check
 #' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'           sd = 2.83, digits_sd = 2, rounding = "up_or_down", Z = "integer")
+#'           sd = 2.83, digits_sd = 2, rounding = "up_or_down", granularity = "integer")
 #' # truncated reporting
 #' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'           rounding = "trunc", Z = "quasiinteger")
+#'           rounding = "trunc", granularity = "quasiinteger")
 #'
 #' # sum-scored 3-item composite (l, u, mean in sum units) with alpha
-#' sd_bounds(l = 3, u = 15, n = 20, mean = 9, Z = "integer",
+#' sd_bounds(l = 3, u = 15, n = 20, mean = 9, granularity = "integer",
 #'           scoring = "sumscored", n_items = 3, alpha = 0.8)
 #' # the same composite reported as an item mean (l, u, mean in mean units)
-#' sd_bounds(l = 1, u = 5, n = 20, mean = 3, Z = "integer",
+#' sd_bounds(l = 1, u = 5, n = 20, mean = 3, granularity = "integer",
 #'           scoring = "meanscored", n_items = 3, alpha = 0.8)
 #' @export
 sd_bounds <- function(
@@ -318,7 +318,7 @@ sd_bounds <- function(
   sd = NULL,
   digits_sd = NULL,
   rounding = NULL,
-  Z = c("continuous", "integer", "quasiinteger"),
+  granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1,
   alpha = NULL
@@ -343,7 +343,7 @@ sd_bounds <- function(
   }
 
   # -- validate ----------------------------------------------------------------
-  Z <- match.arg(Z)
+  granularity <- match.arg(granularity)
   scoring <- match.arg(scoring)
   if (is.character(mean) || is.character(sd)) {
     stop(
@@ -421,7 +421,7 @@ sd_bounds <- function(
   k <- n_items
   # granular limits must lie on the response grid: the integers, or the
   # 1/n_items lattice of a mean-scored composite (w = m * x maps it to them)
-  if (Z %in% c("integer", "quasiinteger")) {
+  if (granularity %in% c("integer", "quasiinteger")) {
     lims <- c(l, u, a, b) * m
     if (length(lims) && any(abs(lims - round(lims)) > 1e-9)) {
       stop(
@@ -463,7 +463,7 @@ sd_bounds <- function(
       upper_att,
       n,
       if (is.null(mm)) NULL else mm * m,
-      Z,
+      granularity,
       alpha,
       k
     )
@@ -483,7 +483,7 @@ sd_bounds <- function(
   # verbatim and any divergence from our own enumeration is surfaced in `note`.
   grim_v <- NA
   grimmer_v <- NA
-  if (Z == "integer" && !is.null(rounding) && !is.null(mean)) {
+  if (granularity == "integer" && !is.null(rounding) && !is.null(mean)) {
     # items_averaged is m, not n_items: a sum score is a whole number per
     # person, so only mean-scored data are averages of several items.
     grim_v <- isTRUE(as.logical(unname(scrutiny::grim(
@@ -565,7 +565,7 @@ sd_bounds <- function(
   }
 
   divergence <- NULL
-  if (Z == "integer") {
+  if (granularity == "integer") {
     # exact: enumerate the GRIM-consistent means in the interval. Under the
     # 1/n_items mean grid a mean is GRIM-consistent when n * m * mean is an
     # integer, so enumerate over nm = n * m.

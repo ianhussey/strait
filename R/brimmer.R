@@ -35,7 +35,7 @@
 #'   `in_scale_range` and a granular-impossible one as `grim`, so neither
 #'   double-counts here.
 #' * `grim`, `grimmer` — scrutiny's verdicts, deferred verbatim (only under
-#'   `Z = "integer"` with `rounding`). NOTE scrutiny's GRIMMER (and, under
+#'   `granularity = "integer"` with `rounding`). NOTE scrutiny's GRIMMER (and, under
 #'   `rounding = "up"`, GRIM) have documented floating-point boundary bugs,
 #'   including false flags under the default rounding. When GRIMMER is the ONLY
 #'   failing test, the note says so explicitly, since that pattern matches
@@ -65,7 +65,7 @@
 #' @param rounding Rounding method for unrounding the reported values, named
 #'   as in scrutiny (default `"up_or_down"`); NULL treats inputs as exact. See
 #'   [sd_bounds()] and [roundwork::unround()].
-#' @param Z "continuous" (default), "integer", or "quasiinteger".
+#' @param granularity "continuous" (default), "integer", or "quasiinteger".
 #' @param scoring "singleitem" (default), "sumscored", or "meanscored".
 #' @param n_items Positive whole number of response items (default 1).
 #' @param alpha Numeric scalar or NULL, reported Cronbach's alpha.
@@ -80,20 +80,20 @@
 #'
 #' @seealso [brim()] for the mean-side test, [brimmest()] for the exact
 #'   certificate that settles what this test can only screen, and
-#'   [brimmer_multiple()] to apply this across a data frame.
+#'   [brimmer_map()] to apply this across a data frame.
 #' @examples
 #' # a perfectly ordinary report on a 1-7 scale
 #' # (witnessed by c(rep(1, 20), rep(7, 9), 6): mean 2.9667, sd 2.8343)
 #' brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'         sd = 2.83, digits_sd = 2, Z = "integer")
+#'         sd = 2.83, digits_sd = 2, granularity = "integer")
 #'
 #' # SD below the quasi-integer floor: inconsistent via the bounds test
 #' brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'         sd = 0.10, digits_sd = 2, Z = "quasiinteger")
+#'         sd = 0.10, digits_sd = 2, granularity = "quasiinteger")
 #'
 #' # GRIM-impossible mean: inconsistent via feasibility (and grim)
 #' brimmer(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2,
-#'         sd = 1.00, digits_sd = 2, Z = "integer")
+#'         sd = 1.00, digits_sd = 2, granularity = "integer")
 #' @export
 brimmer <- function(
   l = NULL,
@@ -106,7 +106,7 @@ brimmer <- function(
   sd = NULL,
   digits_sd = NULL,
   rounding = "up_or_down",
-  Z = c("continuous", "integer", "quasiinteger"),
+  granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1,
   alpha = NULL
@@ -157,7 +157,7 @@ brimmer <- function(
     sd = sd,
     digits_sd = digits_sd,
     rounding = if (is.null(mean)) NULL else rounding,
-    Z = Z,
+    granularity = granularity,
     scoring = scoring,
     n_items = n_items,
     alpha = alpha
@@ -184,7 +184,7 @@ brimmer <- function(
   eff_upper <- if (!is.null(b)) b else u
 
   # The BRIM predicate, computed independently of sd_bounds(). sd_bounds()
-  # legitimately folds GRIM into `feasible` under Z = "integer" (with no
+  # legitimately folds GRIM into `feasible` under granularity = "integer" (with no
   # GRIM-consistent mean there is no sample, so no bounds exist), but an
   # out-of-range mean and a granular-impossible mean are different defects and
   # must not be reported as one. This asks only: can the reported mean's
@@ -246,7 +246,7 @@ brimmer <- function(
     has_mean = !is.null(mean)
   )
 
-  # new_tibble(), as in sd_bounds(), since brimmer_multiple() calls this per row
+  # new_tibble(), as in sd_bounds(), since brimmer_map() calls this per row
   tibble::new_tibble(
     list(
       consistent = length(failed) == 0,
@@ -302,7 +302,7 @@ brimmer <- function(
 #' A thin wrapper on [brimmer()] with no reported SD, so only the mean-side
 #' tests apply: `in_scale_range` (the reported mean's rounding interval must
 #' meet the feasible mean band, see [feasible_mean_band()]) and, under
-#' `Z = "integer"` with `rounding`, scrutiny's `grim` verdict. GRIMMER is never
+#' `granularity = "integer"` with `rounding`, scrutiny's `grim` verdict. GRIMMER is never
 #' invoked, and the SD-side columns are omitted rather than returned as `NA`.
 #'
 #' The two tests are independent and name different defects: a mean can be out
@@ -335,7 +335,7 @@ brim <- function(
   mean = NULL,
   digits_mean = NULL,
   rounding = "up_or_down",
-  Z = c("continuous", "integer", "quasiinteger"),
+  granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1
 ) {
@@ -356,7 +356,7 @@ brim <- function(
     sd = NULL,
     digits_sd = NULL,
     rounding = rounding,
-    Z = Z,
+    granularity = granularity,
     scoring = scoring,
     n_items = n_items
   )
@@ -391,7 +391,7 @@ brim <- function(
 #' an error.
 #'
 #' Recognised names (column or constant): `l`, `u`, `a`, `b`, `n`, `mean`,
-#' `digits_mean`, `sd`, `digits_sd`, `rounding`, `Z`, `scoring`, `n_items`,
+#' `digits_mean`, `sd`, `digits_sd`, `rounding`, `granularity`, `scoring`, `n_items`,
 #' `alpha`.
 #'
 #' @param data A data frame, one reported statistic set per row.
@@ -409,11 +409,11 @@ brim <- function(
 #'
 #' # the scale limits and reported precision are constant across rows;
 #' # row 2 reports an SD above the ceiling for a 1-7 scale at n = 30
-#' out <- brimmer_multiple(reports, l = 1, u = 7,
+#' out <- brimmer_map(reports, l = 1, u = 7,
 #'                                 digits_mean = 2, digits_sd = 2)
 #' out[, c("mean", "sd", "n", "consistent", "failed_tests")]
 #' @export
-brimmer_multiple <- function(data, ..., include_inputs = TRUE) {
+brimmer_map <- function(data, ..., include_inputs = TRUE) {
   if (!is.data.frame(data)) {
     stop("data must be a data frame")
   }
@@ -428,7 +428,7 @@ brimmer_multiple <- function(data, ..., include_inputs = TRUE) {
     "sd",
     "digits_sd",
     "rounding",
-    "Z",
+    "granularity",
     "scoring",
     "n_items",
     "alpha"
@@ -510,7 +510,7 @@ brimmer_multiple <- function(data, ..., include_inputs = TRUE) {
 #'
 #' @param l,u Numeric scalars, limits.
 #' @param n Integer scalar, sample size.
-#' @param Z granularity; `"quasiinteger"` (default) gives a hole-free floor.
+#' @param granularity `"quasiinteger"` (default) gives a hole-free floor.
 #' @param scoring,n_items,alpha As in [sd_bounds()].
 #' @param by Numeric or NULL; mean-grid spacing (default ~ `(u - l) / 1000`).
 #' @return A tibble: `mean`, `min_sd`, `max_sd`, `feasible`, `pomp_mean`,
@@ -532,7 +532,7 @@ sd_bounds_curve <- function(
   l,
   u,
   n,
-  Z = "quasiinteger",
+  granularity = "quasiinteger",
   scoring = "singleitem",
   n_items = 1,
   alpha = NULL,
@@ -560,7 +560,7 @@ sd_bounds_curve <- function(
         u = u,
         n = n,
         mean = mu,
-        Z = Z,
+        granularity = granularity,
         scoring = scoring,
         n_items = n_items,
         alpha = alpha
@@ -589,7 +589,7 @@ sd_bounds_curve <- function(
 #' For each reported mean on the `10^-digits` grid over `[l, u]`, computes the
 #' SD-bounds envelope once, then evaluates every reported SD on the same grid
 #' from 0 up to that mean's ceiling, tagging each `(mean, sd)` cell with the
-#' bounds-overlap and (under `Z = "integer"`) GRIMMER verdicts. This returns the
+#' bounds-overlap and (under `granularity = "integer"`) GRIMMER verdicts. This returns the
 #' FULL grid — feasible means x candidate SDs — with verdict columns, rather
 #' than only the passing tuples, so the plotting layer can render failures as
 #' well as the passing "umbrella".
@@ -597,7 +597,7 @@ sd_bounds_curve <- function(
 #' @param l,u Numeric scalars, limits.
 #' @param n Integer scalar, sample size.
 #' @param digits Integer, reported decimal places (grid step `10^-digits`).
-#' @param Z granularity (default `"integer"`).
+#' @param granularity Response granularity (default `"integer"`).
 #' @param scoring,n_items As in [sd_bounds()].
 #' @param alpha Optional reported Cronbach's alpha; when supplied the bounds each
 #'   cell is tested against are the alpha-conditional ones, so the grid shows the
@@ -623,7 +623,7 @@ umbrella_data <- function(
   u,
   n,
   digits = 2,
-  Z = "integer",
+  granularity = "integer",
   scoring = "singleitem",
   n_items = 1,
   alpha = NULL,
@@ -638,11 +638,11 @@ umbrella_data <- function(
   means <- round(seq(l, u, by = step), digits)
   # items averaged per observation, as in sd_bounds()
   m <- if (scoring == "meanscored") n_items else 1L
-  use_grimmer <- Z == "integer"
+  use_grimmer <- granularity == "integer"
   rows <- list()
   for (mu in means) {
     # sd_bounds() embeds the rounding-aware GRIM prefilter: a mean whose
-    # rounding interval admits no integer sum is infeasible under strict Z,
+    # rounding interval admits no integer sum is infeasible under strict granularity,
     # so none of its SDs need testing.
     d <- sd_bounds(
       l = l,
@@ -651,7 +651,7 @@ umbrella_data <- function(
       mean = mu,
       digits_mean = digits,
       rounding = rounding,
-      Z = Z,
+      granularity = granularity,
       scoring = scoring,
       n_items = n_items,
       alpha = alpha

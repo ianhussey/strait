@@ -71,7 +71,7 @@ test_that("lattice rules return attainable tuples, and alpha is a strict subset"
         n = n,
         mean = keep$mean[i],
         digits_mean = 2,
-                   rounding = "up_or_down", Z = "integer", scoring = "meanscored",
+                   rounding = "up_or_down", granularity = "integer", scoring = "meanscored",
                    n_items = 2, alpha = 0.70)
     isTRUE(r$feasible) &&
       (keep$sd[i] + 0.005) >= r$min_sd - 1e-9 &&
@@ -267,7 +267,7 @@ test_that("forward-rounded exact tuples are a subset of the GRIMMER lattice", {
 test_that("umbrella_data's reporting grid is free of seq() drift", {
   # seq(0, 6, by = 0.1)[4] is 0.3 + 5.6e-17, and scrutiny reads the value as a
   # decimal, so an unrounded grid flips GRIMMER verdicts
-  um <- umbrella_data(n = 12, l = 0, u = 6, digits = 1, Z = "integer")
+  um <- umbrella_data(n = 12, l = 0, u = 6, digits = 1, granularity = "integer")
   expect_true(all(abs(um$mean * 10 - round(um$mean * 10)) < 1e-12))
   expect_true(all(abs(um$sd * 10 - round(um$sd * 10)) < 1e-12))
   expect_identical(sum(um$consistent), 1175L)   # 1167 before the fix
@@ -290,7 +290,7 @@ test_that("the alpha band is what sd_bounds() tests a report against", {
         u = 5,
         n = 30,
         mean = mu,
-        Z = "quasiinteger",
+        granularity = "quasiinteger",
         scoring = "meanscored",
         n_items = 3,
         alpha = 0.8

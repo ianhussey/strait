@@ -9,7 +9,7 @@ umbrella_data(
   u,
   n,
   digits = 2,
-  Z = "integer",
+  granularity = "integer",
   scoring = "singleitem",
   n_items = 1,
   alpha = NULL,
@@ -23,7 +23,7 @@ umbrella_data(
 
 \item{digits}{Integer, reported decimal places (grid step \code{10^-digits}).}
 
-\item{Z}{granularity (default \code{"integer"}).}
+\item{granularity}{Response granularity (default \code{"integer"}).}
 
 \item{scoring, n_items}{As in \code{\link[=sd_bounds]{sd_bounds()}}.}
 
@@ -45,7 +45,7 @@ which is why they are absent from the grid.
 For each reported mean on the \code{10^-digits} grid over \verb{[l, u]}, computes the
 SD-bounds envelope once, then evaluates every reported SD on the same grid
 from 0 up to that mean's ceiling, tagging each \verb{(mean, sd)} cell with the
-bounds-overlap and (under \code{Z = "integer"}) GRIMMER verdicts. This returns the
+bounds-overlap and (under \code{granularity = "integer"}) GRIMMER verdicts. This returns the
 FULL grid — feasible means x candidate SDs — with verdict columns, rather
 than only the passing tuples, so the plotting layer can render failures as
 well as the passing "umbrella".

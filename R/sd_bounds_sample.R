@@ -13,14 +13,14 @@
 #' remainder observation on the Structure S curve; the minimum clusters `n - 1`
 #' observations on the two integers bracketing the mean with one free remainder.
 #' Under the quasi-integer default the single remainder may be non-integer (the
-#' `Z_{n-1}` relaxation used throughout the package); pass `Z = "integer"` to
+#' `Z_{n-1}` relaxation used throughout the package); pass `granularity = "integer"` to
 #' require a GRIM-consistent mean, so the whole sample is integer.
 #'
 #' @param l,u Numeric scalars, the scale limits.
 #' @param n Integer scalar, sample size (`n >= 2`).
 #' @param mean Numeric scalar, the target mean in `[l, u]`.
 #' @param which `"max"` (default) or `"min"`.
-#' @param Z `"quasiinteger"` (default, one observation may be non-integer) or
+#' @param granularity `"quasiinteger"` (default, one observation may be non-integer) or
 #'   `"integer"` (requires a GRIM-consistent mean).
 #' @return A numeric vector of length `n` whose mean is `mean` and whose sample
 #'   SD equals the requested bound.
@@ -35,18 +35,18 @@ sd_bounds_sample <- function(
   n,
   mean,
   which = c("max", "min"),
-  Z = c("quasiinteger", "integer")
+  granularity = c("quasiinteger", "integer")
 ) {
   which <- match.arg(which)
-  Z <- match.arg(Z)
+  granularity <- match.arg(granularity)
   if (is.null(n) || n < 2) {
     stop("n must be >= 2")
   }
   if (mean < l - 1e-9 || mean > u + 1e-9) {
     stop("mean must lie in [l, u]")
   }
-  if (Z == "integer" && abs(n * mean - round(n * mean)) > 1e-9) {
-    stop("Z = 'integer' requires a GRIM-consistent mean (n * mean an integer)")
+  if (granularity == "integer" && abs(n * mean - round(n * mean)) > 1e-9) {
+    stop("granularity = 'integer' requires a GRIM-consistent mean (n * mean an integer)")
   }
 
   if (which == "max") {

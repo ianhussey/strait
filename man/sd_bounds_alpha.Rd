@@ -4,7 +4,7 @@
 \alias{sd_bounds_alpha}
 \title{SD bounds for a k-item composite with reported Cronbach's alpha}
 \usage{
-sd_bounds_alpha(l, u, n, mean, Z, alpha, k_items)
+sd_bounds_alpha(l, u, n, mean, granularity, alpha, k_items)
 }
 \arguments{
 \item{l, u}{Numeric scalars, limits of the SUM score (composite units).}
@@ -13,7 +13,7 @@ sd_bounds_alpha(l, u, n, mean, Z, alpha, k_items)
 
 \item{mean}{Numeric scalar, sum-score mean.}
 
-\item{Z}{One of "continuous", "integer", "quasiinteger" (item-level grid).}
+\item{granularity}{One of "continuous", "integer", "quasiinteger" (item-level grid).}
 
 \item{alpha}{Numeric scalar, reported Cronbach's alpha, \code{alpha < 1}.}
 
@@ -37,10 +37,10 @@ constraint set); this is reported rather than clipped.
 }
 \examples{
 # a 3-item 1-5 battery, so the sum score runs 3-15
-sd_bounds_alpha(l = 3, u = 15, n = 50, mean = 9.4, Z = "continuous",
+sd_bounds_alpha(l = 3, u = 15, n = 50, mean = 9.4, granularity = "continuous",
                 alpha = 0.8, k_items = 3)
 
 # integer items lift the floor off zero and tighten the ceiling
-sd_bounds_alpha(l = 3, u = 15, n = 50, mean = 9.4, Z = "integer",
+sd_bounds_alpha(l = 3, u = 15, n = 50, mean = 9.4, granularity = "integer",
                 alpha = 0.8, k_items = 3)
 }

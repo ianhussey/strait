@@ -21,7 +21,7 @@
 #   - l, u are LOGICAL limits (walls: membership only); a, b are OBSERVED
 #     extremes (attained: at least one observation equals each). a supersedes l
 #     and b supersedes u, because a wall beyond an attained extreme is vacuous.
-#   - Z is the granularity constraint: "continuous" (none), "integer" (all
+#   - granularity: "continuous" (none), "integer" (all
 #     observations on the grid), "quasiinteger" (all but one; GRIM-free).
 #   - Sharp mean-conditional ceilings are Structure S in every case: it equals
 #     the delta-corrected Muilwijk bound (verified to 1e-13), is valid for
@@ -262,7 +262,7 @@ sd_min_quasi_integer <- function(mean, n) {
 #' @param a,b Numeric scalars, observed minimum and maximum (attained).
 #' @param n Integer scalar, sample size, `n >= 2`.
 #' @param mean Numeric scalar or NULL. If NULL, the mean-agnostic floor.
-#' @param Z One of "continuous", "integer", "quasiinteger".
+#' @param granularity One of "continuous", "integer", "quasiinteger".
 #' @return Numeric scalar, the minimum sample SD.
 #' @examples
 #' # mean-agnostic floor: one observation pinned at each observed extreme
@@ -270,9 +270,9 @@ sd_min_quasi_integer <- function(mean, n) {
 #'
 #' # knowing the mean sharpens it, and granularity sharpens it again
 #' sd_min_two_pin(a = 1, b = 7, n = 30, mean = 3)
-#' sd_min_two_pin(a = 1, b = 7, n = 30, mean = 3, Z = "integer")
+#' sd_min_two_pin(a = 1, b = 7, n = 30, mean = 3, granularity = "integer")
 #' @export
-sd_min_two_pin <- function(a, b, n, mean = NULL, Z = "continuous") {
+sd_min_two_pin <- function(a, b, n, mean = NULL, granularity = "continuous") {
   W <- b - a
   if (is.null(mean)) {
     return(W / sqrt(2 * (n - 1)))
@@ -285,11 +285,11 @@ sd_min_two_pin <- function(a, b, n, mean = NULL, Z = "continuous") {
   q <- b - mean
   ss_cont <- p^2 + q^2 + (p - q)^2 / k
   ss <- ss_cont
-  if (Z %in% c("integer", "quasiinteger")) {
+  if (granularity %in% c("integer", "quasiinteger")) {
     T_int <- n * mean - a - b # interior sum
     d <- frac(T_int / k) # interior mean's fractional part
     ss <- ss_cont + k * d * (1 - d)
-    if (Z == "quasiinteger") {
+    if (granularity == "quasiinteger") {
       ss <- ss - frac(T_int) * (1 - frac(T_int))
     }
     ss <- max(ss, ss_cont)
@@ -311,7 +311,7 @@ sd_min_two_pin <- function(a, b, n, mean = NULL, Z = "continuous") {
 #' @param pin Numeric scalar, the attained extreme.
 #' @param n Integer scalar, sample size, `n >= 2`.
 #' @param mean Numeric scalar.
-#' @param Z One of "continuous", "integer", "quasiinteger".
+#' @param granularity One of "continuous", "integer", "quasiinteger".
 #' @param side "max" if the pin is the observed maximum, "min" if the minimum.
 #' @return Numeric scalar, the minimum sample SD.
 #' @examples
@@ -325,23 +325,23 @@ sd_min_one_pin <- function(
   pin,
   n,
   mean,
-  Z = "continuous",
+  granularity = "continuous",
   side = c("max", "min")
 ) {
   side <- match.arg(side)
   # reflect the observed-minimum case onto the observed-maximum formulas
   if (side == "min") {
-    return(sd_min_one_pin(-pin, n, -mean, Z, side = "max"))
+    return(sd_min_one_pin(-pin, n, -mean, granularity, side = "max"))
   }
   k <- n - 1
   q <- pin - mean # distance from mean up to the pin
   ss_cont <- n * q^2 / (n - 1)
   ss <- ss_cont
-  if (Z %in% c("integer", "quasiinteger")) {
+  if (granularity %in% c("integer", "quasiinteger")) {
     T_int <- n * mean - pin # sum of the n - 1 free observations
     d <- frac(T_int / k)
     ss <- ss_cont + k * d * (1 - d)
-    if (Z == "quasiinteger") {
+    if (granularity == "quasiinteger") {
       ss <- ss - frac(T_int) * (1 - frac(T_int))
     }
     ss <- max(ss, ss_cont)
@@ -551,20 +551,20 @@ sd_min_alpha_gini <- function(l, u, n, mean, m, max_profiles = 5e5) {
 #' @param l,u Numeric scalars, limits of the SUM score (composite units).
 #' @param n Integer scalar, sample size.
 #' @param mean Numeric scalar, sum-score mean.
-#' @param Z One of "continuous", "integer", "quasiinteger" (item-level grid).
+#' @param granularity One of "continuous", "integer", "quasiinteger" (item-level grid).
 #' @param alpha Numeric scalar, reported Cronbach's alpha, `alpha < 1`.
 #' @param k_items Integer scalar, number of items, `k_items >= 1`.
 #' @return List with `min_sd`, `max_sd`, `feasible`, `min_rule`, `note`.
 #' @examples
 #' # a 3-item 1-5 battery, so the sum score runs 3-15
-#' sd_bounds_alpha(l = 3, u = 15, n = 50, mean = 9.4, Z = "continuous",
+#' sd_bounds_alpha(l = 3, u = 15, n = 50, mean = 9.4, granularity = "continuous",
 #'                 alpha = 0.8, k_items = 3)
 #'
 #' # integer items lift the floor off zero and tighten the ceiling
-#' sd_bounds_alpha(l = 3, u = 15, n = 50, mean = 9.4, Z = "integer",
+#' sd_bounds_alpha(l = 3, u = 15, n = 50, mean = 9.4, granularity = "integer",
 #'                 alpha = 0.8, k_items = 3)
 #' @export
-sd_bounds_alpha <- function(l, u, n, mean, Z, alpha, k_items) {
+sd_bounds_alpha <- function(l, u, n, mean, granularity, alpha, k_items) {
   k <- k_items
   cc <- (k - 1) / k
   D <- 1 - cc * alpha # k - (k-1) alpha = k * D
@@ -579,7 +579,7 @@ sd_bounds_alpha <- function(l, u, n, mean, Z, alpha, k_items) {
   floor_ <- 0
   floor_rule <- "s >= 0"
   note <- NA_character_
-  if (Z %in% c("integer", "quasiinteger")) {
+  if (granularity %in% c("integer", "quasiinteger")) {
     item_l <- l / k
     item_u <- u / k
     ceil_vmax <- sqrt(
@@ -590,7 +590,7 @@ sd_bounds_alpha <- function(l, u, n, mean, Z, alpha, k_items) {
     floor_rule <- "alpha-amplified quasi-integer floor"
     # sharpen with the exact Gini envelope for strictly integer composites; it
     # is >= the amplified floor and strictly positive at whole-number means.
-    if (Z == "integer" && alpha > 0) {
+    if (granularity == "integer" && alpha > 0) {
       env <- sd_min_alpha_gini(l, u, n, mean, m = 1 / D)
       if (is.null(env)) {
         note <- "exact alpha floor (Theorem H5) not evaluated (n*mean non-integer or composite window over budget); proven amplified floor used, conservative near whole-number means"

@@ -181,7 +181,7 @@ bounds_curve <- function(p) {
     # (sd_bounds_curve() records the spacing it used, so sd_bounds_plot() no
     # longer has to guess it, and a coarser `by` would be safe here too.)
     out <- sd_bounds_curve(
-      l = p$l, u = p$u, n = p$n, Z = p$Z,
+      l = p$l, u = p$u, n = p$n, granularity = p$granularity,
       scoring = p$scoring, n_items = p$k, alpha = p$alpha
     )
     attr(out, "thinned") <- FALSE
@@ -196,7 +196,7 @@ bounds_curve <- function(p) {
   out <- do.call(rbind, lapply(means, function(mu) {
     d <- sd_bounds(
       l = p$l, u = p$u, a = p$a, b = p$b, n = p$n, mean = mu,
-      Z = p$Z, scoring = p$scoring, n_items = p$k, alpha = p$alpha
+      granularity = p$granularity, scoring = p$scoring, n_items = p$k, alpha = p$alpha
     )
     data.frame(
       mean = mu, min_sd = d$min_sd, max_sd = d$max_sd, feasible = d$feasible
@@ -746,7 +746,7 @@ server <- function(input, output, session) {
       ))
     }
 
-    if (Z %in% c("integer", "quasiinteger")) {
+    if (granularity %in% c("integer", "quasiinteger")) {
       lims <- c(num$l, num$u, a, b)
       validate(need(
         all(abs(lims - round(lims)) < 1e-9),
@@ -759,7 +759,7 @@ server <- function(input, output, session) {
     }
 
     c(num, list(
-      Z = Z, scoring = scoring, k = k, rounding = input$rounding,
+      granularity = Z, scoring = scoring, k = k, rounding = input$rounding,
       use_ab = use_ab, a = a, b = b, alpha = alpha,
       eff_l = if (use_ab) a else num$l,
       eff_u = if (use_ab) b else num$u,
@@ -773,7 +773,7 @@ server <- function(input, output, session) {
     x <- list(
       l = p$l, u = p$u, n = p$n,
       digits_mean = p$digits_mean, digits_sd = p$digits_sd,
-      rounding = p$rounding, Z = p$Z, scoring = p$scoring, n_items = p$k
+      rounding = p$rounding, granularity = p$granularity, scoring = p$scoring, n_items = p$k
     )
     if (p$use_ab) {
       x$a <- p$a
@@ -790,7 +790,7 @@ server <- function(input, output, session) {
   report <- reactive({
     p <- params()
     do.call(
-      brimmer_multiple,
+      brimmer_map,
       c(list(data = data.frame(mean = p$mean, sd = p$sd)), constraints(p))
     )
   })
@@ -858,7 +858,7 @@ server <- function(input, output, session) {
     title <- sprintf(
       "%g to %g, n = %d, %s%s",
       p$l, p$u, as.integer(p$n),
-      switch(p$Z,
+      switch(p$granularity,
         quasiinteger = "quasi-integer responses",
         integer = "integer responses",
         continuous = "continuous responses"
@@ -937,7 +937,7 @@ server <- function(input, output, session) {
           "computed in raw units over the rounding intervals either way."
         )
       },
-      if (identical(p$Z, "integer")) {
+      if (identical(p$granularity, "integer")) {
         tags$p(
           class = "strait-note",
           "Under strictly integer responses the band exists only at the means",
@@ -1132,7 +1132,7 @@ server <- function(input, output, session) {
         b = if (p$use_ab) p$b else NA_real_,
         mean = p$mean, digits_mean = p$digits_mean,
         sd = p$sd, digits_sd = p$digits_sd,
-        rounding = p$rounding, Z = p$Z, scoring = p$scoring, n_items = p$k,
+        rounding = p$rounding, granularity = p$granularity, scoring = p$scoring, n_items = p$k,
         alpha = if (is.null(p$alpha)) NA_real_ else p$alpha,
         consistent = r$consistent, failed_tests = r$failed_tests,
         min_sd = r$min_sd, max_sd = r$max_sd,

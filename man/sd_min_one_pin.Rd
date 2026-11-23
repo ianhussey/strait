@@ -4,7 +4,13 @@
 \alias{sd_min_one_pin}
 \title{Minimum SD with one observed extreme attained (one-pin floor)}
 \usage{
-sd_min_one_pin(pin, n, mean, Z = "continuous", side = c("max", "min"))
+sd_min_one_pin(
+  pin,
+  n,
+  mean,
+  granularity = "continuous",
+  side = c("max", "min")
+)
 }
 \arguments{
 \item{pin}{Numeric scalar, the attained extreme.}
@@ -13,7 +19,7 @@ sd_min_one_pin(pin, n, mean, Z = "continuous", side = c("max", "min"))
 
 \item{mean}{Numeric scalar.}
 
-\item{Z}{One of "continuous", "integer", "quasiinteger".}
+\item{granularity}{One of "continuous", "integer", "quasiinteger".}
 
 \item{side}{"max" if the pin is the observed maximum, "min" if the minimum.}
 }

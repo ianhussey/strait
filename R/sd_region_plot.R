@@ -345,7 +345,7 @@ sd_region_data <- function(
       u = u,
       n = n,
       digits = digits,
-      Z = "integer",
+      granularity = "integer",
       scoring = scoring,
       n_items = k,
       alpha = if (rule == "integer_alpha") alpha else NULL
@@ -369,7 +369,7 @@ sd_region_data <- function(
             u = u,
             n = n,
             mean = mu,
-            Z = "integer",
+            granularity = "integer",
             scoring = scoring,
             n_items = k,
             alpha = alpha

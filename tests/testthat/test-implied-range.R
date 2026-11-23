@@ -11,7 +11,7 @@ test_that("an SD near the ceiling forces both scale limits into the data", {
     digits_mean = 2,
     sd = 2.83,
     digits_sd = 2,
-    Z = "integer"
+    granularity = "integer"
   )
   expect_equal(r$min_at_most, 1)
   expect_equal(r$max_at_least, 7)
@@ -26,7 +26,7 @@ test_that("a small SD forces only the neighbouring values", {
     digits_mean = 2,
     sd = 0.53,
     digits_sd = 2,
-    Z = "integer"
+    granularity = "integer"
   )
   expect_equal(r$min_at_most, 3)
   expect_equal(r$max_at_least, 5)
@@ -48,22 +48,22 @@ test_that("integer results are exactly where brimmer() changes its verdict", {
       digits_mean = 2,
       sd = s,
       digits_sd = 2,
-      Z = "integer"
+      granularity = "integer"
     )
     if (is.na(r$min_at_most)) {
       next
     }
     lo <- r$min_at_most
     hi <- r$max_at_least
-    expect_true(consistent_within(lo, 7, mean = m, sd = s, Z = "integer"))
-    expect_true(consistent_within(1, hi, mean = m, sd = s, Z = "integer"))
+    expect_true(consistent_within(lo, 7, mean = m, sd = s, granularity = "integer"))
+    expect_true(consistent_within(1, hi, mean = m, sd = s, granularity = "integer"))
     if (lo + 1 < m) {
       expect_false(consistent_within(
         lo + 1,
         7,
         mean = m,
         sd = s,
-        Z = "integer"
+        granularity = "integer"
       ))
     }
     if (hi - 1 > m) {
@@ -72,7 +72,7 @@ test_that("integer results are exactly where brimmer() changes its verdict", {
         hi - 1,
         mean = m,
         sd = s,
-        Z = "integer"
+        granularity = "integer"
       ))
     }
   }
@@ -103,7 +103,7 @@ test_that("a mean-scored composite is bounded on its 1/n_items grid", {
     digits_mean = 2,
     sd = 1.20,
     digits_sd = 2,
-    Z = "integer",
+    granularity = "integer",
     scoring = "meanscored",
     n_items = 3
   )
@@ -122,7 +122,7 @@ test_that("nothing forced: the bounds fall back to the mean", {
     digits_mean = 2,
     sd = 0.00,
     digits_sd = 2,
-    Z = "integer"
+    granularity = "integer"
   )
   expect_equal(r$min_at_most, 4)
   expect_equal(r$max_at_least, 4)
@@ -150,7 +150,7 @@ test_that("an inconsistent report has no implied range", {
     digits_mean = 2,
     sd = 1.00,
     digits_sd = 2,
-    Z = "integer"
+    granularity = "integer"
   )
   expect_true(is.na(r$min_at_most) && is.na(r$max_at_least))
   expect_match(r$note, "inconsistent")
@@ -171,7 +171,7 @@ test_that("mean-scored data move the limit along the 1/n_items grid", {
     digits_mean = 2,
     sd = 1.95,
     digits_sd = 2,
-    Z = "integer",
+    granularity = "integer",
     scoring = "meanscored",
     n_items = 3
   )

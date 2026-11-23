@@ -16,7 +16,7 @@ with a chosen set of constraints (scale limits or attained extremes, sample
 size, mean, granularity, and a reported Cronbach's alpha), in closed form.
 \code{brimmer()} turns those bounds into a report-level consistency
 verdict and its percent-of-maximum-possible (POMP) transforms;
-\code{brimmer_multiple()} applies it across a data frame. Companion
+\code{brimmer_map()} applies it across a data frame. Companion
 functions trace the feasible envelope (\code{sd_bounds_curve()}), build the
 jointly GRIM-, GRIMMER- and bounds-consistent grid (\code{umbrella_data()}),
 and visualise both on the native and POMP scales (\code{sd_bounds_plot()},

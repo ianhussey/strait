@@ -25,7 +25,7 @@ test_that("brimmest() never contradicts the closed-form screen's rejections", {
   for (cfg in list(c(9, 5), c(12, 5), c(11, 7))) {
     n <- cfg[1]; u <- cfg[2]
     um <- suppressWarnings(umbrella_data(n = n, l = 1, u = u, digits = 1,
-                                         Z = "integer"))
+                                         granularity = "integer"))
     cr <- brimmest(l = 1, u = u, n = n, mean = um$mean, sd = um$sd, digits_mean = 1, digits_sd = 1)
     expect_equal(sum(!um$consistent & cr$possible), 0L)
     expect_true(sum(um$consistent & !cr$possible) >= 0L)
@@ -72,7 +72,7 @@ test_that("brimmest() matches CLOSURE cell for cell", {
   skip_on_cran()
   skip_if_not_installed("unsum")
   um <- suppressWarnings(umbrella_data(n = 9, l = 1, u = 5, digits = 1,
-                                       Z = "integer"))
+                                       granularity = "integer"))
   cr <- brimmest(l = 1, u = 5, n = 9, mean = um$mean, sd = um$sd, digits_mean = 1, digits_sd = 1)
   cl <- vapply(seq_len(nrow(um)), function(i) {
     r <- try(suppressWarnings(unsum::closure_generate(

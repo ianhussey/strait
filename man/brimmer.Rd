@@ -15,7 +15,7 @@ brimmer(
   sd = NULL,
   digits_sd = NULL,
   rounding = "up_or_down",
-  Z = c("continuous", "integer", "quasiinteger"),
+  granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1,
   alpha = NULL
@@ -44,7 +44,7 @@ does; the SD columns are then \code{NA}.}
 as in scrutiny (default \code{"up_or_down"}); NULL treats inputs as exact. See
 \code{\link[=sd_bounds]{sd_bounds()}} and \code{\link[roundwork:unround]{roundwork::unround()}}.}
 
-\item{Z}{"continuous" (default), "integer", or "quasiinteger".}
+\item{granularity}{"continuous" (default), "integer", or "quasiinteger".}
 
 \item{scoring}{"singleitem" (default), "sumscored", or "meanscored".}
 
@@ -94,7 +94,7 @@ floor exceeding the alpha ceiling. An out-of-range mean reports as
 \code{in_scale_range} and a granular-impossible one as \code{grim}, so neither
 double-counts here.
 \item \code{grim}, \code{grimmer} — scrutiny's verdicts, deferred verbatim (only under
-\code{Z = "integer"} with \code{rounding}). NOTE scrutiny's GRIMMER (and, under
+\code{granularity = "integer"} with \code{rounding}). NOTE scrutiny's GRIMMER (and, under
 \code{rounding = "up"}, GRIM) have documented floating-point boundary bugs,
 including false flags under the default rounding. When GRIMMER is the ONLY
 failing test, the note says so explicitly, since that pattern matches
@@ -115,18 +115,18 @@ unused).
 # a perfectly ordinary report on a 1-7 scale
 # (witnessed by c(rep(1, 20), rep(7, 9), 6): mean 2.9667, sd 2.8343)
 brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-        sd = 2.83, digits_sd = 2, Z = "integer")
+        sd = 2.83, digits_sd = 2, granularity = "integer")
 
 # SD below the quasi-integer floor: inconsistent via the bounds test
 brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-        sd = 0.10, digits_sd = 2, Z = "quasiinteger")
+        sd = 0.10, digits_sd = 2, granularity = "quasiinteger")
 
 # GRIM-impossible mean: inconsistent via feasibility (and grim)
 brimmer(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2,
-        sd = 1.00, digits_sd = 2, Z = "integer")
+        sd = 1.00, digits_sd = 2, granularity = "integer")
 }
 \seealso{
 \code{\link[=brim]{brim()}} for the mean-side test, \code{\link[=brimmest]{brimmest()}} for the exact
 certificate that settles what this test can only screen, and
-\code{\link[=brimmer_multiple]{brimmer_multiple()}} to apply this across a data frame.
+\code{\link[=brimmer_map]{brimmer_map()}} to apply this across a data frame.
 }

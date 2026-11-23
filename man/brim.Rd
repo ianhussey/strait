@@ -13,7 +13,7 @@ brim(
   mean = NULL,
   digits_mean = NULL,
   rounding = "up_or_down",
-  Z = c("continuous", "integer", "quasiinteger"),
+  granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1
 )
@@ -34,7 +34,7 @@ brim(
 as in scrutiny (default \code{"up_or_down"}); NULL treats inputs as exact. See
 \code{\link[=sd_bounds]{sd_bounds()}} and \code{\link[roundwork:unround]{roundwork::unround()}}.}
 
-\item{Z}{"continuous" (default), "integer", or "quasiinteger".}
+\item{granularity}{"continuous" (default), "integer", or "quasiinteger".}
 
 \item{scoring}{"singleitem" (default), "sumscored", or "meanscored".}
 
@@ -58,7 +58,7 @@ observed minimum or maximum is reported.
 A thin wrapper on \code{\link[=brimmer]{brimmer()}} with no reported SD, so only the mean-side
 tests apply: \code{in_scale_range} (the reported mean's rounding interval must
 meet the feasible mean band, see \code{\link[=feasible_mean_band]{feasible_mean_band()}}) and, under
-\code{Z = "integer"} with \code{rounding}, scrutiny's \code{grim} verdict. GRIMMER is never
+\code{granularity = "integer"} with \code{rounding}, scrutiny's \code{grim} verdict. GRIMMER is never
 invoked, and the SD-side columns are omitted rather than returned as \code{NA}.
 
 The two tests are independent and name different defects: a mean can be out

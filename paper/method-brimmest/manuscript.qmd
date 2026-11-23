@@ -121,7 +121,7 @@ screen-passers into the truly possible and the blind spot.
 #| fig-cap: 'The blind spot of the closed-form screens. Every reportable (mean, SD) cell for a 1--5 scale, n = 9, one decimal place. Grey cells fail at least one closed-form test (bounds, GRIM, or GRIMMER). Blue cells pass the screens and are certified possible. Red cells pass every closed-form screen and are certified impossible: no sample of nine integers on 1--5 rounds to them. The annotated cell is the example from the introduction.'
 #| fig-width: 7
 #| fig-height: 4.5
-um <- umbrella_data(n = 9, l = 1, u = 5, digits = 1, Z = "integer")
+um <- umbrella_data(n = 9, l = 1, u = 5, digits = 1, granularity = "integer")
 cert <- brimmest(l = 1, u = 5, n = 9, mean = um$mean, sd = um$sd, digits_mean = 1, digits_sd = 1)
 
 um$status <- ifelse(!um$consistent, "fails a screen",

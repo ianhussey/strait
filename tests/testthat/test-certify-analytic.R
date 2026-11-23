@@ -85,13 +85,13 @@ test_that("engine = 'both' finds no disagreement on a wide design (targeted rout
   expect_identical(r$rules, s$rules)
 })
 
-test_that("brimmest_multiple passes engine through as a call constant", {
+test_that("brimmest_map passes engine through as a call constant", {
   reports <- data.frame(mean = c(3.0, 1.3), sd = c(1.0, 0.9))
-  r <- brimmest_multiple(reports, l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
+  r <- brimmest_map(reports, l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
                          engine = "both")
   expect_identical(r$possible, c(TRUE, FALSE))
   expect_error(
-    brimmest_multiple(cbind(reports, engine = "analytic"),
+    brimmest_map(cbind(reports, engine = "analytic"),
                       l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1),
     "constant"
   )

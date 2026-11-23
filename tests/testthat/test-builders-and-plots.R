@@ -1,5 +1,5 @@
 test_that("sd_bounds_curve() is hole-free under quasi-integer", {
-  cv <- sd_bounds_curve(l = 1, u = 7, n = 30, Z = "quasiinteger")
+  cv <- sd_bounds_curve(l = 1, u = 7, n = 30, granularity = "quasiinteger")
   expect_true(all(c("mean", "min_sd", "max_sd", "feasible", "pomp_mean",
                     "parity_max", "ceil_parity", "floor_parity") %in% names(cv)))
   expect_false(any(is.na(cv$min_sd[cv$feasible])))
@@ -27,17 +27,17 @@ test_that("umbrella_data() passing set matches an independent GRIMMER + bounds s
 })
 
 test_that("the plot functions return ggplot objects", {
-  cv  <- sd_bounds_curve(l = 1, u = 7, n = 30, Z = "quasiinteger")
-  pts <- brimmer_multiple(
+  cv  <- sd_bounds_curve(l = 1, u = 7, n = 30, granularity = "quasiinteger")
+  pts <- brimmer_map(
     data.frame(mean = c(3, 4, 5), sd = c(2.5, 0.2, 1.8)),
-    l = 1, u = 7, n = 30, digits_mean = 1, digits_sd = 1, Z = "quasiinteger")
+    l = 1, u = 7, n = 30, digits_mean = 1, digits_sd = 1, granularity = "quasiinteger")
   expect_s3_class(sd_bounds_plot(cv, reports = pts), "ggplot")
   expect_s3_class(sd_bounds_plot(sd_region_data(1, 7, 30), reports = pts), "ggplot")
   expect_s3_class(sd_bounds_pomp_plot(cv, reports = pts, reference = "parity"), "ggplot")
   expect_s3_class(sd_bounds_pomp_plot(cv, reports = pts, reference = "sharp"), "ggplot")
   um <- umbrella_data(n = 12, l = 1, u = 7, digits = 2)
   expect_s3_class(umbrella_plot(um, bounds = sd_bounds_curve(l = 1, u = 7, n = 12,
-                                                             Z = "quasiinteger")), "ggplot")
+                                                             granularity = "quasiinteger")), "ggplot")
 })
 
 test_that("umbrella_plot() fills a band", {
@@ -139,12 +139,12 @@ test_that("a hole-free band is one ring, however dense the kink lattice", {
   # n = 30 was already fine; 60 and 200 are the cases the median guess broke,
   # at 921 and 2001 rings respectively
   for (n in c(30, 60, 200)) {
-    cv <- sd_bounds_curve(l = 1, u = 7, n = n, Z = "quasiinteger")
+    cv <- sd_bounds_curve(l = 1, u = 7, n = n, granularity = "quasiinteger")
     expect_equal(n_rings(sd_bounds_plot(cv)), 1L,
                  info = sprintf("l = 1, u = 7, n = %d", n))
   }
   # and on a wider scale, where the threshold is crossed sooner
-  cv <- sd_bounds_curve(l = 0, u = 10, n = 80, Z = "quasiinteger")
+  cv <- sd_bounds_curve(l = 0, u = 10, n = 80, granularity = "quasiinteger")
   expect_equal(n_rings(sd_bounds_plot(cv)), 1L)
 })
 
@@ -153,15 +153,15 @@ test_that("genuine gaps in the band still split it into separate rings", {
   # band is a comb: merging those into one ring would shade the impossible
   # means between the teeth as feasible, the error band_polygon() exists to
   # prevent. The fix must not over-merge.
-  cv <- sd_bounds_curve(l = 1, u = 7, n = 30, Z = "integer")
+  cv <- sd_bounds_curve(l = 1, u = 7, n = 30, granularity = "integer")
   expect_gt(n_rings(sd_bounds_plot(cv)), 50L)
 })
 
 test_that("a hand-built uniform curve still works without the attribute", {
-  cv <- sd_bounds_curve(l = 1, u = 7, n = 60, Z = "quasiinteger")
+  cv <- sd_bounds_curve(l = 1, u = 7, n = 60, granularity = "quasiinteger")
   flat <- data.frame(mean = seq(1, 7, by = 0.006))
   bd <- do.call(rbind, lapply(flat$mean, function(m)
-    sd_bounds(l = 1, u = 7, n = 60, mean = m, Z = "quasiinteger")))
+    sd_bounds(l = 1, u = 7, n = 60, mean = m, granularity = "quasiinteger")))
   flat$min_sd <- bd$min_sd
   flat$max_sd <- bd$max_sd
   flat$feasible <- bd$feasible

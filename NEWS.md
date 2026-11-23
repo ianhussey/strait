@@ -15,15 +15,19 @@
 
 ## Breaking changes
 
+* `Z` is now `granularity`, and `brimmer_multiple()` and
+  `brimmest_multiple()` are now `brimmer_map()` and `brimmest_map()`, after
+  scrutiny's mappers such as `grim_map()`.
+
 * Arguments, rounding methods and return values follow scrutiny:
   * Decimal places are `digits_mean` and `digits_sd`, as `digits_x` and
     `digits_sd` in scrutiny, instead of `mean_digits` and `sd_digits`, in
-    `sd_bounds()`, `brim()`, `brimmer()`, `brimmer_multiple()`,
-    `implied_range()`, `brimmest()` and `brimmest_multiple()`. `brimmest()`
+    `sd_bounds()`, `brim()`, `brimmer()`, `brimmer_map()`,
+    `implied_range()`, `brimmest()` and `brimmest_map()`. `brimmest()`
     no longer takes `digits` for both; it requires `digits_mean` and
     `digits_sd`.
   * `rounding` takes scrutiny's names everywhere. `brimmest()` and
-    `brimmest_multiple()` take `"up_or_down"` (the new default, standing for
+    `brimmest_map()` take `"up_or_down"` (the new default, standing for
     `"up"` and `"down"`), `"ceiling_or_floor"`, `"up"`, `"down"`, `"even"`,
     `"ceiling"`, `"floor"`, `"trunc"` and `"anti_trunc"`, instead of
     `"half_up"`, `"half_down"` and `"native"`; `sd_region_data()` takes one of
@@ -38,10 +42,10 @@
     `umbrella_data(l, u, n, ...)` instead of `umbrella_data(n, l, u, ...)`.
 
 * As in scrutiny, a missing input gives a missing verdict. `brimmer()`,
-  `brim()`, `brimmer_multiple()` and `implied_range()` return `NA` with a note
+  `brim()`, `brimmer_map()` and `implied_range()` return `NA` with a note
   naming the input, and `brimmest()` returns `possible = NA` for a missing mean
   or SD. Before, a missing SD passed `brimmer()` as consistent, or failed it as
-  GRIMMER-inconsistent under `Z = "integer"`.
+  GRIMMER-inconsistent under `granularity = "integer"`.
 
 * Inputs are validated with clear errors: `n` must be one whole number of at
   least 2, scale limits and reported values single finite numbers, SDs
@@ -120,7 +124,7 @@
   it, which misfiles SDs that lie that close to a tie without being on it, as
   large samples produce. Its cache keeps at most four designs.
 
-* `brimmer_multiple()` reads factor columns as strings, and passes a constant
+* `brimmer_map()` reads factor columns as strings, and passes a constant
   given as `NULL`, such as `rounding = NULL`, instead of replacing it with
   `brimmer()`'s default.
 
@@ -130,7 +134,7 @@
   and real data may be forced to cover more.
 
 * `sd_bounds()` accepts limits on the `1 / n_items` grid of mean-scored data
-  under `Z = "integer"` and `"quasiinteger"`, not only whole numbers.
+  under `granularity = "integer"` and `"quasiinteger"`, not only whole numbers.
 
 * `umbrella_data()` tests each SD with its own rounding interval under the
   chosen `rounding`, rather than a symmetric one.

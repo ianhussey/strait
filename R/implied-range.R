@@ -12,7 +12,7 @@
 #' Each result is found by moving one scale limit inward until [brimmer()] no
 #' longer calls the report consistent, so it can never disagree with the bounds
 #' test. Moving a limit can only narrow the bounds, so the search is a
-#' bisection. Under `Z = "integer"` and `"quasiinteger"` the limit moves along
+#' bisection. Under `granularity = "integer"` and `"quasiinteger"` the limit moves along
 #' the response grid (the integers, or the `1 / n_items` lattice of a
 #' mean-scored composite); under `"continuous"`, to within `1e-6` of the scale
 #' range.
@@ -46,12 +46,12 @@
 #' # an SD near the ceiling of a 1-7 scale: the data must include both a 1
 #' # and a 7
 #' implied_range(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'               sd = 2.83, digits_sd = 2, Z = "integer")
+#'               sd = 2.83, digits_sd = 2, granularity = "integer")
 #'
 #' # a small SD forces only neighbouring values: at least one response of 3 or
 #' # lower, and one of 5 or higher
 #' implied_range(l = 1, u = 7, n = 30, mean = 4.00, digits_mean = 2,
-#'               sd = 0.53, digits_sd = 2, Z = "integer")
+#'               sd = 0.53, digits_sd = 2, granularity = "integer")
 #' @export
 implied_range <- function(
   l = NULL,
@@ -64,11 +64,11 @@ implied_range <- function(
   sd = NULL,
   digits_sd = NULL,
   rounding = "up_or_down",
-  Z = c("continuous", "integer", "quasiinteger"),
+  granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1
 ) {
-  Z <- match.arg(Z)
+  granularity <- match.arg(granularity)
   scoring <- match.arg(scoring)
   if (is.null(sd)) {
     stop("implied_range() needs a reported sd")
@@ -91,7 +91,7 @@ implied_range <- function(
       sd = sd,
       digits_sd = digits_sd,
       rounding = rounding,
-      Z = Z,
+      granularity = granularity,
       scoring = scoring,
       n_items = n_items
     )$consistent
@@ -114,7 +114,7 @@ implied_range <- function(
     sd = sd,
     digits_sd = digits_sd,
     rounding = rounding,
-    Z = Z,
+    granularity = granularity,
     scoring = scoring,
     n_items = n_items
   )
@@ -136,7 +136,7 @@ implied_range <- function(
   } else {
     .unround(mean, digits_mean, rounding, "mean", "digits_mean")
   }
-  granular <- Z != "continuous"
+  granular <- granularity != "continuous"
   span <- upper - lower
   # the response grid a granular limit moves along
   unit <- if (scoring == "meanscored") 1 / n_items else 1
@@ -176,7 +176,7 @@ implied_range <- function(
   d_room <- function(to_mean) {
     min(to_mean, span - if (granular) unit else 1e-9 * span)
   }
-  back <- if (Z == "integer") unit else 0
+  back <- if (granularity == "integer") unit else 0
   # where nothing is forced, the mean's interval, snapped inward to that grid
   snap <- function(d) if (back > 0) floor(d / back + 1e-9) * back else d
 
