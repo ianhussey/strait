@@ -27,7 +27,7 @@ sd_bounds_curve(
 \item{by}{Numeric or NULL; mean-grid spacing (default ~ \code{(u - l) / 1000}).}
 }
 \value{
-A data.frame: \code{mean}, \code{min_sd}, \code{max_sd}, \code{feasible}, \code{pomp_mean},
+A tibble: \code{mean}, \code{min_sd}, \code{max_sd}, \code{feasible}, \code{pomp_mean},
 \code{parity_max}, \code{ceil_parity} (= \code{max_sd / parity_max}), \code{floor_parity}.
 The \code{"step"} attribute records the uniform grid spacing \code{by} actually
 used. The mean grid is deliberately NOT uniform - the kinks and their

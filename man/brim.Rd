@@ -11,7 +11,7 @@ brim(
   b = NULL,
   n = NULL,
   mean = NULL,
-  mean_digits = NULL,
+  digits_mean = NULL,
   rounding = "up_or_down",
   Z = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
@@ -27,12 +27,12 @@ brim(
 
 \item{mean}{Numeric scalar or NULL, the reported mean.}
 
-\item{mean_digits}{Integer scalar or NULL, its reported decimal places
+\item{digits_mean}{Integer scalar or NULL, its reported decimal places
 (required when \code{mean} and \code{rounding} are both given).}
 
-\item{rounding}{Rounding rule for unrounding the reported values
-(default \code{"up_or_down"}); NULL treats inputs as exact. See
-\code{\link[=unround_interval]{unround_interval()}}.}
+\item{rounding}{Rounding method for unrounding the reported values, named
+as in scrutiny (default \code{"up_or_down"}); NULL treats inputs as exact. See
+\code{\link[=sd_bounds]{sd_bounds()}} and \code{\link[roundwork:unround]{roundwork::unround()}}.}
 
 \item{Z}{"continuous" (default), "integer", or "quasiinteger".}
 
@@ -41,7 +41,7 @@ brim(
 \item{n_items}{Positive whole number of response items (default 1).}
 }
 \value{
-A one-row data.frame: \code{consistent} (logical), \code{failed_tests}
+A one-row tibble: \code{consistent} (logical), \code{failed_tests}
 (comma-separated, "" if none), \code{in_scale_range}, \code{grim}, the feasible mean
 band \code{band_lo} and \code{band_hi}, \code{pomp_mean}, and \code{note}.
 }
@@ -67,14 +67,14 @@ the range but GRIM-impossible (3.51 at \code{n = 30}), or both (7.51).
 }
 \examples{
 # an ordinary mean on a 1-7 scale
-brim(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2)
+brim(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2)
 
 # a mean above the scale maximum cannot be attained
-brim(l = 1, u = 7, n = 30, mean = 7.5, mean_digits = 1)
+brim(l = 1, u = 7, n = 30, mean = 7.5, digits_mean = 1)
 
 # attained extremes narrow the band, and can exclude a mean the bare
 # scale limits would allow
-brim(a = 1, b = 7, n = 30, mean = 1.10, mean_digits = 2)
+brim(a = 1, b = 7, n = 30, mean = 1.10, digits_mean = 2)
 }
 \seealso{
 \code{\link[=brimmer]{brimmer()}} for the SD-side test, \code{\link[=brimmest]{brimmest()}} for the exact

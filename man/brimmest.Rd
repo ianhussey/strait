@@ -10,10 +10,9 @@ brimmest(
   n,
   mean,
   sd,
-  digits = NULL,
-  mean_digits = NULL,
-  sd_digits = NULL,
-  rounding = c("half_up", "half_down"),
+  digits_mean,
+  digits_sd,
+  rounding = "up_or_down",
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1,
   max_cells = 2e+07,
@@ -28,18 +27,16 @@ units when \code{n_items > 1} and \code{scoring} is \code{"meanscored"}).}
 \item{n}{Integer scalar, sample size.}
 
 \item{mean, sd}{Numeric vectors of reported means and SDs, recycled against
-each other. All are certified against one lattice.}
+each other. All are certified against one lattice. A missing value gives
+a missing verdict.}
 
-\item{digits}{Integer, the reported decimal places, used for both \code{mean}
-and \code{sd} unless the next two are given.}
+\item{digits_mean, digits_sd}{Integer scalars, the reported decimal places
+of the mean and the SD, as in scrutiny.}
 
-\item{mean_digits, sd_digits}{Integer scalars or NULL; reported decimal
-places when the mean and SD are reported to different precision.}
-
-\item{rounding}{Character vector of rounding rules to admit, from
-\code{"half_up"}, \code{"half_down"}, \code{"native"}, \code{"ceiling"}, \code{"floor"},
-\code{"trunc"}, \code{"anti_trunc"}. A tuple is possible if it is reachable under
-any of them.}
+\item{rounding}{Character vector of rounding methods to admit, named as in
+scrutiny: \code{"up_or_down"} (default), \code{"ceiling_or_floor"}, \code{"up"},
+\code{"down"}, \code{"even"}, \code{"ceiling"}, \code{"floor"}, \code{"trunc"}, \code{"anti_trunc"}. A
+tuple is possible if it is reachable under any of them.}
 
 \item{scoring}{"singleitem" (default), "sumscored", or "meanscored".}
 
@@ -62,8 +59,8 @@ cross-check; also applied against the lattice when the lattice route is
 taken). All rounding rules are supported identically by every engine.}
 }
 \value{
-A data.frame with one row per reported tuple: \code{mean}, \code{sd},
-\code{possible} (logical), and \code{rules} — the rounding rules under which the
+A tibble with one row per reported tuple: \code{mean}, \code{sd},
+\code{possible} (logical), and \code{rules} — the rounding methods under which the
 tuple is reachable, comma-separated and \code{""} when none.
 }
 \description{
@@ -104,7 +101,8 @@ are produced: the lattice records which \verb{(mean, sd)} pairs are reachable,
 not how. In exchange the cost depends only on \code{l}, \code{u} and \code{n}, not on how
 many datasets happen to satisfy the constraints. The certification
 validation document in \verb{validation/} reports the comparison against CLOSURE
-in full.
+in full (it ships with the package's source repository, not the installed
+package).
 }
 \section{How the work is done}{
 
@@ -149,25 +147,30 @@ sweep at all.
 A hit certifies possibility under whichever rounding rule produced it. A
 miss certifies impossibility only \emph{relative to the rules in \code{rounding}},
 because a report unreachable under one convention may be reachable under
-another. The default takes the union of \code{"half_up"} and \code{"half_down"},
+another. The default, \code{"up_or_down"}, takes the union of \code{"up"} and \code{"down"},
 which spans the usual ambiguity about how a source rounded its halves.
 Narrow it only when the source's convention is actually known: certifying
 against one rule when the paper used another manufactures a false
-impossibility. Note that unlike \code{\link[=brimmer]{brimmer()}} there is no \code{"up_or_down"}
-option, since rounding the lattice forward needs a definite direction.
+impossibility. Rounding the lattice forward needs a definite direction, so
+the compound methods \code{"up_or_down"} and \code{"ceiling_or_floor"} stand for
+their two parts, and \code{"even"} lets a tie round either way, as
+\code{\link[roundwork:unround]{roundwork::unround()}} does, since software does not reliably round decimal
+ties to even.
 }
 
 \examples{
 # a report a real 1-5 scale sample can produce
-brimmest(l = 1, u = 5, n = 9, mean = 3.0, sd = 1.0, digits = 1)
+brimmest(l = 1, u = 5, n = 9, mean = 3.0, sd = 1.0, digits_mean = 1,
+         digits_sd = 1)
 
 # inside the SD bounds and passing GRIM and GRIMMER, yet no integer
 # sample produces it: the residual blind spot of the closed-form screen
-brimmest(l = 1, u = 5, n = 9, mean = 1.3, sd = 0.9, digits = 1)
+brimmest(l = 1, u = 5, n = 9, mean = 1.3, sd = 0.9, digits_mean = 1,
+         digits_sd = 1)
 
 # one lattice certifies many reports at once
-brimmest(l = 1, u = 5, n = 9, digits = 1,
-        mean = c(3.0, 1.3, 2.5), sd = c(1.0, 0.9, 1.2))
+brimmest(l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
+         mean = c(3.0, 1.3, 2.5), sd = c(1.0, 0.9, 1.2))
 }
 \seealso{
 \code{\link[=brim]{brim()}} and \code{\link[=brimmer]{brimmer()}} for the closed-form screens to run

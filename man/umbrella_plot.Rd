@@ -92,7 +92,7 @@ The gap is not always small — 9\\% at \verb{l = 1, u = 5, n = 10}, and nearly 
 factor of three at \verb{l = 0, u = 6, n = 23} with two items.
 }
 \examples{
-grid <- umbrella_data(n = 12, l = 1, u = 3, digits = 1)
+grid <- umbrella_data(l = 1, u = 3, n = 12, digits = 1)
 umbrella_plot(grid, title = "n = 12, 1-3 scale")
 
 # the previous look, separating the two ways a tuple can be ruled out

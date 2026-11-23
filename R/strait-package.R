@@ -1,4 +1,4 @@
-#' strait: Truncation-Induced Dependency among Summary Statistics
+#' strait: Bounds Checks for Reported Summary Statistics
 #'
 #' A forensic meta-science / trustworthiness-assessment toolkit for checking
 #' whether reported means, standard deviations and sample sizes measured on a

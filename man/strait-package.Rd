@@ -4,7 +4,7 @@
 \name{strait-package}
 \alias{strait}
 \alias{strait-package}
-\title{strait: Truncation-Induced Dependency among Summary Statistics}
+\title{strait: Bounds Checks for Reported Summary Statistics}
 \description{
 A forensic meta-science / trustworthiness-assessment toolkit for checking
 whether reported means, standard deviations and sample sizes measured on a
@@ -28,6 +28,12 @@ worked example and the method background.
 }
 \author{
 \strong{Maintainer}: Ian Hussey \email{ian.hussey@unibe.ch} (\href{https://orcid.org/0000-0001-8906-7559}{ORCID})
+
+Other contributors:
+\itemize{
+  \item Lukas Jung [contributor]
+  \item Jamie Cummins [contributor]
+}
 
 }
 \keyword{internal}

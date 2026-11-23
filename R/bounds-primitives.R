@@ -14,7 +14,7 @@
 #                       sd_min_two_pin, sd_min_one_pin         (attained)
 #            feasibility: feasible_mean_band
 #   Layer 2  alpha composite layer: v_max_alpha, sd_bounds_alpha
-#   Layer 3  rounding layer: infer_digits, unround_interval
+#   Layer 3  rounding layer: .check_rounding, .unround (via roundwork)
 #
 # CONVENTIONS
 #   - All SDs are sample SDs (Bessel, n - 1 divisor).
@@ -28,7 +28,7 @@
 #     continuous data (endpoint counts must be whole regardless), and is
 #     unchanged by attainment inside the feasible mean band.
 #   - A reported mean may be treated as exact (default) or as a rounded or
-#     truncated value via `digits` + `rounding` (scrutiny-style options); the
+#     truncated value via `digits_mean` + `rounding` (scrutiny's options); the
 #     bounds are then the ENVELOPE over all exact means consistent with the
 #     report: min over the interval of the floor, max over it of the ceiling.
 
@@ -113,8 +113,8 @@ sd_max_span <- function(lower, upper) (upper - lower) / sqrt(2)
 #' configuration occupies both limits).
 #'
 #' @param lower,upper Numeric scalars, the effective limits.
-#' @param n Integer scalar, sample size, `n >= 2`.
-#' @return Numeric scalar, the maximum sample SD.
+#' @param n Integer vector, sample size(s), `n >= 2`.
+#' @return Numeric, the maximum sample SD.
 #' @examples
 #' # an even n splits exactly; an odd n pays the parity correction
 #' sd_max_span_n(lower = 1, upper = 7, n = 30)
@@ -124,8 +124,7 @@ sd_max_span <- function(lower, upper) (upper - lower) / sqrt(2)
 #' sd_max_span(lower = 1, upper = 7)
 #' @export
 sd_max_span_n <- function(lower, upper, n) {
-  R <- upper - lower
-  if (n %% 2 == 0) (R / 2) * sqrt(n / (n - 1)) else (R / 2) * sqrt((n + 1) / n)
+  (upper - lower) / 2 * ifelse(n %% 2 == 0, sqrt(n / (n - 1)), sqrt((n + 1) / n))
 }
 
 #' Smooth mean-conditional maximum SD (Muilwijk / Bhatia-Davis)
@@ -555,96 +554,48 @@ sd_bounds_alpha <- function(l, u, n, mean, Z, alpha, k_items) {
 
 # ---- Layer 3: rounding / truncation of reported inputs -----------------------
 
-#' Infer the number of reported decimal places
-#'
-#' From a character input, the count of digits after the decimal point (so
-#' `"2.90"` gives 2). From a numeric input the same after `as.character()`,
-#' which cannot see trailing zeros (`2.90` gives 1) — pass the reported value
-#' as a string to preserve them, as the scrutiny package advises.
-#'
-#' @param x Character or numeric scalar, the reported value.
-#' @return Integer, the inferred number of decimal places.
-#' @examples
-#' # a string preserves trailing zeros
-#' infer_digits("2.90")
-#'
-#' # a numeric cannot: 2.90 is stored as 2.9
-#' infer_digits(2.90)
-#' infer_digits(3)
-#' @export
-infer_digits <- function(x) {
-  s <- if (is.character(x)) x else as.character(x)
-  if (!grepl("\\.", s)) return(0L)
-  nchar(sub("^-?[0-9]*\\.", "", s))
-}
+# The rounding methods strait accepts, named as in scrutiny and roundwork.
+# The threshold methods ("up_from", ...) are left out: strait has no
+# `threshold` argument, and at its default they equal "up", "down" and
+# "up_or_down".
+# fmt: skip
+ROUNDING_METHODS <- c(
+  "up_or_down", "ceiling_or_floor", "up", "down", "even",
+  "ceiling", "floor", "trunc", "anti_trunc",
+  "ties_up", "ties_down", "ties_away", "ties_zero", "ties_even"
+)
 
-#' Reconstruct the interval of exact values behind a rounded/truncated report
-#'
-#' Given a reported value and the rounding procedure that produced it, returns
-#' the interval of exact values consistent with the report, in the style of
-#' scrutiny's `unround()`. With `unit = 10^-digits` and `h = unit / 2`:
-#'
-#' * `"up_or_down"` (default): `[x - h, x + h]`, both endpoints included —
-#'   the agnostic choice when the rounding direction at ties is unknown.
-#' * `"up"` (round half up): `[x - h, x + h)`.
-#' * `"down"` (round half down): `(x - h, x + h]`.
-#' * `"even"` (banker's): `[x - h, x + h]` both included — conservative, since
-#'   whether a tie rounds to `x` depends on the parity of its last digit.
-#' * `"ceiling"`: `(x - unit, x]`.
-#' * `"floor"`: `[x, x + unit)`.
-#' * `"trunc"` (toward zero): `[x, x + unit)` for `x >= 0`, `(x - unit, x]`
-#'   for `x < 0`.
-#' * `"anti_trunc"` (away from zero): the mirror of `"trunc"`.
-#'
-#' Mirroring scrutiny's post-string API, the primary contract is a numeric `x`
-#' with `digits` supplied explicitly. A character `x` is accepted as a
-#' convenience for wrappers built above this layer (digits then inferred via
-#' [infer_digits()], preserving trailing zeros); a numeric `x` with `digits`
-#' missing is an error, because trailing zeros cannot be recovered from a
-#' numeric.
-#'
-#' @param x Numeric scalar, the reported value (character accepted for
-#'   digit inference only).
-#' @param digits Integer, reported decimal places. Required when `x` is
-#'   numeric.
-#' @param rounding One of the options above.
-#' @return List: `lo`, `hi` (numeric), `lo_incl`, `hi_incl` (logical),
-#'   `digits` (integer used).
-#' @examples
-#' # the exact values that could have been reported as 2.97
-#' unround_interval(2.97, digits = 2)
-#'
-#' # truncation rather than rounding shifts the interval
-#' unround_interval(2.97, digits = 2, rounding = "trunc")
-#'
-#' # digits are inferred from a string, so trailing zeros are honoured
-#' unround_interval("2.90")
-#' @export
-unround_interval <- function(x, digits = NULL,
-                             rounding = c("up_or_down", "up", "down", "even",
-                                          "ceiling", "floor", "trunc", "anti_trunc")) {
-  rounding <- match.arg(rounding)
-  if (is.null(digits)) {
-    if (!is.character(x))
-      stop("digits must be supplied for numeric x (trailing zeros are not recoverable); ",
-           "or pass the reported value as a string for inference via infer_digits()")
-    digits <- infer_digits(x)
+# Internal: check a `rounding` value against `allowed`, pointing the names
+# strait used before 0.5.0 to their scrutiny equivalents.
+.check_rounding <- function(rounding, allowed = ROUNDING_METHODS,
+                            several = FALSE) {
+  old <- c(half_up = "up", half_down = "down", native = "even")
+  if (!is.character(rounding) || !length(rounding) ||
+      (!several && length(rounding) != 1L))
+    stop("`rounding` must be ", if (several) "a character vector" else
+      "a single string", " naming a rounding method", call. = FALSE)
+  bad <- setdiff(rounding, allowed)
+  if (length(bad)) {
+    hint <- intersect(bad, names(old))
+    stop("unknown rounding method(s): ", paste(bad, collapse = ", "), ". ",
+         if (length(hint)) paste0("strait now uses scrutiny's names: ",
+           paste0('"', hint, '" is "', old[hint], '"', collapse = ", "),
+           ". "),
+         "Choose from: ", paste(allowed, collapse = ", "), call. = FALSE)
   }
-  xv <- as.numeric(x)
-  unit <- 10^(-digits)
-  h <- unit / 2
-  res <- switch(rounding,
-    up_or_down = list(lo = xv - h,    hi = xv + h,    lo_incl = TRUE,  hi_incl = TRUE),
-    up         = list(lo = xv - h,    hi = xv + h,    lo_incl = TRUE,  hi_incl = FALSE),
-    down       = list(lo = xv - h,    hi = xv + h,    lo_incl = FALSE, hi_incl = TRUE),
-    even       = list(lo = xv - h,    hi = xv + h,    lo_incl = TRUE,  hi_incl = TRUE),
-    ceiling    = list(lo = xv - unit, hi = xv,        lo_incl = FALSE, hi_incl = TRUE),
-    floor      = list(lo = xv,        hi = xv + unit, lo_incl = TRUE,  hi_incl = FALSE),
-    trunc      = if (xv >= 0) list(lo = xv,        hi = xv + unit, lo_incl = TRUE,  hi_incl = FALSE)
-                 else         list(lo = xv - unit, hi = xv,        lo_incl = FALSE, hi_incl = TRUE),
-    anti_trunc = if (xv >= 0) list(lo = xv - unit, hi = xv,        lo_incl = FALSE, hi_incl = TRUE)
-                 else         list(lo = xv,        hi = xv + unit, lo_incl = TRUE,  hi_incl = FALSE)
-  )
-  c(res, list(digits = digits))
+  rounding
 }
 
+# Internal: the interval of exact values behind reported values `x` with
+# `digits` decimal places, from roundwork::unround(), so that strait unrounds
+# exactly as scrutiny does. Vectorised over `x`. `arg` and `arg_digits` name
+# the arguments in errors.
+.unround <- function(x, digits, rounding, arg = "x", arg_digits = "digits") {
+  if (any(abs(x - round(x, digits)) > 1e-9 * pmax(1, abs(x))))
+    stop(sprintf("`%s` has more decimal places than `%s` states (%s)", arg,
+                 arg_digits, paste(digits, collapse = ", ")), call. = FALSE)
+  r <- roundwork::unround(round(x, digits), rounding = rounding,
+                          digits = digits)
+  list(lo = r$lower, hi = r$upper, lo_incl = r$incl_lower,
+       hi_incl = r$incl_upper)
+}

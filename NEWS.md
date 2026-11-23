@@ -11,6 +11,41 @@
 
 ## Breaking changes
 
+* Arguments, rounding methods and return values follow scrutiny:
+  * Decimal places are `digits_mean` and `digits_sd`, as `digits_x` and
+    `digits_sd` in scrutiny, instead of `mean_digits` and `sd_digits`, in
+    `sd_bounds()`, `brim()`, `brimmer()`, `brimmer_multiple()`,
+    `implied_range()`, `brimmest()` and `brimmest_multiple()`. `brimmest()`
+    no longer takes `digits` for both; it requires `digits_mean` and
+    `digits_sd`.
+  * `rounding` takes scrutiny's names everywhere. `brimmest()` and
+    `brimmest_multiple()` take `"up_or_down"` (the new default, standing for
+    `"up"` and `"down"`), `"ceiling_or_floor"`, `"up"`, `"down"`, `"even"`,
+    `"ceiling"`, `"floor"`, `"trunc"` and `"anti_trunc"`, instead of
+    `"half_up"`, `"half_down"` and `"native"`; `sd_region_data()` takes one of
+    these, with `"up"` as the default. The old names are an error that names
+    the new one.
+  * Reported values are unrounded by `roundwork::unround()`, so strait and
+    scrutiny agree on every method. `unround_interval()` is removed: use
+    `roundwork::unround()`. `infer_digits()` is removed: use
+    `scrutiny::decimal_places()`.
+  * Every function that returns a table returns a tibble.
+  * `umbrella_data()` takes the scale first, like every other function:
+    `umbrella_data(l, u, n, ...)` instead of `umbrella_data(n, l, u, ...)`.
+
+* As in scrutiny, a missing input gives a missing verdict. `brimmer()`,
+  `brim()`, `brimmer_multiple()` and `implied_range()` return `NA` with a note
+  naming the input, and `brimmest()` returns `possible = NA` for a missing mean
+  or SD. Before, a missing SD passed `brimmer()` as consistent, or failed it as
+  GRIMMER-inconsistent under `Z = "integer"`.
+
+* Inputs are validated with clear errors: `n` must be one whole number of at
+  least 2, scale limits and reported values single finite numbers, SDs
+  non-negative, and a reported value must not have more decimal places than
+  its `digits_*` states. `brimmest()` now checks this on its targeted route
+  too, where a non-integer scale width, a non-integer `n` or a negative SD used
+  to be accepted.
+
 * `sd_plausibility()`, `rho_from_summary()`, `s2_exact()` and
   `rho_corpus_fit()` use strait's argument names:
   `sd_plausibility(l, u, n, mean, sd = NULL, ..., digits_mean = NULL)`,
@@ -65,6 +100,39 @@
 
 ## Bug fixes
 
+* `brimmest()` gave different verdicts on its two routes, so `engine = "both"`
+  stopped with "This is a bug":
+  * Under banker's rounding (`"even"`, formerly `"native"`), the targeted route
+    let a tie round either way while the lattice route rounded it to even. Both
+    now let a tie round either way, as `roundwork::unround()` does, because
+    software does not reliably round decimal ties to even.
+  * Under `"trunc"`, a reported 0 was unrounded to `[0, unit)`, though
+    truncation sends all of `(-unit, unit)` to 0, so a real sample with a small
+    negative mean was called impossible. `"anti_trunc"` had the mirror error and
+    admitted impossible reports.
+
+* `brimmest()`'s lattice route rounds the attainable means and SDs exactly, in
+  integer arithmetic. It used to snap values within 1e-9 of a rounding tie onto
+  it, which misfiles SDs that lie that close to a tie without being on it, as
+  large samples produce. Its cache keeps at most four designs.
+
+* `brimmer_multiple()` reads factor columns as strings, and passes a constant
+  given as `NULL`, such as `rounding = NULL`, instead of replacing it with
+  `brimmer()`'s default.
+
+* `implied_range()` moves a limit along the `1 / n_items` grid of mean-scored
+  data rather than in whole numbers, which gave looser bounds. Its help page no
+  longer calls the results exact: they are the range `brimmer()` can prove,
+  and real data may be forced to cover more.
+
+* `sd_bounds()` accepts limits on the `1 / n_items` grid of mean-scored data
+  under `Z = "integer"` and `"quasiinteger"`, not only whole numbers.
+
+* `umbrella_data()` tests each SD with its own rounding interval under the
+  chosen `rounding`, rather than a symmetric one.
+
+* `sd_max_span_n()` is vectorised over `n`.
+
 * `grim_aggregate()`:
   * Missing values in `x`, `n`, `digits_x` or `items_averaged`, an infinite
     `n`, and an empty `data` are errors. Before, a malformed mean such as
@@ -94,6 +162,9 @@
     reuses it for every `p`.
   * The help page gains an Accuracy section: with strong skew, the `"chisq3"`
     and `"cf"` lower bounds can be anti-conservative.
+
+* The plots use scrutiny's colours for consistent and inconsistent values,
+  which colour-blind readers can tell apart.
 
 * Under `scoring = "sumscored"`, the GRIM and GRIMMER verdicts of `sd_bounds()`,
   `brimmer()`, and `umbrella_data()` treated each sum score as the average of
@@ -180,6 +251,72 @@
 
 ## Bug fixes
 
+* `brimmest()` gave different verdicts on its two routes, so `engine = "both"`
+  stopped with "This is a bug":
+  * Under banker's rounding (`"even"`, formerly `"native"`), the targeted route
+    let a tie round either way while the lattice route rounded it to even. Both
+    now let a tie round either way, as `roundwork::unround()` does, because
+    software does not reliably round decimal ties to even.
+  * Under `"trunc"`, a reported 0 was unrounded to `[0, unit)`, though
+    truncation sends all of `(-unit, unit)` to 0, so a real sample with a small
+    negative mean was called impossible. `"anti_trunc"` had the mirror error and
+    admitted impossible reports.
+
+* `brimmest()`'s lattice route rounds the attainable means and SDs exactly, in
+  integer arithmetic. It used to snap values within 1e-9 of a rounding tie onto
+  it, which misfiles SDs that lie that close to a tie without being on it, as
+  large samples produce. Its cache keeps at most four designs.
+
+* `brimmer_multiple()` reads factor columns as strings, and passes a constant
+  given as `NULL`, such as `rounding = NULL`, instead of replacing it with
+  `brimmer()`'s default.
+
+* `implied_range()` moves a limit along the `1 / n_items` grid of mean-scored
+  data rather than in whole numbers, which gave looser bounds. Its help page no
+  longer calls the results exact: they are the range `brimmer()` can prove,
+  and real data may be forced to cover more.
+
+* `sd_bounds()` accepts limits on the `1 / n_items` grid of mean-scored data
+  under `Z = "integer"` and `"quasiinteger"`, not only whole numbers.
+
+* `umbrella_data()` tests each SD with its own rounding interval under the
+  chosen `rounding`, rather than a symmetric one.
+
+* `sd_max_span_n()` is vectorised over `n`.
+
+* `grim_aggregate()`:
+  * Missing values in `x`, `n`, `digits_x` or `items_averaged`, an infinite
+    `n`, and an empty `data` are errors. Before, a malformed mean such as
+    `"3,14"` silently passed GRIM.
+  * If even lambda = 1 cannot explain the observed failures, the confidence
+    interval for lambda is `NA` with a warning that the model is rejected,
+    instead of collapsing to `[1, 1]`.
+  * `conf_level` must lie in (0, 1) and `support_c` above 1. The interval label
+    keeps decimals: `lambda_ci_97.5`, not `lambda_ci_98`.
+  * `q` and `mean_q` are exactly 0 where every ending passes. A function `eps`
+    is called once, and the `eps` column is present even when no value is
+    informative.
+
+* `grim_aggregate_by()` keeps rows whose grouping value is `NA` as their own
+  group instead of dropping them, and errors if a `by` column clashes with an
+  output column such as `F` or `k`.
+
+* `sd_plausibility()`:
+  * `digits_mean` is recycled with `mean`. Before, every row after the first
+    got wrong hard bounds.
+  * A mean at a scale limit given with `sd` returns zero bounds, as with
+    `rho`, instead of "missing input".
+  * On a two-point scale (`u - l == 1`), `rho` is `NA` with a note that it is
+    not identified; `rho_from_summary()` errors there.
+  * Giving both `rho` and `sd` is an error rather than ignoring `sd`.
+  * `method = "exact"` computes the distribution once per row and node and
+    reuses it for every `p`.
+  * The help page gains an Accuracy section: with strong skew, the `"chisq3"`
+    and `"cf"` lower bounds can be anti-conservative.
+
+* The plots use scrutiny's colours for consistent and inconsistent values,
+  which colour-blind readers can tell apart.
+
 * The lattice route declared some reports impossible that real samples
   produce exactly, under the directional rounding rules. An attainable mean
   of exactly 113/25 = 4.52 scales to the double 451.99999999999994, which
@@ -195,6 +332,72 @@
 # strait 0.4.10
 
 ## Bug fixes
+
+* `brimmest()` gave different verdicts on its two routes, so `engine = "both"`
+  stopped with "This is a bug":
+  * Under banker's rounding (`"even"`, formerly `"native"`), the targeted route
+    let a tie round either way while the lattice route rounded it to even. Both
+    now let a tie round either way, as `roundwork::unround()` does, because
+    software does not reliably round decimal ties to even.
+  * Under `"trunc"`, a reported 0 was unrounded to `[0, unit)`, though
+    truncation sends all of `(-unit, unit)` to 0, so a real sample with a small
+    negative mean was called impossible. `"anti_trunc"` had the mirror error and
+    admitted impossible reports.
+
+* `brimmest()`'s lattice route rounds the attainable means and SDs exactly, in
+  integer arithmetic. It used to snap values within 1e-9 of a rounding tie onto
+  it, which misfiles SDs that lie that close to a tie without being on it, as
+  large samples produce. Its cache keeps at most four designs.
+
+* `brimmer_multiple()` reads factor columns as strings, and passes a constant
+  given as `NULL`, such as `rounding = NULL`, instead of replacing it with
+  `brimmer()`'s default.
+
+* `implied_range()` moves a limit along the `1 / n_items` grid of mean-scored
+  data rather than in whole numbers, which gave looser bounds. Its help page no
+  longer calls the results exact: they are the range `brimmer()` can prove,
+  and real data may be forced to cover more.
+
+* `sd_bounds()` accepts limits on the `1 / n_items` grid of mean-scored data
+  under `Z = "integer"` and `"quasiinteger"`, not only whole numbers.
+
+* `umbrella_data()` tests each SD with its own rounding interval under the
+  chosen `rounding`, rather than a symmetric one.
+
+* `sd_max_span_n()` is vectorised over `n`.
+
+* `grim_aggregate()`:
+  * Missing values in `x`, `n`, `digits_x` or `items_averaged`, an infinite
+    `n`, and an empty `data` are errors. Before, a malformed mean such as
+    `"3,14"` silently passed GRIM.
+  * If even lambda = 1 cannot explain the observed failures, the confidence
+    interval for lambda is `NA` with a warning that the model is rejected,
+    instead of collapsing to `[1, 1]`.
+  * `conf_level` must lie in (0, 1) and `support_c` above 1. The interval label
+    keeps decimals: `lambda_ci_97.5`, not `lambda_ci_98`.
+  * `q` and `mean_q` are exactly 0 where every ending passes. A function `eps`
+    is called once, and the `eps` column is present even when no value is
+    informative.
+
+* `grim_aggregate_by()` keeps rows whose grouping value is `NA` as their own
+  group instead of dropping them, and errors if a `by` column clashes with an
+  output column such as `F` or `k`.
+
+* `sd_plausibility()`:
+  * `digits_mean` is recycled with `mean`. Before, every row after the first
+    got wrong hard bounds.
+  * A mean at a scale limit given with `sd` returns zero bounds, as with
+    `rho`, instead of "missing input".
+  * On a two-point scale (`u - l == 1`), `rho` is `NA` with a note that it is
+    not identified; `rho_from_summary()` errors there.
+  * Giving both `rho` and `sd` is an error rather than ignoring `sd`.
+  * `method = "exact"` computes the distribution once per row and node and
+    reuses it for every `p`.
+  * The help page gains an Accuracy section: with strong skew, the `"chisq3"`
+    and `"cf"` lower bounds can be anti-conservative.
+
+* The plots use scrutiny's colours for consistent and inconsistent values,
+  which colour-blind readers can tell apart.
 
 * `plot_sd_bounds(shade = "outside")` drew the feasible region as thousands of
   one-column slivers instead of a single band, for any design with a dense kink
@@ -515,6 +718,72 @@ This release prepares the package for CRAN and fixes several bugs that affected
 the installed package.
 
 ## Bug fixes
+
+* `brimmest()` gave different verdicts on its two routes, so `engine = "both"`
+  stopped with "This is a bug":
+  * Under banker's rounding (`"even"`, formerly `"native"`), the targeted route
+    let a tie round either way while the lattice route rounded it to even. Both
+    now let a tie round either way, as `roundwork::unround()` does, because
+    software does not reliably round decimal ties to even.
+  * Under `"trunc"`, a reported 0 was unrounded to `[0, unit)`, though
+    truncation sends all of `(-unit, unit)` to 0, so a real sample with a small
+    negative mean was called impossible. `"anti_trunc"` had the mirror error and
+    admitted impossible reports.
+
+* `brimmest()`'s lattice route rounds the attainable means and SDs exactly, in
+  integer arithmetic. It used to snap values within 1e-9 of a rounding tie onto
+  it, which misfiles SDs that lie that close to a tie without being on it, as
+  large samples produce. Its cache keeps at most four designs.
+
+* `brimmer_multiple()` reads factor columns as strings, and passes a constant
+  given as `NULL`, such as `rounding = NULL`, instead of replacing it with
+  `brimmer()`'s default.
+
+* `implied_range()` moves a limit along the `1 / n_items` grid of mean-scored
+  data rather than in whole numbers, which gave looser bounds. Its help page no
+  longer calls the results exact: they are the range `brimmer()` can prove,
+  and real data may be forced to cover more.
+
+* `sd_bounds()` accepts limits on the `1 / n_items` grid of mean-scored data
+  under `Z = "integer"` and `"quasiinteger"`, not only whole numbers.
+
+* `umbrella_data()` tests each SD with its own rounding interval under the
+  chosen `rounding`, rather than a symmetric one.
+
+* `sd_max_span_n()` is vectorised over `n`.
+
+* `grim_aggregate()`:
+  * Missing values in `x`, `n`, `digits_x` or `items_averaged`, an infinite
+    `n`, and an empty `data` are errors. Before, a malformed mean such as
+    `"3,14"` silently passed GRIM.
+  * If even lambda = 1 cannot explain the observed failures, the confidence
+    interval for lambda is `NA` with a warning that the model is rejected,
+    instead of collapsing to `[1, 1]`.
+  * `conf_level` must lie in (0, 1) and `support_c` above 1. The interval label
+    keeps decimals: `lambda_ci_97.5`, not `lambda_ci_98`.
+  * `q` and `mean_q` are exactly 0 where every ending passes. A function `eps`
+    is called once, and the `eps` column is present even when no value is
+    informative.
+
+* `grim_aggregate_by()` keeps rows whose grouping value is `NA` as their own
+  group instead of dropping them, and errors if a `by` column clashes with an
+  output column such as `F` or `k`.
+
+* `sd_plausibility()`:
+  * `digits_mean` is recycled with `mean`. Before, every row after the first
+    got wrong hard bounds.
+  * A mean at a scale limit given with `sd` returns zero bounds, as with
+    `rho`, instead of "missing input".
+  * On a two-point scale (`u - l == 1`), `rho` is `NA` with a note that it is
+    not identified; `rho_from_summary()` errors there.
+  * Giving both `rho` and `sd` is an error rather than ignoring `sd`.
+  * `method = "exact"` computes the distribution once per row and node and
+    reuses it for every `p`.
+  * The help page gains an Accuracy section: with strong skew, the `"chisq3"`
+    and `"cf"` lower bounds can be anti-conservative.
+
+* The plots use scrutiny's colours for consistent and inconsistent values,
+  which colour-blind readers can tell apart.
 
 * Core functions (`tides()`, `tides_df()`, `umbrella()`, `approximate_sd_bounds()`)
   no longer error when the package is installed: functions that were used but

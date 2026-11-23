@@ -114,7 +114,7 @@ brute_ok <- map_lgl(list(c(4, 1, 5, 1), c(5, 0, 3, 1), c(6, 1, 4, 1)), function(
   b <- brute_pairs(n, l, u, d)
   grid <- expand_grid(mean = round(seq(l, u, by = 10^-d), d),
                       sd   = round(seq(0, (u - l), by = 10^-d), d))
-  cert <- brimmest(l = l, u = u, n = n, mean = grid$mean, sd = grid$sd, digits = d)
+  cert <- brimmest(l = l, u = u, n = n, mean = grid$mean, sd = grid$sd, digits_mean = d, digits_sd = d)
   bk <- paste(sprintf("%.6f", b[, 1]), sprintf("%.6f", b[, 2]))
   gk <- paste(sprintf("%.6f", grid$mean), sprintf("%.6f", grid$sd))
   identical(sort(gk[cert$possible]), sort(intersect(gk, bk)))
@@ -130,7 +130,7 @@ tibble(design = c("n=4 on 1-5", "n=5 on 0-3", "n=6 on 1-4"), agrees = brute_ok) 
 n_c <- 9; l_c <- 1; u_c <- 5; d_c <- 1
 um_c <- umbrella_data(n = n_c, l = l_c, u = u_c, digits = d_c, Z = "integer")
 cert_c <- brimmest(l = l_c, u = u_c, n = n_c, mean = um_c$mean, sd = um_c$sd,
-                  digits = d_c)
+                  digits_mean = d_c, digits_sd = d_c)
 
 closure_says <- cached("closure_n9_1to5.rds", {
   vapply(seq_len(nrow(um_c)), function(i) {
@@ -170,8 +170,8 @@ grid_e <- expand_grid(mean = round(seq(l_e, u_e, by = 10^-d_e), d_e),
 
 grid_e$brimmer_verdict <- vapply(seq_len(nrow(grid_e)), function(i) {
   isTRUE(brimmer(l = l_e, u = u_e, n = n_e,
-                 mean = grid_e$mean[i], mean_digits = d_e,
-                 sd = grid_e$sd[i], sd_digits = d_e, Z = "integer")$consistent)
+                 mean = grid_e$mean[i], digits_mean = d_e,
+                 sd = grid_e$sd[i], digits_sd = d_e, Z = "integer")$consistent)
 }, logical(1))
 
 check(all(grid_e$grid_verdict == grid_e$brimmer_verdict),
@@ -218,7 +218,7 @@ sweep_one <- function(l, u, n, digits) {
            grimmer   = coalesce(grimmer, FALSE),
            screened  = coalesce(consistent, FALSE),
            certified = brimmest(l = l, u = u, n = n, mean = mean, sd = sd,
-                               digits = digits)$possible)
+                               digits_mean = digits, digits_sd = digits)$possible)
 
   ff <- g$certified & !g$screened          # false flags, by the test responsible
   tibble(l = l, u = u, n = n, digits = digits,
@@ -344,22 +344,22 @@ the sweep must show that.
 round_check <- function(rules) {
   n <- 12; l <- 0; u <- 6; d <- 1
   um <- umbrella_data(n = n, l = l, u = u, digits = d, Z = "integer")
-  ce <- brimmest(l = l, u = u, n = n, mean = um$mean, sd = um$sd, digits = d,
+  ce <- brimmest(l = l, u = u, n = n, mean = um$mean, sd = um$sd, digits_mean = d, digits_sd = d,
                 rounding = rules)
   tibble(rules = paste(rules, collapse = " + "),
          certified = sum(ce$possible))
 }
 
-bind_rows(round_check("half_up"), round_check("half_down"),
-          round_check(c("half_up", "half_down"))) |>
+bind_rows(round_check("up"), round_check("down"),
+          round_check(c("up", "down"))) |>
   kable(caption = "Admitting fewer rounding conventions certifies fewer reports as possible.")
 ```
 
 ```{r rounding-witness}
 # a real sample whose report is reachable ONLY when halves round down
 x_w <- c(rep(0, 9), 1, 1, 1)
-w_up   <- brimmest(l = 0, u = 6, n = 12, mean = 0.2, sd = 0.5, digits = 1, rounding = "half_up")
-w_both <- brimmest(l = 0, u = 6, n = 12, mean = 0.2, sd = 0.5, digits = 1)
+w_up   <- brimmest(l = 0, u = 6, n = 12, mean = 0.2, sd = 0.5, digits_mean = 1, digits_sd = 1, rounding = "up")
+w_both <- brimmest(l = 0, u = 6, n = 12, mean = 0.2, sd = 0.5, digits_mean = 1, digits_sd = 1)
 
 check(!w_up$possible && w_both$possible,
       "narrowing the rule set can wrongly reject a real sample")
@@ -367,7 +367,7 @@ check(!w_up$possible && w_both$possible,
 tibble(sample = "c(rep(0, 9), 1, 1, 1)",
        mean = mean(x_w), sd = sd(x_w),
        `reported 1 dp` = "0.2, 0.5",
-       `brimmest, half_up only` = w_up$possible,
+       `brimmest, up only` = w_up$possible,
        `brimmest, default rules` = w_both$possible) |>
   kable(digits = 4,
         caption = "Restricting rounding to a convention the source did not use is itself a false-flag risk.")
@@ -382,7 +382,7 @@ agree about that grid, in both sum-scored and mean-scored form.
 scoring_one <- function(scoring, n_items, l, u, n, digits) {
   um <- umbrella_data(n = n, l = l, u = u, digits = digits, Z = "integer",
                       scoring = scoring, n_items = n_items)
-  ce <- brimmest(l = l, u = u, n = n, mean = um$mean, sd = um$sd, digits = digits,
+  ce <- brimmest(l = l, u = u, n = n, mean = um$mean, sd = um$sd, digits_mean = digits, digits_sd = digits,
                 scoring = scoring, n_items = n_items)
   ff <- ce$possible & !um$consistent
   tibble(scoring = scoring, n_items = n_items,
@@ -428,7 +428,7 @@ mi <- tibble(
   value = c(length(x_mi), sprintf("%.4f", mean(x_mi)), sprintf("%.4f", sd(x_mi)),
             "2.2, 0.2",
             as.character(brimmest(l = 1, u = 5, n = 10, mean = 2.2, sd = 0.2,
-                                 digits = 1, scoring = "meanscored", n_items = 2)$possible),
+                                 digits_mean = 1, digits_sd = 1, scoring = "meanscored", n_items = 2)$possible),
             as.character(as.logical(grimmer(x = 2.2, sd = 0.2, n = 10, digits_x = 1,
                                             digits_sd = 1, items = 2))),
             as.character(as.logical(grimmer(x = 4.3, sd = 0.5, n = 10, digits_x = 1,
@@ -469,13 +469,13 @@ witness_designs <- list(
 witnesses <- map_dfr(witness_designs, function(w) {
   n <- length(w$x)
   m_r <- round_up(mean(w$x), w$d); s_r <- round_up(sd(w$x), w$d)
-  b <- brimmer(l = w$l, u = w$u, n = n, mean = m_r, mean_digits = w$d,
-               sd = s_r, sd_digits = w$d, Z = "integer")
+  b <- brimmer(l = w$l, u = w$u, n = n, mean = m_r, digits_mean = w$d,
+               sd = s_r, digits_sd = w$d, Z = "integer")
   tibble(n = n, scale = sprintf("%d-%d", w$l, w$u),
          reported = sprintf("%.*f, %.*f", w$d, m_r, w$d, s_r),
          brimmer_consistent = isTRUE(b$consistent),
          certified = brimmest(l = w$l, u = w$u, n = n, mean = m_r, sd = s_r,
-                             digits = w$d)$possible)
+                             digits_mean = w$d, digits_sd = w$d)$possible)
 })
 
 check(all(witnesses$certified), "every witness sample is certified possible")

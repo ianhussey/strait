@@ -2,40 +2,60 @@
 # lattice of strictly integer data. See R/sd_region_plot.R for the dynamic
 # program that enumerates the lattice.
 
-# Internal: forward-round lattice values straight to whole numbers of
-# reporting-grid steps, with the boundary snap the naive route lacks.
+# The rounding methods brimmest() certifies against. A certificate needs a
+# definite direction, so the compound methods stand for their two parts.
+BRIMMEST_ROUNDING <- c("up_or_down", "ceiling_or_floor", "up", "down",
+                       "even", "ceiling", "floor", "trunc", "anti_trunc")
+
+.expand_rounding <- function(rounding) {
+  unique(unlist(lapply(rounding, function(r) switch(r,
+    up_or_down = c("up", "down"),
+    ceiling_or_floor = c("ceiling", "floor"),
+    r
+  ))))
+}
+
+# Internal: forward-round lattice values to whole numbers of reporting-grid
+# steps, exactly. A value y on that scale is given as the whole numbers whose
+# ratio it is, (num / den for a mean, sqrt(num / den) for an SD), so every
+# decision -- below, on, or above a half step -- is integer arithmetic.
+# Scaling the double mean instead misfiles values on a boundary: 113/25 = 4.52
+# scales to 451.99999999999994, which trunc() files under 4.51; and snapping to
+# the nearest half step within a tolerance misfiles SDs that lie that close to
+# one without being on it, which large samples produce.
 #
-# Rounding x by first computing x * 10^digits invites a floating-point
-# hazard: an attainable mean of exactly 113/25 = 4.52 scales to
-# 451.99999999999994, which trunc() files under 4.51 -- so the lattice route
-# declared reports impossible that a real sample produces exactly (caught by
-# brimmest(engine = "both"); see tests/testthat/test-certify-analytic.R).
-# The directional rules (trunc, floor, ceiling, anti_trunc) fall hardest, the
-# half rules at half-boundaries. The fix mirrors the 1e-9 tolerances the
-# targeted route has always used: snap the scaled value to the nearest half
-# grid step when it is within 1e-9 of one -- attainable values are rationals
-# (or square roots of rationals) that are never that close to a boundary
-# without being on it, for any design the lattice route accepts -- then apply
-# the rule in scaled space, where it is exact integer arithmetic.
-#
-# Semantics match scrutiny's forward rounding (verified against it in the
-# tests): half_up takes halves toward +Inf, half_down toward -Inf, native to
-# even, trunc toward zero, anti_trunc away from zero.
-.round_scaled <- function(x, digits, rounding) {
-  y <- x * 10^digits
-  r2 <- round(y * 2) / 2
-  snap <- abs(y - r2) < 1e-9
-  y[snap] <- r2[snap]
-  switch(rounding,
-    half_up    = floor(y + 0.5),
-    half_down  = ceiling(y - 0.5),
-    native     = round(y),
-    ceiling    = ceiling(y),
-    floor      = floor(y),
-    trunc      = trunc(y),
-    anti_trunc = sign(y) * ceiling(abs(y)),
-    stop("unknown rounding rule: ", rounding)
+# Returns `lo` and `hi`, the step counts with ties resolved down and up. They
+# differ only under "even", which, like roundwork::unround(), lets a tie go
+# either way: software does not reliably round decimal ties to even.
+# Directions follow roundwork: "up" takes ties toward +Inf, "trunc" toward 0.
+.round_exact <- function(num, den, rounding, root = FALSE) {
+  if (root) {
+    fl <- floor(sqrt(num / den))
+    fl <- fl + ((fl + 1)^2 * den <= num) - (fl^2 * den > num)
+    on_int <- fl^2 * den == num
+    half <- sign(4 * num - (2 * fl + 1)^2 * den)
+  } else {
+    fl <- floor(num / den)
+    rem <- num - fl * den
+    fl <- fl + (rem >= den) - (rem < 0)
+    rem <- num - fl * den
+    on_int <- rem == 0
+    half <- sign(2 * rem - den)
+  }
+  nonneg <- num >= 0
+  up <- fl + (half >= 0)
+  down <- fl + (half > 0)
+  val <- switch(rounding,
+    up = up,
+    down = down,
+    even = return(list(lo = down, hi = up)),
+    ceiling = fl + !on_int,
+    floor = fl,
+    trunc = ifelse(nonneg, fl, fl + !on_int),
+    anti_trunc = ifelse(nonneg, fl + !on_int, fl),
+    stop("unknown rounding method: ", rounding)
   )
+  list(lo = val, hi = val)
 }
 
 #' BRIMMEST: certify whether a reported (mean, SD) is attainable
@@ -76,7 +96,8 @@
 #' not how. In exchange the cost depends only on `l`, `u` and `n`, not on how
 #' many datasets happen to satisfy the constraints. The certification
 #' validation document in `validation/` reports the comparison against CLOSURE
-#' in full.
+#' in full (it ships with the package's source repository, not the installed
+#' package).
 #'
 #' @section How the work is done:
 #' Two routes reach the same verdict, chosen automatically by design size.
@@ -118,26 +139,28 @@
 #' A hit certifies possibility under whichever rounding rule produced it. A
 #' miss certifies impossibility only *relative to the rules in `rounding`*,
 #' because a report unreachable under one convention may be reachable under
-#' another. The default takes the union of `"half_up"` and `"half_down"`,
+#' another. The default, `"up_or_down"`, takes the union of `"up"` and `"down"`,
 #' which spans the usual ambiguity about how a source rounded its halves.
 #' Narrow it only when the source's convention is actually known: certifying
 #' against one rule when the paper used another manufactures a false
-#' impossibility. Note that unlike [brimmer()] there is no `"up_or_down"`
-#' option, since rounding the lattice forward needs a definite direction.
+#' impossibility. Rounding the lattice forward needs a definite direction, so
+#' the compound methods `"up_or_down"` and `"ceiling_or_floor"` stand for
+#' their two parts, and `"even"` lets a tie round either way, as
+#' [roundwork::unround()] does, since software does not reliably round decimal
+#' ties to even.
 #'
 #' @param l,u Numeric scalars, the scale limits. Integer-valued (in mean-score
 #'   units when `n_items > 1` and `scoring` is `"meanscored"`).
 #' @param n Integer scalar, sample size.
 #' @param mean,sd Numeric vectors of reported means and SDs, recycled against
-#'   each other. All are certified against one lattice.
-#' @param digits Integer, the reported decimal places, used for both `mean`
-#'   and `sd` unless the next two are given.
-#' @param mean_digits,sd_digits Integer scalars or NULL; reported decimal
-#'   places when the mean and SD are reported to different precision.
-#' @param rounding Character vector of rounding rules to admit, from
-#'   `"half_up"`, `"half_down"`, `"native"`, `"ceiling"`, `"floor"`,
-#'   `"trunc"`, `"anti_trunc"`. A tuple is possible if it is reachable under
-#'   any of them.
+#'   each other. All are certified against one lattice. A missing value gives
+#'   a missing verdict.
+#' @param digits_mean,digits_sd Integer scalars, the reported decimal places
+#'   of the mean and the SD, as in scrutiny.
+#' @param rounding Character vector of rounding methods to admit, named as in
+#'   scrutiny: `"up_or_down"` (default), `"ceiling_or_floor"`, `"up"`,
+#'   `"down"`, `"even"`, `"ceiling"`, `"floor"`, `"trunc"`, `"anti_trunc"`. A
+#'   tuple is possible if it is reachable under any of them.
 #' @param scoring "singleitem" (default), "sumscored", or "meanscored".
 #' @param n_items Positive whole number of response items (default 1).
 #' @param max_cells Guard on the dynamic program's state space (default
@@ -153,52 +176,78 @@
 #'   two independent methods and error on any disagreement (a built-in
 #'   cross-check; also applied against the lattice when the lattice route is
 #'   taken). All rounding rules are supported identically by every engine.
-#' @return A data.frame with one row per reported tuple: `mean`, `sd`,
-#'   `possible` (logical), and `rules` — the rounding rules under which the
+#' @return A tibble with one row per reported tuple: `mean`, `sd`,
+#'   `possible` (logical), and `rules` — the rounding methods under which the
 #'   tuple is reachable, comma-separated and `""` when none.
 #' @seealso [brim()] and [brimmer()] for the closed-form screens to run
 #'   first, and [sd_region_data()] for the lattice itself.
 #' @examples
 #' # a report a real 1-5 scale sample can produce
-#' brimmest(l = 1, u = 5, n = 9, mean = 3.0, sd = 1.0, digits = 1)
+#' brimmest(l = 1, u = 5, n = 9, mean = 3.0, sd = 1.0, digits_mean = 1,
+#'          digits_sd = 1)
 #'
 #' # inside the SD bounds and passing GRIM and GRIMMER, yet no integer
 #' # sample produces it: the residual blind spot of the closed-form screen
-#' brimmest(l = 1, u = 5, n = 9, mean = 1.3, sd = 0.9, digits = 1)
+#' brimmest(l = 1, u = 5, n = 9, mean = 1.3, sd = 0.9, digits_mean = 1,
+#'          digits_sd = 1)
 #'
 #' # one lattice certifies many reports at once
-#' brimmest(l = 1, u = 5, n = 9, digits = 1,
-#'         mean = c(3.0, 1.3, 2.5), sd = c(1.0, 0.9, 1.2))
+#' brimmest(l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
+#'          mean = c(3.0, 1.3, 2.5), sd = c(1.0, 0.9, 1.2))
 #' @export
-brimmest <- function(l, u, n, mean, sd, digits = NULL,
-                    mean_digits = NULL, sd_digits = NULL,
-                    rounding = c("half_up", "half_down"),
+brimmest <- function(l, u, n, mean, sd, digits_mean, digits_sd,
+                     rounding = "up_or_down",
                     scoring = c("singleitem", "sumscored", "meanscored"),
                     n_items = 1, max_cells = 2e7, search_budget = 2e5,
                     engine = c("analytic", "search", "both")) {
   scoring <- match.arg(scoring)
   engine <- match.arg(engine)
-  valid <- c("half_up", "half_down", "native", "ceiling", "floor",
-             "trunc", "anti_trunc")
-  bad <- setdiff(rounding, valid)
-  if (length(bad))
-    stop("unknown rounding rule(s): ", paste(bad, collapse = ", "),
-         ". Choose from: ", paste(valid, collapse = ", "))
-  if (!length(rounding)) stop("at least one rounding rule is required")
-
-  md <- if (!is.null(mean_digits)) mean_digits else digits
-  sdd <- if (!is.null(sd_digits)) sd_digits else digits
-  if (is.null(md) || is.null(sdd))
-    stop("reported decimal places are required: give digits, or both ",
-         "mean_digits and sd_digits")
-  if (is.null(n) || n < 2) stop("n must be >= 2 for a sample SD")
+  rounding <- .expand_rounding(.check_rounding(rounding, BRIMMEST_ROUNDING,
+                                               several = TRUE))
+  if (missing(digits_mean) || missing(digits_sd))
+    stop("reported decimal places are required: give digits_mean and ",
+         "digits_sd")
+  .check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
+  .check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
+  .check_scalar(l, "l"); .check_scalar(u, "u")
+  .check_scalar(n, "n", whole = TRUE, min = 2)
+  .check_scalar(n_items, "n_items", whole = TRUE, min = 1)
+  md <- digits_mean
+  sdd <- digits_sd
 
   k <- as.integer(round(n_items))
   g <- .scoring_geometry(scoring, k, l, u)
+  # both routes work on the integer grid y = mg * (x - l) in 0..W
+  if (abs(g$mg * l - round(g$mg * l)) > 1e-9 ||
+      abs(g$mg * u - round(g$mg * u)) > 1e-9 || u <= l)
+    stop("l and u must lie on the response grid (whole numbers, or ",
+         "multiples of 1/n_items for mean-scored data), with u > l")
 
+  if (!is.numeric(mean) || !is.numeric(sd))
+    stop("mean and sd must be numeric")
   nn <- max(length(mean), length(sd))
   mean <- rep(mean, length.out = nn)
   sd <- rep(sd, length.out = nn)
+  if (any(sd < 0, na.rm = TRUE)) stop("sd must not be negative")
+
+  # scrutiny's NA rule: a missing mean or SD gets a missing verdict
+  ok <- !is.na(mean) & !is.na(sd)
+  if (!all(ok)) {
+    out <- tibble::tibble(mean = mean, sd = sd, possible = NA,
+                          rules = NA_character_)
+    if (any(ok)) {
+      res <- brimmest(l, u, n, mean[ok], sd[ok], md, sdd,
+                      rounding = rounding, scoring = scoring,
+                      n_items = n_items, max_cells = max_cells,
+                      search_budget = search_budget, engine = engine)
+      out$possible[ok] <- res$possible
+      out$rules[ok] <- res$rules
+    }
+    return(out)
+  }
+  # reject values with more decimals than stated, as both routes assume
+  .unround(mean, md, "up", "mean", "digits_mean")
+  .unround(sd, sdd, "up", "sd", "digits_sd")
 
   # Two routes to the same verdict, chosen by how much work each implies.
   #
@@ -256,15 +305,26 @@ brimmest <- function(l, u, n, mean, sd, digits = NULL,
     # a multi-million-row lattice cheap to match against. Integers also
     # sidestep the negative zero some rounding rules return at 0, which
     # compares equal but formats differently.
-    mult_m <- 10^md
-    mult_s <- 10^sdd
-    qm <- round(mean * mult_m)
-    qs <- round(sd * mult_s)
+    qm <- round(mean * 10^md)
+    qs <- round(sd * 10^sdd)
+    # the lattice's mean and SD on the reporting grid, as whole-number ratios:
+    # mean * 10^md = (l * n * mg + S) * 10^md / (n * mg), and
+    # (sd * 10^sdd)^2 = nss * 10^(2 * sdd) / (n * (n - 1) * mg^2)
+    m_num <- (round(l * g$mg) * n + lat$S) * 10^md
+    m_den <- n * g$mg
+    s_num <- lat$nss * 10^(2 * sdd)
+    s_den <- n * (n - 1) * g$mg^2
+    if (max(4 * s_num, abs(m_num)) >= 2^53)
+      stop("the lattice is too fine to round exactly at this precision; ",
+           "report to fewer decimal places")
     hit_mat <- vapply(rounding, function(rr) {
-      lm <- .round_scaled(lat$mean, md, rr)
-      ls <- .round_scaled(lat$sd, sdd, rr)
-      span <- max(c(ls, qs), 0) + 1            # same packing for both sides
-      (qm * span + qs) %in% (lm * span + ls)
+      lm <- .round_exact(m_num, m_den, rr)
+      ls <- .round_exact(s_num, s_den, rr, root = TRUE)
+      span <- max(c(ls$hi, qs), 0) + 1         # same packing for both sides
+      key <- qm * span + qs
+      # under "even" a tie may round either way, in the mean and SD alike
+      key %in% (lm$lo * span + ls$lo) | key %in% (lm$lo * span + ls$hi) |
+        key %in% (lm$hi * span + ls$lo) | key %in% (lm$hi * span + ls$hi)
     }, logical(nn))
     if (engine == "both") {
       # cross-check the lattice verdicts against the analytic engine, tuple
@@ -285,9 +345,9 @@ brimmest <- function(l, u, n, mean, sd, digits = NULL,
   dim(hit_mat) <- c(nn, length(rounding))
 
   rules <- apply(hit_mat, 1L, function(z) paste(rounding[z], collapse = ","))
-  data.frame(mean = mean, sd = sd,
-             possible = as.logical(rowSums(hit_mat) > 0),
-             rules = rules, stringsAsFactors = FALSE)
+  tibble::tibble(mean = mean, sd = sd,
+                 possible = as.logical(rowSums(hit_mat) > 0),
+                 rules = rules)
 }
 
 # ---- Batch certification -----------------------------------------------------
@@ -307,7 +367,7 @@ brimmest <- function(l, u, n, mean, sd, digits = NULL,
 #' Row order is preserved.
 #'
 #' Recognised per row (column or constant): `l`, `u`, `n`, `mean`, `sd`,
-#' `digits`, `mean_digits`, `sd_digits`, `scoring`, `n_items`.
+#' `digits_mean`, `digits_sd`, `scoring`, `n_items`.
 #'
 #' `rounding`, `max_cells`, `search_budget` and `engine` may be given only as
 #' constants, never as columns. `rounding` is a *set* of admitted rules rather
@@ -319,7 +379,7 @@ brimmest <- function(l, u, n, mean, sd, digits = NULL,
 #' @param include_inputs If TRUE (default), returns `data` column-bound to the
 #'   results; if FALSE, only the result columns (same row order), for drop-in
 #'   use inside a `dplyr::mutate()` / `purrr` pipeline.
-#' @return A data frame with `possible` (logical) and `rules` (the rounding
+#' @return A tibble with `possible` (logical) and `rules` (the rounding
 #'   rules under which the row is reachable, comma-separated and `""` when
 #'   none), optionally with `data` prepended. Unlike [brimmest()], the reported
 #'   `mean` and `sd` are not echoed back: they are already columns of `data`
@@ -333,19 +393,20 @@ brimmest <- function(l, u, n, mean, sd, digits = NULL,
 #' # one design, one lattice. Rows 2 and 3 are both impossible, for different
 #' # reasons: row 3 already fails GRIM and GRIMMER, while row 2 clears every
 #' # closed-form screen and is caught only here.
-#' brimmest_multiple(reports, l = 1, u = 5, n = 9, digits = 1)
+#' brimmest_multiple(reports, l = 1, u = 5, n = 9, digits_mean = 1,
+#'                   digits_sd = 1)
 #'
 #' # designs may vary per row; rows sharing one are certified together
 #' mixed <- data.frame(mean = c(3.0, 1.3, 4.0),
 #'                     sd   = c(1.0, 0.9, 1.5),
 #'                     n    = c(9, 9, 12))
-#' brimmest_multiple(mixed, l = 1, u = 5, digits = 1,
+#' brimmest_multiple(mixed, l = 1, u = 5, digits_mean = 1, digits_sd = 1,
 #'                   include_inputs = FALSE)
 #' @export
 brimmest_multiple <- function(data, ..., include_inputs = TRUE) {
   if (!is.data.frame(data)) stop("data must be a data frame")
-  row_args <- c("l", "u", "n", "mean", "sd", "digits",
-                "mean_digits", "sd_digits", "scoring", "n_items")
+  row_args <- c("l", "u", "n", "mean", "sd", "digits_mean", "digits_sd",
+                "scoring", "n_items")
   call_args <- c("rounding", "max_cells", "search_budget", "engine")
   consts <- list(...)
   unknown <- setdiff(names(consts), c(row_args, call_args))
@@ -363,18 +424,15 @@ brimmest_multiple <- function(data, ..., include_inputs = TRUE) {
     incon <- nm %in% names(consts) && !is.null(consts[[nm]])
     if (incol && incon)
       stop(sprintf("'%s' supplied as both a column and a constant", nm))
-    if (incol) data[[nm]]
-    else if (incon) rep(consts[[nm]], length.out = N)
-    else NULL
+    v <- if (incol) data[[nm]]
+         else if (incon) rep(consts[[nm]], length.out = N)
+    if (is.factor(v)) as.character(v) else v
   }
   cols <- lapply(row_args, resolve); names(cols) <- row_args
   present <- row_args[!vapply(cols, is.null, logical(1))]
-  for (nm in c("l", "u", "n", "mean", "sd"))
+  for (nm in c("l", "u", "n", "mean", "sd", "digits_mean", "digits_sd"))
     if (!(nm %in% present))
       stop(sprintf("'%s' is required (as a column of data or a constant)", nm))
-  if (!any(c("digits", "mean_digits", "sd_digits") %in% present))
-    stop("reported decimal places are required: give digits, or both ",
-         "mean_digits and sd_digits")
 
   passthru <- consts[intersect(call_args, names(consts))]
 
@@ -386,8 +444,8 @@ brimmest_multiple <- function(data, ..., include_inputs = TRUE) {
   fmt <- function(nm) format(cols[[nm]], nsmall = 6, trim = TRUE)
   gkey <- do.call(paste, c(lapply(design, fmt), sep = "\r"))
 
-  possible <- logical(N)
-  rules <- character(N)
+  possible <- rep(NA, N)
+  rules <- rep(NA_character_, N)
   for (g in unique(gkey)) {
     ix <- which(gkey == g)
     args <- lapply(design, function(nm) cols[[nm]][ix[1]])
@@ -403,7 +461,6 @@ brimmest_multiple <- function(data, ..., include_inputs = TRUE) {
     rules[ix] <- r$rules[back]
   }
 
-  res <- data.frame(possible = possible, rules = rules,
-                    stringsAsFactors = FALSE)
-  if (include_inputs) cbind(data, res) else res
+  res <- tibble::tibble(possible = possible, rules = rules)
+  if (include_inputs) .bind_inputs(data, res) else res
 }

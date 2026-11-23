@@ -8,7 +8,7 @@
       ggplot2::aes(x = .data[[xvar]], y = .data[[yvar]], fill = .data$.consistent),
       shape = 21, colour = "black", size = 2.4, na.rm = TRUE),
     ggplot2::scale_fill_manual(
-      values = c("TRUE" = "#43BF71", "FALSE" = "#D7191C"),
+      values = c("TRUE" = "#0047ff", "FALSE" = "#ff2a00"),
       na.value = "grey50", name = "Consistent",
       labels = c("TRUE" = "consistent", "FALSE" = "inconsistent")))
 }
@@ -50,7 +50,7 @@
 #' # above the ceiling, so it plots as inconsistent)
 #' reports <- data.frame(mean = c(2.97, 3.51), sd = c(2.83, 3.50))
 #' checked <- brimmer_multiple(reports, l = 1, u = 7, n = 30,
-#'                             mean_digits = 2, sd_digits = 2)
+#'                             digits_mean = 2, digits_sd = 2)
 #' sd_bounds_plot(curve, reports = checked)
 #'
 #' # the previous look, with the feasible band filled
@@ -59,7 +59,6 @@
 sd_bounds_plot <- function(data, reports = NULL, title = NULL,
                            fill = "grey85", line_colour = "grey30",
                            shade = c("outside", "inside"), expand = 0.03) {
-  stopifnot(requireNamespace("ggplot2", quietly = TRUE))
   shade <- match.arg(shade)
   cur <- .band_mask(data)
 
@@ -139,7 +138,6 @@ sd_bounds_plot <- function(data, reports = NULL, title = NULL,
 sd_bounds_pomp_plot <- function(data, reports = NULL,
                                 reference = c("sharp", "parity"),
                                 title = NULL) {
-  stopifnot(requireNamespace("ggplot2", quietly = TRUE))
   reference <- match.arg(reference)
   if (reference == "parity") {
     cur <- .band_mask(data)
@@ -238,7 +236,7 @@ sd_bounds_pomp_plot <- function(data, reports = NULL,
 #'   [sd_bounds_plot()].
 #' @return A ggplot object.
 #' @examples
-#' grid <- umbrella_data(n = 12, l = 1, u = 3, digits = 1)
+#' grid <- umbrella_data(l = 1, u = 3, n = 12, digits = 1)
 #' umbrella_plot(grid, title = "n = 12, 1-3 scale")
 #'
 #' # the previous look, separating the two ways a tuple can be ruled out
@@ -254,7 +252,6 @@ umbrella_plot <- function(data, bounds = NULL, title = NULL,
                           style = c("points", "tiles"), fill = "grey30",
                           point_colour = "black", point_size = NULL,
                           reference_colour = "grey35", expand = 0.03) {
-  stopifnot(requireNamespace("ggplot2", quietly = TRUE))
   style <- match.arg(style)
   is_band <- !"sd" %in% names(data)
   if (is_band && !all(c("min_sd", "max_sd") %in% names(data)))
@@ -280,7 +277,7 @@ umbrella_plot <- function(data, bounds = NULL, title = NULL,
         ggplot2::aes(x = .data$mean, y = .data$sd, fill = .data$category)) +
       ggplot2::geom_tile() +
       ggplot2::scale_fill_manual(values = c(
-        "consistent" = "#43BF71", "GRIMMER-inconsistent" = "#FDAE61",
+        "consistent" = "#0047ff", "GRIMMER-inconsistent" = "#ff2a00",
         "out of bounds" = "grey80"), name = NULL) +
       bounds_layers +
       ggplot2::labs(x = "Mean", y = "SD", title = title) +

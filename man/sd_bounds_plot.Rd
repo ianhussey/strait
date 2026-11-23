@@ -59,7 +59,7 @@ sd_bounds_plot(curve, title = "Feasible SDs, 1-7 scale, n = 30")
 # above the ceiling, so it plots as inconsistent)
 reports <- data.frame(mean = c(2.97, 3.51), sd = c(2.83, 3.50))
 checked <- brimmer_multiple(reports, l = 1, u = 7, n = 30,
-                            mean_digits = 2, sd_digits = 2)
+                            digits_mean = 2, digits_sd = 2)
 sd_bounds_plot(curve, reports = checked)
 
 # the previous look, with the feasible band filled

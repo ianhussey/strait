@@ -37,30 +37,14 @@
 
 .gcd2 <- function(a, b) { while (b) { t <- b; b <- a %% b; a <- t }; a }
 
-# Internal: apply one reporting-rounding convention, using roundwork's
-# implementations (formerly scrutiny's) so that the vocabulary matches the rest
-# of the error-detection ecosystem. "native" is base R's round(), which rounds halves to even.
-.round_reported <- function(x, digits, rounding) {
-  switch(rounding,
-    half_up    = roundwork::round_up(x, digits),
-    half_down  = roundwork::round_down(x, digits),
-    native     = round(x, digits),
-    ceiling    = roundwork::round_ceiling(x, digits),
-    floor      = roundwork::round_floor(x, digits),
-    trunc      = roundwork::round_trunc(x, digits),
-    anti_trunc = roundwork::round_anti_trunc(x, digits),
-    stop("unknown rounding rule: ", rounding)
-  )
-}
-
 # Internal: round a lattice of (mean, sd) pairs to reporting precision and
 # collapse the duplicates that creates. Distinct attainable pairs routinely
 # round into one reported cell, which is exactly why a rounded lattice can look
 # solid where the exact one is full of holes.
 .round_lattice <- function(d, digits, rounding) {
   if (is.null(digits)) return(d)
-  d$mean <- .round_reported(d$mean, digits, rounding)
-  d$sd   <- .round_reported(d$sd,   digits, rounding)
+  d$mean <- roundwork::reround(d$mean, digits, rounding)
+  d$sd   <- roundwork::reround(d$sd,   digits, rounding)
   # some rounding rules return negative zero at 0, which compares equal but
   # prints and string-matches differently; normalise it away
   d$mean[d$mean == 0] <- 0
@@ -139,9 +123,12 @@
   nr <- Smax + 1L
   S  <- (w - 1L) %% nr
   Q  <- W * S - ((w - 1L) %/% nr) * g
-  ss <- Q - S^2 / n                       # sum of squares is translation-free
+  # n times the sum of squares, a whole number, so that brimmest() can round
+  # the SD exactly; ss = nss / n is translation-free
+  nss <- n * Q - S^2
   out <- data.frame(mean = l + S / (n * mg),
-                    sd   = sqrt(pmax(0, ss) / (n - 1)) / mg)
+                    sd   = sqrt(pmax(0, nss) / (n * (n - 1))) / mg,
+                    S = S, nss = nss)
   out[order(out$mean, out$sd), , drop = FALSE]
 }
 
@@ -226,16 +213,16 @@
 #'   (default) returns them unrounded, which for the `"attainable"` rules means
 #'   exactly. Band rules are unaffected: rounding a bound can turn it
 #'   anti-conservative, so bounds are always returned at full precision.
-#' @param rounding How to round when `round_digits` is given. `"half_up"`
-#'   (default) and the other named rules use roundwork's implementations, so the
-#'   vocabulary matches GRIM and GRIMMER; `"native"` is base R's `round()`,
-#'   which rounds halves to even.
+#' @param rounding How to round when `round_digits` is given: one of
+#'   scrutiny's single rounding methods, such as `"up"` (default), `"down"`,
+#'   `"even"`, `"ceiling"`, `"floor"`, `"trunc"`, or `"anti_trunc"`, applied
+#'   by [roundwork::reround()].
 #' @param by Optional mean-grid spacing (default `(u - l) / 1000`); ignored by
 #'   the lattice rules, which step by `10^-digits`.
-#' @return For band rules, a data frame with `mean`, `min_sd`, `max_sd`, which
+#' @return For band rules, a tibble with `mean`, `min_sd`, `max_sd`, which
 #'   are `NA` where no SD is possible; its `"step"` attribute is the grid
 #'   spacing `by`. For the lattice rules (`"integer"`, `"integer_alpha"`,
-#'   `"attainable"`, `"attainable_alpha"`), a data frame with `mean`, `sd`: the
+#'   `"attainable"`, `"attainable_alpha"`), a tibble with `mean`, `sd`: the
 #'   tuples passing every applicable test. The `type` attribute is `"band"` or
 #'   `"points"`.
 #' @examples
@@ -257,13 +244,11 @@ sd_region_data <- function(l, u, n,
                                     "attainable_alpha"),
                            scoring = NULL,
                            n_items = 1, alpha = NULL, digits = 2, by = NULL,
-                           round_digits = NULL,
-                           rounding = c("half_up", "half_down", "native",
-                                        "ceiling", "floor", "trunc",
-                                        "anti_trunc")) {
+                           round_digits = NULL, rounding = "up") {
   rule <- match.arg(rule)
   if (rule == "muilwijk") rule <- "mean"          # alias: named for its author
-  rounding <- match.arg(rounding)
+  .check_rounding(rounding, setdiff(ROUNDING_METHODS,
+                                    c("up_or_down", "ceiling_or_floor")))
   if (rule %in% c("alpha", "integer_alpha", "attainable_alpha") && is.null(alpha))
     stop(sprintf("rule = '%s' requires alpha", rule))
   k <- n_items
@@ -277,19 +262,18 @@ sd_region_data <- function(l, u, n,
   # region is a set of points, not a band (no curve is defined at the means and
   # SDs that strictly integer data cannot produce).
   if (rule %in% c("integer", "integer_alpha")) {
-    um <- umbrella_data(n = n, l = l, u = u, digits = digits, Z = "integer",
+    um <- umbrella_data(l = l, u = u, n = n, digits = digits, Z = "integer",
                         scoring = scoring, n_items = k,
                         alpha = if (rule == "integer_alpha") alpha else NULL)
-    out <- um[which(um$consistent), c("mean", "sd"), drop = FALSE]
-    rownames(out) <- NULL
-    out <- .round_lattice(out, round_digits, rounding)
+    out <- as.data.frame(um[which(um$consistent), c("mean", "sd")])
+    out <- tibble::as_tibble(.round_lattice(out, round_digits, rounding))
     attr(out, "type") <- "points"
     return(out)
   }
 
   # exact lattice rules: the true attainable tuples, with no reporting grid.
   if (rule %in% c("attainable", "attainable_alpha")) {
-    out <- .attainable_lattice(l, u, n, g$mg)
+    out <- .attainable_lattice(l, u, n, g$mg)[c("mean", "sd")]
     if (rule == "attainable_alpha") {
       mus <- unique(out$mean)
       bd <- do.call(rbind, lapply(mus, function(mu) {
@@ -304,7 +288,7 @@ sd_region_data <- function(l, u, n,
       out <- out[order(out$mean, out$sd), , drop = FALSE]
     }
     rownames(out) <- NULL
-    out <- .round_lattice(out, round_digits, rounding)
+    out <- tibble::as_tibble(.round_lattice(out, round_digits, rounding))
     attr(out, "type") <- "points"
     return(out)
   }
@@ -338,6 +322,7 @@ sd_region_data <- function(l, u, n,
   # an empty band (floor above ceiling) is infeasible, not a negative region
   bad <- d$min_sd > d$max_sd + 1e-12
   d$min_sd[bad] <- NA_real_; d$max_sd[bad] <- NA_real_
+  d <- tibble::as_tibble(d)
   attr(d, "type") <- "band"
   attr(d, "step") <- by
   d
@@ -393,7 +378,6 @@ sd_region_plot <- function(data, reference = NULL, title = NULL,
                            reference_colour = "grey45",
                            point_colour = "#1d4ed8", point_size = 0.5) {
   shade <- match.arg(shade)
-  stopifnot(requireNamespace("ggplot2", quietly = TRUE))
   is_band <- !"sd" %in% names(data)
   if (is_band) {
     data <- .band_mask(data)

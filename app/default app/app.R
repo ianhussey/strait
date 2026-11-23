@@ -214,19 +214,6 @@ bounds_curve <- function(p) {
   out
 }
 
-# brimmer()'s unrounding vocabulary against brimmest()'s forward-rounding one.
-# "up_or_down" spans the usual ambiguity about how a source rounded its halves,
-# so it maps to the union of the two half rules.
-brimmest_rules <- function(rounding) {
-  switch(rounding,
-    up_or_down = c("half_up", "half_down"),
-    up = "half_up",
-    down = "half_down",
-    even = "native",
-    rounding
-  )
-}
-
 # ---- UI ---------------------------------------------------------------------
 
 strait_theme <- bs_theme(
@@ -341,9 +328,9 @@ report_panel <- nav_panel(
         accordion_panel(
           "The reported values",
           numericInput("mean", "Reported mean", value = 2.97, step = 0.01),
-          numericInput("mean_digits", "Its decimal places", value = 2, min = 0, max = 8, step = 1),
+          numericInput("digits_mean", "Its decimal places", value = 2, min = 0, max = 8, step = 1),
           numericInput("sd", "Reported SD", value = 2.83, min = 0, step = 0.01),
-          numericInput("sd_digits", "Its decimal places", value = 2, min = 0, max = 8, step = 1),
+          numericInput("digits_sd", "Its decimal places", value = 2, min = 0, max = 8, step = 1),
           selectInput(
             "rounding",
             "Rounding rule used by the authors",
@@ -690,7 +677,7 @@ server <- function(input, output, session) {
   params <- reactive({
     num <- list(
       l = input$l, u = input$u, n = input$n, mean = input$mean, sd = input$sd,
-      mean_digits = input$mean_digits, sd_digits = input$sd_digits
+      digits_mean = input$digits_mean, digits_sd = input$digits_sd
     )
     validate(need(
       all(vapply(num, function(x) length(x) == 1L && !is.na(x) && is.finite(x), logical(1))),
@@ -703,8 +690,8 @@ server <- function(input, output, session) {
     ))
     validate(need(num$sd >= 0, "A standard deviation cannot be negative."))
     validate(need(
-      num$mean_digits >= 0 && num$mean_digits <= 8 &&
-        num$sd_digits >= 0 && num$sd_digits <= 8,
+      num$digits_mean >= 0 && num$digits_mean <= 8 &&
+        num$digits_sd >= 0 && num$digits_sd <= 8,
       "Decimal places must be between 0 and 8."
     ))
 
@@ -785,7 +772,7 @@ server <- function(input, output, session) {
   constraints <- function(p) {
     x <- list(
       l = p$l, u = p$u, n = p$n,
-      mean_digits = p$mean_digits, sd_digits = p$sd_digits,
+      digits_mean = p$digits_mean, digits_sd = p$digits_sd,
       rounding = p$rounding, Z = p$Z, scoring = p$scoring, n_items = p$k
     )
     if (p$use_ab) {
@@ -828,8 +815,8 @@ server <- function(input, output, session) {
     b <- bounds()
 
     if (identical(p$units, "native")) {
-      loc <- c("reported mean", fmt(p$mean, p$mean_digits))
-      val <- c("reported SD", fmt(p$sd, p$sd_digits))
+      loc <- c("reported mean", fmt(p$mean, p$digits_mean))
+      val <- c("reported SD", fmt(p$sd, p$digits_sd))
       lo <- c("smallest possible SD", fmt(r$min_sd))
       hi <- c("largest possible SD", fmt(r$max_sd))
     } else if (identical(p$reference, "parity")) {
@@ -1044,8 +1031,8 @@ server <- function(input, output, session) {
       tryCatch(
         brimmest(
           l = p$l, u = p$u, n = p$n, mean = p$mean, sd = p$sd,
-          mean_digits = p$mean_digits, sd_digits = p$sd_digits,
-          rounding = brimmest_rules(p$rounding),
+          digits_mean = p$digits_mean, digits_sd = p$digits_sd,
+          rounding = p$rounding,
           scoring = p$scoring, n_items = p$k
         ),
         error = function(e) list(error = conditionMessage(e))
@@ -1110,10 +1097,10 @@ server <- function(input, output, session) {
         )
       ),
       stat_cards(list(
-        c("reported mean", fmt(cert$mean[1], params()$mean_digits)),
-        c("reported SD", fmt(cert$sd[1], params()$sd_digits)),
+        c("reported mean", fmt(cert$mean[1], params()$digits_mean)),
+        c("reported SD", fmt(cert$sd[1], params()$digits_sd)),
         c("verdict", if (possible) "possible" else "impossible"),
-        c("rounding rules admitted", paste(brimmest_rules(params()$rounding), collapse = ", "))
+        c("rounding rules admitted", paste(params()$rounding, collapse = ", "))
       ))
     )
   })
@@ -1143,8 +1130,8 @@ server <- function(input, output, session) {
         l = p$l, u = p$u, n = p$n,
         a = if (p$use_ab) p$a else NA_real_,
         b = if (p$use_ab) p$b else NA_real_,
-        mean = p$mean, mean_digits = p$mean_digits,
-        sd = p$sd, sd_digits = p$sd_digits,
+        mean = p$mean, digits_mean = p$digits_mean,
+        sd = p$sd, digits_sd = p$digits_sd,
         rounding = p$rounding, Z = p$Z, scoring = p$scoring, n_items = p$k,
         alpha = if (is.null(p$alpha)) NA_real_ else p$alpha,
         consistent = r$consistent, failed_tests = r$failed_tests,

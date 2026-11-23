@@ -8,7 +8,7 @@
 # where the band does not exist.
 .band_mask <- function(d) {
   ok <- is.finite(d$min_sd) & is.finite(d$max_sd)
-  if (!is.null(d$feasible)) ok <- ok & d$feasible
+  if (!is.null(d[["feasible"]])) ok <- ok & d$feasible
   for (col in intersect(c("min_sd", "max_sd", "floor_parity", "ceil_parity"),
                         names(d)))
     d[[col]][!ok] <- NA_real_
@@ -139,8 +139,7 @@ sd_delta <- function(mean, n, lower, upper, tol = 1e-9) {
   R <- upper - lower
   nl <- n * (upper - mean) / R
   nu <- n * (mean - lower) / R
-  fr <- function(x) { f <- x - floor(x); ifelse(f > 1 - tol, 0, f) }
   muil <- n * (upper - mean) * (mean - lower)   # SS of the uncorrected bound
-  ss <- muil - fr(nl) * fr(nu) * R^2            # SS of the sharp bound
+  ss <- muil - frac(nl, tol) * frac(nu, tol) * R^2  # SS of the sharp bound
   ifelse(muil <= 0, 1, pmax(0, ss) / muil)
 }

@@ -17,8 +17,7 @@ sd_region_data(
   digits = 2,
   by = NULL,
   round_digits = NULL,
-  rounding = c("half_up", "half_down", "native", "ceiling", "floor", "trunc",
-    "anti_trunc")
+  rounding = "up"
 )
 }
 \arguments{
@@ -51,16 +50,16 @@ this many decimal places, collapsing pairs that round together. \code{NULL}
 exactly. Band rules are unaffected: rounding a bound can turn it
 anti-conservative, so bounds are always returned at full precision.}
 
-\item{rounding}{How to round when \code{round_digits} is given. \code{"half_up"}
-(default) and the other named rules use roundwork's implementations, so the
-vocabulary matches GRIM and GRIMMER; \code{"native"} is base R's \code{round()},
-which rounds halves to even.}
+\item{rounding}{How to round when \code{round_digits} is given: one of
+scrutiny's single rounding methods, such as \code{"up"} (default), \code{"down"},
+\code{"even"}, \code{"ceiling"}, \code{"floor"}, \code{"trunc"}, or \code{"anti_trunc"}, applied
+by \code{\link[roundwork:reround]{roundwork::reround()}}.}
 }
 \value{
-For band rules, a data frame with \code{mean}, \code{min_sd}, \code{max_sd}, which
+For band rules, a tibble with \code{mean}, \code{min_sd}, \code{max_sd}, which
 are \code{NA} where no SD is possible; its \code{"step"} attribute is the grid
 spacing \code{by}. For the lattice rules (\code{"integer"}, \code{"integer_alpha"},
-\code{"attainable"}, \code{"attainable_alpha"}), a data frame with \code{mean}, \code{sd}: the
+\code{"attainable"}, \code{"attainable_alpha"}), a tibble with \code{mean}, \code{sd}: the
 tuples passing every applicable test. The \code{type} attribute is \code{"band"} or
 \code{"points"}.
 }

@@ -11,9 +11,9 @@ brimmer(
   b = NULL,
   n = NULL,
   mean = NULL,
-  mean_digits = NULL,
+  digits_mean = NULL,
   sd = NULL,
-  sd_digits = NULL,
+  digits_sd = NULL,
   rounding = "up_or_down",
   Z = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
@@ -30,19 +30,19 @@ brimmer(
 
 \item{mean}{Numeric scalar or NULL, the reported mean.}
 
-\item{mean_digits}{Integer scalar or NULL, its reported decimal places
+\item{digits_mean}{Integer scalar or NULL, its reported decimal places
 (required when \code{mean} and \code{rounding} are both given).}
 
 \item{sd}{Numeric scalar or NULL, the reported SD — the thing being
 checked. NULL runs the mean-side tests only, which is what \code{\link[=brim]{brim()}}
 does; the SD columns are then \code{NA}.}
 
-\item{sd_digits}{Integer scalar or NULL, its reported decimal places
+\item{digits_sd}{Integer scalar or NULL, its reported decimal places
 (required when \code{rounding} is given).}
 
-\item{rounding}{Rounding rule for unrounding the reported values
-(default \code{"up_or_down"}); NULL treats inputs as exact. See
-\code{\link[=unround_interval]{unround_interval()}}.}
+\item{rounding}{Rounding method for unrounding the reported values, named
+as in scrutiny (default \code{"up_or_down"}); NULL treats inputs as exact. See
+\code{\link[=sd_bounds]{sd_bounds()}} and \code{\link[roundwork:unround]{roundwork::unround()}}.}
 
 \item{Z}{"continuous" (default), "integer", or "quasiinteger".}
 
@@ -53,7 +53,7 @@ does; the SD columns are then \code{NA}.}
 \item{alpha}{Numeric scalar or NULL, reported Cronbach's alpha.}
 }
 \value{
-A one-row data.frame: \code{consistent} (logical), \code{failed_tests}
+A one-row tibble: \code{consistent} (logical), \code{failed_tests}
 (comma-separated names, "" if none), then the \code{\link[=sd_bounds]{sd_bounds()}} columns
 \code{min_sd}, \code{max_sd}, \code{feasible}, the BRIM predicate \code{in_scale_range}, then
 \code{grim}, \code{grimmer}, \code{sd_in_bounds}, the
@@ -102,7 +102,9 @@ the documented false-flag family.
 }
 
 \code{consistent} is TRUE iff every applicable test passes. \code{failed_tests}
-names the failures (empty string if none).
+names the failures (empty string if none). As in scrutiny, a missing
+value among the inputs gives a missing verdict: \code{consistent} and
+\code{failed_tests} are \code{NA}, and \code{note} names the missing input.
 
 Unlike \code{\link[=sd_bounds]{sd_bounds()}}, \code{rounding} here defaults to \code{"up_or_down"} — a
 report-checking context virtually always deals with rounded values. Pass
@@ -112,16 +114,16 @@ unused).
 \examples{
 # a perfectly ordinary report on a 1-7 scale
 # (witnessed by c(rep(1, 20), rep(7, 9), 6): mean 2.9667, sd 2.8343)
-brimmer(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
-        sd = 2.83, sd_digits = 2, Z = "integer")
+brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+        sd = 2.83, digits_sd = 2, Z = "integer")
 
 # SD below the quasi-integer floor: inconsistent via the bounds test
-brimmer(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
-        sd = 0.10, sd_digits = 2, Z = "quasiinteger")
+brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+        sd = 0.10, digits_sd = 2, Z = "quasiinteger")
 
 # GRIM-impossible mean: inconsistent via feasibility (and grim)
-brimmer(l = 1, u = 7, n = 30, mean = 3.51, mean_digits = 2,
-        sd = 1.00, sd_digits = 2, Z = "integer")
+brimmer(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2,
+        sd = 1.00, digits_sd = 2, Z = "integer")
 }
 \seealso{
 \code{\link[=brim]{brim()}} for the mean-side test, \code{\link[=brimmest]{brimmest()}} for the exact

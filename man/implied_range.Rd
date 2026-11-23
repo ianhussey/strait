@@ -11,9 +11,9 @@ implied_range(
   b = NULL,
   n = NULL,
   mean = NULL,
-  mean_digits = NULL,
+  digits_mean = NULL,
   sd = NULL,
-  sd_digits = NULL,
+  digits_sd = NULL,
   rounding = "up_or_down",
   Z = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
@@ -29,17 +29,17 @@ implied_range(
 
 \item{mean}{Numeric scalar or NULL, the reported mean.}
 
-\item{mean_digits}{Integer scalar or NULL, its reported decimal places
+\item{digits_mean}{Integer scalar or NULL, its reported decimal places
 (required when \code{mean} and \code{rounding} are both given).}
 
 \item{sd}{Numeric scalar, the reported SD (required).}
 
-\item{sd_digits}{Integer scalar or NULL, its reported decimal places
+\item{digits_sd}{Integer scalar or NULL, its reported decimal places
 (required when \code{rounding} is given).}
 
-\item{rounding}{Rounding rule for unrounding the reported values
-(default \code{"up_or_down"}); NULL treats inputs as exact. See
-\code{\link[=unround_interval]{unround_interval()}}.}
+\item{rounding}{Rounding method for unrounding the reported values, named
+as in scrutiny (default \code{"up_or_down"}); NULL treats inputs as exact. See
+\code{\link[=sd_bounds]{sd_bounds()}} and \code{\link[roundwork:unround]{roundwork::unround()}}.}
 
 \item{Z}{"continuous" (default), "integer", or "quasiinteger".}
 
@@ -48,7 +48,8 @@ implied_range(
 \item{n_items}{Positive whole number of response items (default 1).}
 }
 \value{
-A one-row data.frame: \code{min_at_most}, \code{max_at_least}, and \code{note}.
+A one-row tibble: \code{min_at_most}, \code{max_at_least}, and \code{note}. A
+missing input gives \code{NA} results, as in \code{\link[=brimmer]{brimmer()}}.
 }
 \description{
 How polarised must the data behind a report be? A sample whose values all
@@ -64,12 +65,15 @@ simulating a single sample.
 Each result is found by moving one scale limit inward until \code{\link[=brimmer]{brimmer()}} no
 longer calls the report consistent, so it can never disagree with the bounds
 test. Moving a limit can only narrow the bounds, so the search is a
-bisection. Under \code{Z = "integer"} and \code{"quasiinteger"} the limit moves in
-whole numbers, as \code{\link[=sd_bounds]{sd_bounds()}} requires; under \code{"continuous"}, to within
-\code{1e-6} of the scale range. Every result is a bound the data must meet:
-exact on the response grid of integer data (the integers, or the
-\code{1 / n_items} lattice of a mean-scored composite), and otherwise loose by at
-most that resolution.
+bisection. Under \code{Z = "integer"} and \code{"quasiinteger"} the limit moves along
+the response grid (the integers, or the \code{1 / n_items} lattice of a
+mean-scored composite); under \code{"continuous"}, to within \code{1e-6} of the scale
+range.
+
+Every result is a bound the data must meet, but not always the tightest
+one: \code{\link[=brimmer]{brimmer()}} is a necessary test, so it can accept a narrowed range that
+no real sample fits. The range is exactly the one \code{\link[=brimmer]{brimmer()}} can prove, and
+real data may be forced to cover more.
 
 Each result is a constraint on its own: the smallest observation is at most
 \code{min_at_most} (with the largest anywhere in range), and the largest is at
@@ -88,13 +92,13 @@ narrowing the composite's range would misstate.
 \examples{
 # an SD near the ceiling of a 1-7 scale: the data must include both a 1
 # and a 7
-implied_range(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
-              sd = 2.83, sd_digits = 2, Z = "integer")
+implied_range(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+              sd = 2.83, digits_sd = 2, Z = "integer")
 
 # a small SD forces only neighbouring values: at least one response of 3 or
 # lower, and one of 5 or higher
-implied_range(l = 1, u = 7, n = 30, mean = 4.00, mean_digits = 2,
-              sd = 0.53, sd_digits = 2, Z = "integer")
+implied_range(l = 1, u = 7, n = 30, mean = 4.00, digits_mean = 2,
+              sd = 0.53, digits_sd = 2, Z = "integer")
 }
 \seealso{
 \code{\link[=brimmer]{brimmer()}}, whose question this extends from "is the report

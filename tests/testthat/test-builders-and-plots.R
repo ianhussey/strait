@@ -30,7 +30,7 @@ test_that("the plot functions return ggplot objects", {
   cv  <- sd_bounds_curve(l = 1, u = 7, n = 30, Z = "quasiinteger")
   pts <- brimmer_multiple(
     data.frame(mean = c(3, 4, 5), sd = c(2.5, 0.2, 1.8)),
-    l = 1, u = 7, n = 30, mean_digits = 1, sd_digits = 1, Z = "quasiinteger")
+    l = 1, u = 7, n = 30, digits_mean = 1, digits_sd = 1, Z = "quasiinteger")
   expect_s3_class(sd_bounds_plot(cv, reports = pts), "ggplot")
   expect_s3_class(sd_bounds_plot(sd_region_data(1, 7, 30), reports = pts), "ggplot")
   expect_s3_class(sd_bounds_pomp_plot(cv, reports = pts, reference = "parity"), "ggplot")

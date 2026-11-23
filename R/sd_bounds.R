@@ -74,6 +74,23 @@
   res
 }
 
+# Internal: check an optional scalar argument. NULL means "not supplied";
+# anything else must be one finite number (whole and >= `min` if asked).
+.check_scalar <- function(x, name, whole = FALSE, min = -Inf) {
+  if (is.null(x)) return(invisible())
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || !is.finite(x))
+    stop(sprintf("`%s` must be a single finite number, not %s", name,
+                 if (length(x) == 1L) format(x) else
+                   paste("a vector of length", length(x))), call. = FALSE)
+  if (whole && abs(x - round(x)) > 1e-9)
+    stop(sprintf("`%s` must be a whole number, not %s", name, format(x)),
+         call. = FALSE)
+  if (x < min)
+    stop(sprintf("`%s` must be at least %s, not %s", name, format(min),
+                 format(x)), call. = FALSE)
+  invisible()
+}
+
 # Internal: candidate exact means inside [m_lo, m_hi] for the envelope —
 # a dense grid plus every analytic breakpoint of the piecewise bounds
 # (multiples of 1/n, where both floors and Structure S can kink).
@@ -105,18 +122,17 @@
 #'   extreme is vacuous). Attainment leaves ceilings unchanged but creates
 #'   nonzero floors.
 #' * `n` — sample size (required for any mean-conditional bound).
-#' * `mean`, `mean_digits` — the reported mean, numeric, with its number of
-#'   reported decimal places. This mirrors scrutiny's post-string API (numeric
-#'   `x` plus `digits_x`); a character-parsing wrapper can be layered above via
-#'   [infer_digits()], but is not required here. With `rounding = NULL` the
-#'   mean is treated as exact and `mean_digits` is ignored.
-#' * `rounding` — NULL (mean exact) or one of `"up_or_down"`, `"up"`,
-#'   `"down"`, `"even"`, `"ceiling"`, `"floor"`, `"trunc"`, `"anti_trunc"`
-#'   (see [unround_interval()]; requires `mean_digits`). The returned bounds
+#' * `mean`, `digits_mean` — the reported mean, numeric, with its number of
+#'   reported decimal places, as `x` and `digits_x` in scrutiny. With
+#'   `rounding = NULL` the mean is treated as exact and `digits_mean` is
+#'   ignored.
+#' * `rounding` — NULL (mean exact) or one of scrutiny's rounding methods,
+#'   such as `"up_or_down"`, `"up"`, `"even"` or `"trunc"` (see
+#'   [roundwork::unround()]; requires `digits_mean`). The returned bounds
 #'   are then the ENVELOPE over all exact means consistent with the report,
 #'   intersected with the feasible mean band. Under `Z = "integer"` the
 #'   envelope enumerates the GRIM-consistent means in the interval exactly.
-#' * `sd`, `sd_digits` — optionally, the reported SD and its decimal places.
+#' * `sd`, `digits_sd` — optionally, the reported SD and its decimal places.
 #'   The SD never changes the bounds; it enables the report-consistency
 #'   columns: `sd_in_bounds` (does the SD's own rounding interval overlap
 #'   `[min_sd, max_sd]`?) and, under `Z = "integer"` with `rounding` set, the
@@ -155,15 +171,17 @@
 #' @param a,b Numeric scalars or NULL, observed (attained) extremes.
 #' @param n Integer scalar or NULL, sample size (`n >= 2` when given).
 #' @param mean Numeric scalar or NULL, the reported sample mean.
-#' @param mean_digits Integer scalar or NULL, decimal places of the reported
+#' @param digits_mean Integer scalar or NULL, decimal places of the reported
 #'   mean (required with `rounding`).
 #' @param sd Numeric scalar or NULL, the reported sample SD (verdict columns
 #'   only; never affects the bounds).
-#' @param sd_digits Integer scalar or NULL, decimal places of the reported SD
+#' @param digits_sd Integer scalar or NULL, decimal places of the reported SD
 #'   (required for GRIMMER and for interval-based `sd_in_bounds` when
 #'   `rounding` is set).
-#' @param rounding NULL (mean is exact) or a rounding/truncation rule; see
-#'   [unround_interval()].
+#' @param rounding NULL (mean is exact) or a rounding method, named as in
+#'   scrutiny: `"up_or_down"`, `"ceiling_or_floor"`, `"up"`, `"down"`,
+#'   `"even"`, `"ceiling"`, `"floor"`, `"trunc"`, `"anti_trunc"`, or one of
+#'   the `"ties_*"` methods. See [roundwork::unround()].
 #' @param Z "continuous" (default), "integer", or "quasiinteger".
 #' @param scoring "singleitem" (default), "sumscored", or "meanscored".
 #' @param n_items Positive whole number of response items (default 1). Must be
@@ -171,7 +189,7 @@
 #' @param alpha Numeric scalar or NULL, reported Cronbach's alpha (requires
 #'   `scoring = "sumscored"` or `"meanscored"`).
 #'
-#' @return A one-row data.frame: `min_sd`, `max_sd` (Inf if unbounded),
+#' @return A one-row tibble: `min_sd`, `max_sd` (Inf if unbounded),
 #'   `feasible` (FALSE when the constraint set admits no sample, with
 #'   `min_sd`/`max_sd` NA), `min_rule`, `max_rule` (which bound binds),
 #'   `grim`, `grimmer` (scrutiny's verdicts; NA when not applicable),
@@ -188,13 +206,13 @@
 #'
 #' # reported mean rounded to 2 dp: envelope over [2.965, 2.975];
 #' # GRIM verdict deferred to scrutiny
-#' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
+#' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
 #'           rounding = "up_or_down", Z = "integer")
 #' # with a reported SD: adds scrutiny's GRIMMER verdict and the bounds check
-#' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
-#'           sd = 2.83, sd_digits = 2, rounding = "up_or_down", Z = "integer")
+#' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+#'           sd = 2.83, digits_sd = 2, rounding = "up_or_down", Z = "integer")
 #' # truncated reporting
-#' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, mean_digits = 2,
+#' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
 #'           rounding = "trunc", Z = "quasiinteger")
 #'
 #' # sum-scored 3-item composite (l, u, mean in sum units) with alpha
@@ -205,35 +223,34 @@
 #'           scoring = "meanscored", n_items = 3, alpha = 0.8)
 #' @export
 sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
-                      n = NULL, mean = NULL, mean_digits = NULL,
-                      sd = NULL, sd_digits = NULL, rounding = NULL,
+                      n = NULL, mean = NULL, digits_mean = NULL,
+                      sd = NULL, digits_sd = NULL, rounding = NULL,
                       Z = c("continuous", "integer", "quasiinteger"),
                       scoring = c("singleitem", "sumscored", "meanscored"),
                       n_items = 1, alpha = NULL) {
 
-  out <- function(r) data.frame(min_sd = r$min_sd, max_sd = r$max_sd,
-                                feasible = r$feasible, min_rule = r$min_rule,
-                                max_rule = r$max_rule,
-                                grim = r$grim, grimmer = r$grimmer,
-                                sd_in_bounds = r$sd_in_bounds, note = r$note,
-                                stringsAsFactors = FALSE)
-  base_res <- function(note = NA_character_)
-    list(grim = NA, grimmer = NA, sd_in_bounds = NA, note = note)
-  infeasible <- function(note, extra = base_res()) {
-    extra$min_sd <- NA_real_; extra$max_sd <- NA_real_; extra$feasible <- FALSE
-    extra$min_rule <- NA_character_; extra$max_rule <- NA_character_
-    extra$note <- if (is.na(extra$note)) note else paste(extra$note, note, sep = "; ")
-    if (is.na(extra$note)) extra$note <- note
-    extra$note <- note
-    out(extra)
-  }
+  out <- function(r) tibble::tibble(min_sd = r$min_sd, max_sd = r$max_sd,
+                                    feasible = r$feasible,
+                                    min_rule = r$min_rule,
+                                    max_rule = r$max_rule,
+                                    grim = r$grim, grimmer = r$grimmer,
+                                    sd_in_bounds = r$sd_in_bounds,
+                                    note = r$note)
 
   # -- validate ----------------------------------------------------------------
   Z <- match.arg(Z)
   scoring <- match.arg(scoring)
   if (is.character(mean) || is.character(sd))
-    stop("mean and sd must be numeric (mirroring scrutiny's post-string API); ",
-         "parse reported strings upstream, e.g. with infer_digits() + as.numeric()")
+    stop("mean and sd must be numeric, with their decimal places in ",
+         "digits_mean and digits_sd, as in scrutiny; count them from strings ",
+         "with scrutiny::decimal_places()")
+  .check_scalar(l, "l"); .check_scalar(u, "u")
+  .check_scalar(a, "a"); .check_scalar(b, "b")
+  .check_scalar(n, "n", whole = TRUE, min = 2)
+  .check_scalar(mean, "mean"); .check_scalar(sd, "sd", min = 0)
+  .check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
+  .check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
+  if (!is.null(rounding)) .check_rounding(rounding)
   if (is.null(n_items) || length(n_items) != 1 || n_items < 1 ||
       abs(n_items - round(n_items)) > 1e-9)
     stop("n_items must be a positive whole number")
@@ -244,24 +261,16 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
       stop("scoring = 'singleitem' cannot take alpha (a single item has no ",
            "internal consistency); use scoring = 'sumscored' or 'meanscored'")
   }
-  if (!is.null(n) && n < 2) stop("n must be >= 2 for a sample SD")
   if (!is.null(mean) && is.null(n)) stop("mean-conditional bounds require n")
   if (!is.null(rounding) && is.null(mean)) stop("rounding requires a mean")
-  if (!is.null(rounding) && is.null(mean_digits))
-    stop("rounding requires mean_digits (decimal places of the reported mean)")
-  if (!is.null(sd) && !is.null(rounding) && is.null(sd_digits))
-    stop("a reported sd with rounding requires sd_digits")
+  if (!is.null(rounding) && is.null(digits_mean))
+    stop("rounding requires digits_mean (decimal places of the reported mean)")
+  if (!is.null(sd) && !is.null(rounding) && is.null(digits_sd))
+    stop("a reported sd with rounding requires digits_sd")
   if (!is.null(l) && !is.null(u) && u <= l) stop("need u > l")
   if (!is.null(a) && !is.null(b) && b < a) stop("need b >= a")
   if (!is.null(a) && !is.null(l) && a < l) stop("observed minimum a cannot lie below the wall l")
   if (!is.null(b) && !is.null(u) && b > u) stop("observed maximum b cannot lie above the wall u")
-  # granularity limits live on the reported scale; the 1/n_items mean-score grid
-  # maps to integers under w = n_items * x, so reported limits must be integers.
-  if (Z %in% c("integer", "quasiinteger")) {
-    lims <- c(l, u, a, b)
-    if (length(lims) && any(abs(lims - round(lims)) > 1e-9))
-      stop("integer/quasiinteger constraints require integer-valued limits")
-  }
 
   # -- granularity multiplier (m) and alpha item count (k) ---------------------
   # m rescales the reported (mean-score) scale to the integer sum scale on which
@@ -273,6 +282,15 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
   # divisor and the composite item count (a mean-scored composite with alpha).
   m <- if (scoring == "meanscored") n_items else 1L
   k <- n_items
+  # granular limits must lie on the response grid: the integers, or the
+  # 1/n_items lattice of a mean-scored composite (w = m * x maps it to them)
+  if (Z %in% c("integer", "quasiinteger")) {
+    lims <- c(l, u, a, b) * m
+    if (length(lims) && any(abs(lims - round(lims)) > 1e-9))
+      stop("integer/quasiinteger constraints require limits on the response ",
+           "grid (whole numbers, or multiples of 1/n_items for mean-scored ",
+           "data)")
+  }
   if (!is.null(alpha)) {
     if (alpha >= 1) stop("alpha must be < 1")
     if (k == 1L) alpha <- NULL              # alpha is inert at k = 1
@@ -310,19 +328,19 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
     # items_averaged is m, not n_items: a sum score is a whole number per
     # person, so only mean-scored data are averages of several items.
     grim_v <- isTRUE(as.logical(unname(scrutiny::grim(
-      x = mean, n = n, digits_x = mean_digits, items_averaged = m,
+      x = mean, n = n, digits_x = digits_mean, items_averaged = m,
       data_type = "integer", rounding = rounding)))[1])
     if (!is.null(sd))
       grimmer_v <- isTRUE(as.logical(unname(scrutiny::grimmer(
-        x = mean, sd = sd, n = n, digits_x = mean_digits, digits_sd = sd_digits,
+        x = mean, sd = sd, n = n, digits_x = digits_mean, digits_sd = digits_sd,
         items_averaged = m, data_type = "integer", rounding = rounding)))[1])
   }
 
   # helper: does the reported sd (as an interval if rounded) overlap the bounds
   sd_check <- function(min_sd, max_sd) {
     if (is.null(sd) || is.na(min_sd)) return(NA)
-    if (!is.null(rounding) && !is.null(sd_digits)) {
-      iv <- unround_interval(sd, sd_digits, rounding)
+    if (!is.null(rounding) && !is.null(digits_sd)) {
+      iv <- .unround(sd, digits_sd, rounding, "sd", "digits_sd")
       iv$hi >= min_sd - 1e-9 && iv$lo <= max_sd + 1e-9
     } else {
       sd >= min_sd - 1e-9 && sd <= max_sd + 1e-9
@@ -343,7 +361,7 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
   }
 
   # -- rounded/truncated mean: envelope over the rounding interval -------------
-  iv <- unround_interval(mean, mean_digits, rounding)
+  iv <- .unround(mean, digits_mean, rounding, "mean", "digits_mean")
   m_lo <- iv$lo; m_hi <- iv$hi
   band <- feasible_mean_band(lower, upper, lower_att, upper_att, n)
   m_lo2 <- max(m_lo, band[1]); m_hi2 <- min(m_hi, band[2])
@@ -395,7 +413,7 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
     note = sprintf("mean treated as %s-%s to %d dp: envelope over [%.6g, %.6g]%s",
                    if (rounding %in% c("trunc", "anti_trunc", "ceiling", "floor"))
                      "truncated" else "rounded",
-                   rounding, iv$digits, m_lo, m_hi,
+                   rounding, as.integer(digits_mean), m_lo, m_hi,
                    if (m_lo2 > m_lo || m_hi2 < m_hi)
                      sprintf(", clipped to feasible [%.6g, %.6g]", m_lo2, m_hi2) else "")
   ), extra_note = divergence)
