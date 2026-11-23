@@ -12,7 +12,7 @@
 # Hussey, I. (2026). strait: Bounds checks for reported summary statistics.
 # https://doi.org/10.5281/zenodo.21439905
 #
-# Run with: shiny::runApp("app/default app")
+# Run with: shiny::runApp("app/default-app")
 
 library(shiny)
 library(bslib)
