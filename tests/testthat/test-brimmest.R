@@ -91,7 +91,7 @@ test_that("the targeted route and the lattice route give identical verdicts", {
   # brimmest() picks a route by design size; both must certify the same set
   for (cfg in list(c(1, 5, 9), c(0, 6, 10), c(1, 7, 8))) {
     l <- cfg[1]; u <- cfg[2]; n <- cfg[3]
-    lat <- strait:::.attainable_lattice(l, u, n, 1)
+    lat <- strait:::attainable_lattice(l, u, n, 1)
     grid <- expand.grid(mean = round(seq(l, u, by = 0.1), 1),
                         sd = round(seq(0, (u - l) / sqrt(2), by = 0.1), 1))
     for (rr in c("up", "down")) {
@@ -99,9 +99,9 @@ test_that("the targeted route and the lattice route give identical verdicts", {
       ls <- round(roundwork::reround(lat$sd, 1, rr) * 10)
       ref <- paste(round(grid$mean * 10), round(grid$sd * 10)) %in% paste(lm, ls)
       got <- vapply(seq_len(nrow(grid)), function(i) {
-        tg <- strait:::.target_states(l, u, n, 1, grid$mean[i], grid$sd[i],
+        tg <- strait:::target_states(l, u, n, 1, grid$mean[i], grid$sd[i],
                                       1, 1, rr)
-        isTRUE(strait:::.attainable_target(as.integer(u - l), n, tg))
+        isTRUE(strait:::attainable_target(as.integer(u - l), n, tg))
       }, logical(1))
       expect_identical(got, ref)
     }
@@ -123,7 +123,7 @@ test_that("a zero SD survives the unrounding sign trap", {
 test_that("a mean admitting no integer sum is refused, not mis-enumerated", {
   # seq.int() counts down when from > to, so an empty candidate range must be
   # caught explicitly or it yields phantom sums and a false 'possible'
-  expect_null(strait:::.target_states(1, 4, 6, 1, 1.1, 0.0, 1, 1, "up"))
+  expect_null(strait:::target_states(1, 4, 6, 1, 1.1, 0.0, 1, 1, "up"))
   expect_false(brimmest(l = 1, u = 4, n = 6, mean = 1.1, sd = 0.0,
                         digits_mean = 1, digits_sd = 1)$possible)
 })
@@ -132,14 +132,14 @@ test_that("brimmest() certifies designs too large for the full lattice", {
   skip_on_cran()
   # a 0-63 inventory at n = 50 needs a 3151 x 24801 state table, which the
   # lattice guard refuses outright; the targeted corridor is ~9% of that
-  expect_gt(strait:::.lattice_cells(0, 63, 50, 1), 2e7)
+  expect_gt(strait:::lattice_cells(0, 63, 50, 1), 2e7)
   r <- brimmest(l = 0, u = 63, n = 50, mean = 20.5, sd = 12.3, digits_mean = 1, digits_sd = 1)
   expect_true(r$possible)
 })
 
 test_that("the lattice cache returns an identical object", {
-  a <- strait:::.lattice_cached(1, 5, 9, 1)
-  b <- strait:::.lattice_cached(1, 5, 9, 1)
+  a <- strait:::lattice_cached(1, 5, 9, 1)
+  b <- strait:::lattice_cached(1, 5, 9, 1)
   expect_identical(a, b)
-  expect_identical(a, strait:::.attainable_lattice(1, 5, 9, 1))
+  expect_identical(a, strait:::attainable_lattice(1, 5, 9, 1))
 })

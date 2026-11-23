@@ -22,7 +22,7 @@
 
 # Internal: beta-binomial pmf on 0:m. rho <= 0 is the binomial (the floor of
 # the family); rho >= 1 is the limit with all mass at the two endpoints.
-.bb_pmf <- function(m, mu, rho) {
+bb_pmf <- function(m, mu, rho) {
   x <- 0:m
   if (rho <= 1e-10) {
     return(stats::dbinom(x, m, mu))
@@ -38,7 +38,7 @@
 }
 
 # Internal: population cumulants of X from the pmf.
-.cumulants_from_pmf <- function(pr) {
+cumulants_from_pmf <- function(pr) {
   x <- seq_along(pr) - 1
   mean <- sum(pr * x)
   cm <- vapply(2:6, function(r) sum(pr * (x - mean)^r), numeric(1))
@@ -77,14 +77,14 @@
 #' bb_cumulants(63, 25 / 63, 0.052)
 #' @export
 bb_cumulants <- function(m, mu, rho) {
-  tibble::as_tibble(.cumulants_from_pmf(.bb_pmf(m, mu, rho)))
+  tibble::as_tibble(cumulants_from_pmf(bb_pmf(m, mu, rho)))
 }
 
 # Internal: cumulants of the unbiased sample variance S^2 of N iid draws.
 # conditional = TRUE gives the leading-order moments of S^2 given that the
 # sample mean equals the population mean, removing the part of Var(S^2) that
 # Cov(xbar, S^2) = kappa_3 / N explains.
-.s2_cumulants <- function(cu, N, conditional = FALSE) {
+s2_cumulants <- function(cu, N, conditional = FALSE) {
   k2 <- cu$k2
   k3 <- cu$k3
   k4 <- cu$k4
@@ -104,7 +104,7 @@ bb_cumulants <- function(m, mu, rho) {
 # ---- approximate CDFs of S ---------------------------------------------------
 
 # Internal: CDF of S at s for one rho, under an approximation of S^2.
-.cdf_s_approx <- function(s, sc, method) {
+cdf_s_approx <- function(s, sc, method) {
   s2 <- s^2
   switch(
     method,
@@ -114,7 +114,7 @@ bb_cumulants <- function(m, mu, rho) {
     },
     chisq3 = {
       if (sc$k3 <= 0) {
-        return(.cdf_s_approx(s, sc, "chisq2"))
+        return(cdf_s_approx(s, sc, "chisq2"))
       }
       b <- sc$k3 / (4 * sc$k2)
       nu <- 8 * sc$k2^3 / sc$k3^2
@@ -145,7 +145,7 @@ bb_cumulants <- function(m, mu, rho) {
 
 # Internal: minimum and maximum of sum x^2 over n integers in [0, m] summing
 # to s.
-.q_min <- function(n, s) {
+q_min <- function(n, s) {
   if (n == 0) {
     return(0)
   }
@@ -153,7 +153,7 @@ bb_cumulants <- function(m, mu, rho) {
   r <- s %% n
   (n - r) * a^2 + r * (a + 1)^2
 }
-.q_max <- function(n, s, m) {
+q_max <- function(n, s, m) {
   k <- s %/% m
   rem <- s %% m
   k * m^2 + rem^2
@@ -165,12 +165,12 @@ bb_cumulants <- function(m, mu, rho) {
 # p(x) < prune and sums whose total mass is below prune are dropped; the
 # discarded mass is returned as `lost`. `keep` lists the sample sizes whose
 # joint distribution is returned (all <= N), so one run serves several N.
-.sq_joint <- function(pr, N, keep = N, prune = 1e-17, max_cells = 4e7) {
+sq_joint <- function(pr, N, keep = N, prune = 1e-17, max_cells = 4e7) {
   m <- length(pr) - 1
   cells <- sum(vapply(
     0:(N * m),
     function(s) {
-      .q_max(N, s, m) - .q_min(N, s) + 1
+      q_max(N, s, m) - q_min(N, s) + 1
     },
     numeric(1)
   ))
@@ -198,7 +198,7 @@ bb_cumulants <- function(m, mu, rho) {
     smax_new <- (n + 1) * m
     new <- vector("list", smax_new + 1)
     for (s2 in 0:smax_new) {
-      base <- .q_min(n + 1, s2)
+      base <- q_min(n + 1, s2)
       v <- NULL
       for (x in xs) {
         s <- s2 - x
@@ -210,9 +210,9 @@ bb_cumulants <- function(m, mu, rho) {
           next
         }
         if (is.null(v)) {
-          v <- numeric(.q_max(n + 1, s2, m) - base + 1)
+          v <- numeric(q_max(n + 1, s2, m) - base + 1)
         }
-        idx <- .q_min(n, s) + x^2 - base + seq_along(o)
+        idx <- q_min(n, s) + x^2 - base + seq_along(o)
         v[idx] <- v[idx] + pr[x + 1] * o
       }
       if (!is.null(v)) {
@@ -231,7 +231,7 @@ bb_cumulants <- function(m, mu, rho) {
 # Internal: distribution of S^2 from a joint state, optionally restricted to
 # the sums in `sums` (conditioning on the sample mean). Returns a data frame
 # (s2, prob) sorted by s2, with prob normalised within the condition.
-.s2_from_joint <- function(j, sums = NULL) {
+s2_from_joint <- function(j, sums = NULL) {
   N <- j$N
   st <- j$state
   ss <- which(!vapply(st, is.null, logical(1))) - 1
@@ -249,7 +249,7 @@ bb_cumulants <- function(m, mu, rho) {
   for (s in ss) {
     v <- st[[s + 1]]
     nz <- which(v > 0)
-    q <- .q_min(N, s) + nz - 1
+    q <- q_min(N, s) + nz - 1
     num[[length(num) + 1]] <- N * q - s^2 # N (N - 1) S^2, an integer
     pr[[length(pr) + 1]] <- v[nz]
   }
@@ -281,15 +281,15 @@ bb_cumulants <- function(m, mu, rho) {
 #' sum(d$s2 * d$prob)   # equals the population variance
 #' @export
 s2_exact <- function(m, mu, rho, n, sums = NULL) {
-  .sdp_check_n(n, allow_na = FALSE)
-  j <- .sq_joint(.bb_pmf(m, mu, rho), max(n), keep = n)
-  out <- lapply(j, function(x) tibble::as_tibble(.s2_from_joint(x, sums)))
+  plausibility_check_n(n, allow_na = FALSE)
+  j <- sq_joint(bb_pmf(m, mu, rho), max(n), keep = n)
+  out <- lapply(j, function(x) tibble::as_tibble(s2_from_joint(x, sums)))
   attr(out, "lost") <- attr(j, "lost")
   out
 }
 
 # Internal: stop unless n holds whole numbers >= 2 (NA allowed if allow_na).
-.sdp_check_n <- function(n, allow_na = TRUE) {
+plausibility_check_n <- function(n, allow_na = TRUE) {
   v <- if (allow_na) n[!is.na(n)] else n
   if (
     !is.numeric(n) ||
@@ -306,7 +306,7 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
 # Internal: sums t (on the 0..m scale) whose mean l + t / n rounds to `mean`
 # at `digits` decimals (half-width tolerance), or the exact sum when digits
 # is NULL and the mean is GRIM-consistent. `digits` is a single value.
-.consistent_sums <- function(l, mean, n, m, digits = NULL) {
+consistent_sums <- function(l, mean, n, m, digits = NULL) {
   if (is.null(digits)) {
     t <- round(n * (mean - l))
     if (abs(t - n * (mean - l)) > 1e-7) {
@@ -325,8 +325,8 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
 }
 
 # Internal: hard min / max SD for integer data on [l, u] with reported mean.
-.hard_bounds <- function(l, u, mean, n, m, digits) {
-  t <- .consistent_sums(l, mean, n, m, digits)
+hard_bounds <- function(l, u, mean, n, m, digits) {
+  t <- consistent_sums(l, mean, n, m, digits)
   if (length(t) == 0) {
     # no integer sample has this mean: fall back to the quasi-integer floor,
     # which is a valid floor at every real mean
@@ -342,7 +342,7 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
 # ---- the main function -------------------------------------------------------
 
 # Internal: rho nodes of N(rho, tau^2) truncated to [0, 1), equal weights.
-.rho_nodes <- function(rho, tau, K) {
+rho_nodes <- function(rho, tau, K) {
   if (tau <= 0) {
     return(rho)
   }
@@ -355,7 +355,7 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
 # Internal: lower and upper quantiles of S for one row, at every tail
 # probability in `p`. The distribution (exact) or the cumulants (approximate)
 # are computed once per rho node and shared by all `p`.
-.sd_plaus_row <- function(
+sd_plausibility_row <- function(
   l,
   u,
   mean,
@@ -370,10 +370,10 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
 ) {
   m <- u - l
   mu <- (mean - l) / m
-  rhos <- .rho_nodes(rho, tau, K)
+  rhos <- rho_nodes(rho, tau, K)
   if (method == "exact") {
     sums <- if (conditional) {
-      t <- .consistent_sums(l, mean, n, m, digits)
+      t <- consistent_sums(l, mean, n, m, digits)
       if (length(t) == 0) {
         stop(
           "Conditioning on the mean with the exact method needs a ",
@@ -387,7 +387,7 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
     d <- do.call(
       rbind,
       lapply(rhos, function(r) {
-        .s2_from_joint(.sq_joint(.bb_pmf(m, mu, r), n)[[1]], sums)
+        s2_from_joint(sq_joint(bb_pmf(m, mu, r), n)[[1]], sums)
       })
     )
     agg <- rowsum(
@@ -400,10 +400,10 @@ s2_exact <- function(m, mu, rho, n, sums = NULL) {
     q <- function(pp) s[which(cdf >= pp - TOLERANCE_TIGHT)[1]]
   } else {
     scs <- lapply(rhos, function(r) {
-      .s2_cumulants(.cumulants_from_pmf(.bb_pmf(m, mu, r)), n, conditional)
+      s2_cumulants(cumulants_from_pmf(bb_pmf(m, mu, r)), n, conditional)
     })
     cdf <- function(s) {
-      mean(vapply(scs, function(sc) .cdf_s_approx(s, sc, method), numeric(1)))
+      mean(vapply(scs, function(sc) cdf_s_approx(s, sc, method), numeric(1)))
     }
     hi <- 2 * sqrt(max(vapply(scs, `[[`, numeric(1), "k1"))) + 1
     q <- function(pp) {
@@ -532,9 +532,9 @@ sd_plausibility <- function(
   digits_mean = NULL,
   K = 41
 ) {
-  .ga_check_dots(..., .renamed = .sd_renamed)
+  grim_aggregate_check_dots(..., .renamed = sd_renamed)
   method <- match.arg(method)
-  m <- .sdp_check_scale(l, u)
+  m <- plausibility_check_scale(l, u)
   if (is.null(rho) == is.null(sd)) {
     stop(
       "Supply exactly one of `rho` (e.g. a corpus prediction) and `sd` ",
@@ -556,7 +556,7 @@ sd_plausibility <- function(
       call. = FALSE
     )
   }
-  .sdp_check_n(n)
+  plausibility_check_n(n)
   if (!is.numeric(p) || length(p) == 0 || anyNA(p) || any(p <= 0 | p >= 0.5)) {
     stop("`p` must contain tail probabilities in (0, 0.5).", call. = FALSE)
   }
@@ -666,8 +666,8 @@ sd_plausibility <- function(
         res$rho <- rho_i
       }
       digits_i <- if (is.na(digits_in[i])) NULL else digits_in[i]
-      hb <- .hard_bounds(l, u, mean[i], n[i], m, digits_i)
-      q <- .sd_plaus_row(
+      hb <- hard_bounds(l, u, mean[i], n[i], m, digits_i)
+      q <- sd_plausibility_row(
         l,
         u,
         mean[i],
@@ -682,7 +682,7 @@ sd_plausibility <- function(
       )
       lo_clip <- q$lower < hb[1] - TOLERANCE_TIGHT
       hi_clip <- q$upper > hb[2] + TOLERANCE_TIGHT
-      res$sigma <- sqrt(.cumulants_from_pmf(.bb_pmf(m, mu, rho_i))$k2)
+      res$sigma <- sqrt(cumulants_from_pmf(bb_pmf(m, mu, rho_i))$k2)
       res$hard_min <- hb[1]
       res$hard_max <- hb[2]
       res$lower <- pmax(q$lower, hb[1])
@@ -721,7 +721,7 @@ sd_plausibility <- function(
 }
 
 # Internal: old argument and column names, for clear errors.
-.sd_renamed <- c(
+sd_renamed <- c(
   L = "l",
   U = "u",
   M = "mean",
@@ -731,7 +731,7 @@ sd_plausibility <- function(
 )
 
 # Internal: validate scalar scale limits; return m = u - l.
-.sdp_check_scale <- function(l, u) {
+plausibility_check_scale <- function(l, u) {
   if (
     !is.numeric(l) ||
       !is.numeric(u) ||
@@ -781,8 +781,8 @@ sd_plausibility <- function(
 #' rho_from_summary(0, 63, n = c(50, 120), mean = c(25, 12), sd = c(8, 7))
 #' @export
 rho_from_summary <- function(l, u, n, mean, sd, ..., rho_var = NULL) {
-  .ga_check_dots(..., .renamed = .sd_renamed)
-  m <- .sdp_check_scale(l, u)
+  grim_aggregate_check_dots(..., .renamed = sd_renamed)
+  m <- plausibility_check_scale(l, u)
   if (m < 2) {
     stop(
       "`u - l` must be at least 2: on a two-point scale scores are ",
@@ -812,8 +812,8 @@ rho_from_summary <- function(l, u, n, mean, sd, ..., rho_var = NULL) {
       ) {
         return(NA_real_)
       }
-      cu <- .cumulants_from_pmf(.bb_pmf(m, mu[i], min(max(rv[i], 0), 1)))
-      .s2_cumulants(cu, n[i])$k2 / (m * (m - 1) * mu[i] * (1 - mu[i]))^2
+      cu <- cumulants_from_pmf(bb_pmf(m, mu[i], min(max(rv[i], 0), 1)))
+      s2_cumulants(cu, n[i])$k2 / (m * (m - 1) * mu[i] * (1 - mu[i]))^2
     },
     numeric(1)
   )
@@ -821,7 +821,7 @@ rho_from_summary <- function(l, u, n, mean, sd, ..., rho_var = NULL) {
 }
 
 # Internal: rho_from_summary() row by row, for corpora mixing scales.
-.rho_corpus_rows <- function(d, rho_var = rep(NA_real_, nrow(d))) {
+rho_corpus_rows <- function(d, rho_var = rep(NA_real_, nrow(d))) {
   do.call(
     rbind,
     lapply(seq_len(nrow(d)), function(i) {
@@ -865,7 +865,7 @@ rho_corpus_fit <- function(corpus, df = 3, iterate = TRUE, ...) {
   if (!is.data.frame(corpus) || !all(need %in% names(corpus))) {
     hint <- if (
       is.data.frame(corpus) &&
-        all(names(.sd_renamed)[1:5] %in% names(corpus))
+        all(names(sd_renamed)[1:5] %in% names(corpus))
     ) {
       " Columns `L`, `U`, `M`, `SD` and `N` were renamed."
     } else {
@@ -877,7 +877,7 @@ rho_corpus_fit <- function(corpus, df = 3, iterate = TRUE, ...) {
       call. = FALSE
     )
   }
-  d <- cbind(corpus, .rho_corpus_rows(corpus))
+  d <- cbind(corpus, rho_corpus_rows(corpus))
   d <- d[stats::complete.cases(d[c("mu_hat", "rho_hat", "var_rho")]), ]
   basis <- splines::ns(d$mu_hat, df = df)
   fit_once <- function(v) {
@@ -886,7 +886,7 @@ rho_corpus_fit <- function(corpus, df = 3, iterate = TRUE, ...) {
   fit <- fit_once(d$var_rho)
   if (iterate) {
     pred <- as.numeric(stats::predict(fit)$pred)
-    d$var_rho <- .rho_corpus_rows(d, rho_var = pred)$var_rho
+    d$var_rho <- rho_corpus_rows(d, rho_var = pred)$var_rho
     fit <- fit_once(d$var_rho)
   }
   structure(

@@ -14,7 +14,7 @@
 #                       sd_min_two_pin, sd_min_one_pin         (attained)
 #            feasibility: feasible_mean_band
 #   Layer 2  alpha composite layer: v_max_alpha, sd_bounds_alpha
-#   Layer 3  rounding layer: .check_rounding, .unround (via roundwork)
+#   Layer 3  rounding layer: check_rounding, unround_reported (via roundwork)
 #
 # CONVENTIONS
 #   - All SDs are sample SDs (Bessel, n - 1 divisor).
@@ -432,14 +432,14 @@ v_max_alpha <- function(mean_sum, k, n, item_l, item_u) {
 
 # Internal: all non-negative integer count vectors (c_0, ..., c_{slots-1}) that
 # sum to `total`. Rows enumerate compositions; used for the exact Gini envelope.
-.count_vectors <- function(slots, total) {
+count_vectors <- function(slots, total) {
   if (slots == 1L) {
     return(matrix(total, ncol = 1))
   }
   do.call(
     rbind,
     lapply(0:total, function(k) {
-      cbind(k, .count_vectors(slots - 1L, total - k))
+      cbind(k, count_vectors(slots - 1L, total - k))
     })
   )
 }
@@ -483,7 +483,7 @@ sd_min_alpha_gini <- function(
     return(NULL)
   } # no integer composite
   target <- N - n * l # required sum of (value - l)
-  env <- .alpha_gini_envelope(l, u, n, m, max_profiles)
+  env <- alpha_gini_envelope(l, u, n, m, max_profiles)
   if (is.null(env)) {
     return(NULL)
   } # over budget -> fall back
@@ -501,11 +501,11 @@ sd_min_alpha_gini <- function(
 # mean's floor from a single pass, which is what makes mean-sweeps (figures,
 # umbrella grids) affordable. Cached on (l, u, n, m, budget) because `m`
 # decides which profiles can support the reported alpha.
-.gini_envelope_cache <- new.env(parent = emptyenv())
+gini_envelope_cache <- new.env(parent = emptyenv())
 
-.alpha_gini_envelope <- function(l, u, n, m, max_profiles = MAX_GINI_PROFILES) {
+alpha_gini_envelope <- function(l, u, n, m, max_profiles = MAX_GINI_PROFILES) {
   key <- paste(l, u, n, signif(m, 12), max_profiles, sep = "|")
-  hit <- .gini_envelope_cache[[key]]
+  hit <- gini_envelope_cache[[key]]
   if (!is.null(hit)) {
     return(if (identical(hit, NA)) NULL else hit)
   }
@@ -515,11 +515,11 @@ sd_min_alpha_gini <- function(
       !is.finite(suppressWarnings(choose(n + W, W))) ||
       choose(n + W, W) > max_profiles
   ) {
-    assign(key, NA, envir = .gini_envelope_cache)
+    assign(key, NA, envir = gini_envelope_cache)
     return(NULL)
   }
   vals <- 0:W # deviations above l
-  cv <- .count_vectors(W + 1L, n)
+  cv <- count_vectors(W + 1L, n)
   tot <- as.vector(cv %*% vals)
   SS <- as.vector(cv %*% (vals^2)) - tot^2 / n # SS_S (shift-invariant)
   # Gini double-sum over unordered value pairs: sum_{a<b} c_a c_b (v_b - v_a)
@@ -537,7 +537,7 @@ sd_min_alpha_gini <- function(
     agg <- tapply(SS[ok], tot[ok], min)
     list(target = as.integer(names(agg)), ss = as.numeric(agg))
   }
-  assign(key, res, envir = .gini_envelope_cache)
+  assign(key, res, envir = gini_envelope_cache)
   res
 }
 
@@ -631,7 +631,7 @@ ROUNDING_METHODS <- c(
 
 # Internal: check a `rounding` value against `allowed`, pointing the names
 # strait used before 0.5.0 to their scrutiny equivalents.
-.check_rounding <- function(
+check_rounding <- function(
   rounding,
   allowed = ROUNDING_METHODS,
   several = FALSE
@@ -679,7 +679,13 @@ ROUNDING_METHODS <- c(
 # `digits` decimal places, from roundwork::unround(), so that strait unrounds
 # exactly as scrutiny does. Vectorised over `x`. `arg` and `arg_digits` name
 # the arguments in errors.
-.unround <- function(x, digits, rounding, arg = "x", arg_digits = "digits") {
+unround_reported <- function(
+  x,
+  digits,
+  rounding,
+  arg = "x",
+  arg_digits = "digits"
+) {
   if (any(abs(x - round(x, digits)) > TOLERANCE * pmax(1, abs(x)))) {
     stop(
       sprintf(

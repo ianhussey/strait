@@ -43,7 +43,7 @@ exact_q <- function(d, pp) sqrt(d$s2[which(cumsum(d$prob) >= pp - 1e-12)[1]])
 rows <- list()
 for (g in seq_len(nrow(grid))) {
   mu <- grid$mu[g]; rho <- grid$rho[g]
-  pr <- strait:::.bb_pmf(m, mu, rho)
+  pr <- strait:::bb_pmf(m, mu, rho)
   sigma_binom <- sqrt(m * mu * (1 - mu))
   t0 <- Sys.time()
   ex <- s2_exact(m, mu, rho, c(10, 20))
@@ -57,12 +57,12 @@ for (g in seq_len(nrow(grid))) {
     s <- sort(mc_s(pr, N, reps))
     for (pp in probs) {
       approx <- vapply(c("chisq2", "chisq3", "cf"), function(meth) {
-        # .sd_plaus_row(l, u, mean, n, p, ...) returns list(lower, upper)
-        q <- strait:::.sd_plaus_row(0, m, m * mu, N, min(pp, 1 - pp), rho, 0,
+        # sd_plausibility_row(l, u, mean, n, p, ...) returns list(lower, upper)
+        q <- strait:::sd_plausibility_row(0, m, m * mu, N, min(pp, 1 - pp), rho, 0,
                                     meth, FALSE, NULL, 1)
         if (pp < 0.5) q$lower else q$upper
       }, numeric(1))
-      cond <- strait:::.sd_plaus_row(0, m, m * mu, N, min(pp, 1 - pp), rho, 0,
+      cond <- strait:::sd_plausibility_row(0, m, m * mu, N, min(pp, 1 - pp), rho, 0,
                                      "chisq2", TRUE, NULL, 1)
       has_exact <- N <= 20
       rows[[length(rows) + 1]] <- data.frame(

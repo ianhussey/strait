@@ -134,7 +134,7 @@ implied_range <- function(
   } else if (is.null(rounding)) {
     list(lo = mean, hi = mean)
   } else {
-    .unround(mean, digits_mean, rounding, "mean", "digits_mean")
+    unround_reported(mean, digits_mean, rounding, "mean", "digits_mean")
   }
   granular <- granularity != "continuous"
   span <- upper - lower

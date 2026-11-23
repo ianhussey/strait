@@ -141,7 +141,7 @@ brimmer <- function(
     logical(1)
   )]
   if (length(na_in)) {
-    return(.brimmer_na(paste("missing input:", paste(na_in, collapse = ", "))))
+    return(brimmer_na(paste("missing input:", paste(na_in, collapse = ", "))))
   }
 
   # a mean-free check is legitimate (e.g. sd vs the parity ceiling), but
@@ -169,7 +169,7 @@ brimmer <- function(
     if (is.null(digits_sd)) {
       stop("rounding requires digits_sd for the reported sd")
     }
-    iv <- .unround(sd, digits_sd, rounding, "sd", "digits_sd")
+    iv <- unround_reported(sd, digits_sd, rounding, "sd", "digits_sd")
     r$sd_in_bounds <- if (is.na(r$min_sd)) {
       NA
     } else {
@@ -204,7 +204,7 @@ brimmer <- function(
     iv <- if (is.null(rounding)) {
       list(lo = mean, hi = mean)
     } else {
-      .unround(mean, digits_mean, rounding, "mean", "digits_mean")
+      unround_reported(mean, digits_mean, rounding, "mean", "digits_mean")
     }
     in_scale_range <- (iv$hi >= band[1] - TOLERANCE &&
       iv$lo <= band[2] + TOLERANCE)
@@ -236,7 +236,7 @@ brimmer <- function(
     note <- if (is.na(note)) caveat else paste(note, caveat, sep = "; ")
   }
 
-  pomp <- .pomp_cols(
+  pomp <- pomp_cols(
     mean,
     sd,
     r$min_sd,
@@ -269,7 +269,7 @@ brimmer <- function(
 }
 
 # Internal: brimmer()'s row for a report that cannot be judged.
-.brimmer_na <- function(note) {
+brimmer_na <- function(note) {
   tibble::new_tibble(
     list(
       consistent = NA,
@@ -485,12 +485,12 @@ brimmer_map <- function(data, ..., include_inputs = TRUE) {
     })
   )
   res <- res_uni[back, , drop = FALSE]
-  if (include_inputs) .bind_inputs(data, res) else res
+  if (include_inputs) bind_inputs(data, res) else res
 }
 
 # Internal: the inputs, then the results, as one tibble. Names are kept as
 # they are, so an input column that shares a result's name stays visible.
-.bind_inputs <- function(data, res) {
+bind_inputs <- function(data, res) {
   tibble::as_tibble(
     cbind(as.data.frame(data), as.data.frame(res)),
     .name_repair = "minimal"
@@ -630,7 +630,7 @@ umbrella_data <- function(
   alpha = NULL,
   rounding = "up_or_down"
 ) {
-  .check_rounding(rounding)
+  check_rounding(rounding)
   step <- 10^(-digits)
   # round() the grids back onto the nearest double to each decimal. seq() by a
   # decimal step accumulates error (seq(0, 6, by = 0.1)[4] is 0.3 + 5.6e-17),
@@ -662,7 +662,7 @@ umbrella_data <- function(
     }
     sds <- round(seq(0, ceiling(d$max_sd / step) * step, by = step), digits)
     # each SD's own rounding interval, as sd_bounds() unrounds a reported SD
-    iv <- .unround(sds, digits, rounding, "sd", "digits")
+    iv <- unround_reported(sds, digits, rounding, "sd", "digits")
     in_bounds <- iv$hi >= d$min_sd - TOLERANCE & iv$lo <= d$max_sd + TOLERANCE
     # GRIMMER (the expensive per-tuple test) runs only where the SD is inside
     # the sharp bounds; outside, the tuple is already inconsistent and the

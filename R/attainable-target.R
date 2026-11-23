@@ -1,7 +1,7 @@
 # Targeted reachability for brimmest(): certify ONE reported tuple without
 # enumerating the whole attainable lattice.
 #
-# .attainable_lattice() answers "which (mean, sd) pairs are reachable?" and
+# attainable_lattice() answers "which (mean, sd) pairs are reachable?" and
 # then brimmest() asks whether the report is among them. For a single report
 # that is a membership question answered by a reachability-of-everything
 # computation, and on a wide scale the full lattice is not merely slow but
@@ -39,10 +39,10 @@
 # equivalence is asserted cell for cell in tests/testthat/test-brimmest.R.
 
 # Internal: how many cells would the full lattice need? Mirrors the arithmetic
-# in .attainable_lattice() without allocating anything, so brimmest() can
+# in attainable_lattice() without allocating anything, so brimmest() can
 # choose a route before committing to one. NA when the design is not on the
 # integer grid at all.
-.lattice_cells <- function(l, u, n, mg) {
+lattice_cells <- function(l, u, n, mg) {
   W <- mg * (u - l)
   if (abs(W - round(W)) > TOLERANCE) {
     return(NA_real_)
@@ -53,7 +53,7 @@
   }
   ys <- 0:W
   pr <- ys * (W - ys)
-  g <- Reduce(.gcd2, pr[pr > 0])
+  g <- Reduce(gcd, pr[pr > 0])
   if (!length(g) || is.na(g) || g < 1) {
     g <- 1
   }
@@ -63,29 +63,29 @@
 # Internal: the full lattice, memoised per design. Enumerating it is the
 # dominant cost of the lattice route, and repeated calls on one design are
 # the common case when screening a table of reports.
-.lattice_cache <- new.env(parent = emptyenv())
+lattice_cache <- new.env(parent = emptyenv())
 
-.lattice_cached <- function(l, u, n, mg, max_cells = MAX_LATTICE_CELLS) {
+lattice_cached <- function(l, u, n, mg, max_cells = MAX_LATTICE_CELLS) {
   key <- paste(l, u, n, mg, sep = "\r")
-  hit <- get0(key, envir = .lattice_cache, inherits = FALSE)
+  hit <- get0(key, envir = lattice_cache, inherits = FALSE)
   if (!is.null(hit)) {
     return(hit)
   }
-  res <- .attainable_lattice(l, u, n, mg, max_cells = max_cells)
+  res <- attainable_lattice(l, u, n, mg, max_cells = max_cells)
   # ponytail: keeps at most 4 designs, dropping all at once; a lattice can
   # take hundreds of MB. Use LRU eviction if callers alternate among more.
-  if (length(ls(.lattice_cache)) >= 4L) {
-    rm(list = ls(.lattice_cache), envir = .lattice_cache)
+  if (length(ls(lattice_cache)) >= 4L) {
+    rm(list = ls(lattice_cache), envir = lattice_cache)
   }
-  assign(key, res, envir = .lattice_cache)
+  assign(key, res, envir = lattice_cache)
   res
 }
 
 # Internal: the (S, Q) targets implied by one reported (mean, sd) under one
 # rounding rule. Returns NULL when the report admits no integer sum at all
 # (the GRIM condition failing), which is already a certificate of
-# impossibility. `mg` is the granularity multiplier from .scoring_geometry().
-.target_states <- function(
+# impossibility. `mg` is the granularity multiplier from scoring_geometry().
+target_states <- function(
   l,
   u,
   n,
@@ -99,8 +99,8 @@
   W <- as.integer(round(mg * (u - l)))
   # roundwork's intervals, so a reported 0 under "trunc" owns (-unit, unit),
   # and "even" lets a tie round either way, as on the lattice route
-  iv_m <- .unround(mean, digits_mean, rounding, "mean", "digits_mean")
-  iv_s <- .unround(sd, digits_sd, rounding, "sd", "digits_sd")
+  iv_m <- unround_reported(mean, digits_mean, rounding, "mean", "digits_mean")
+  iv_s <- unround_reported(sd, digits_sd, rounding, "sd", "digits_sd")
 
   # S = n * mg * (mean - l) must be a whole number of grid steps. Endpoint
   # inclusion matters: a half-up report owns its lower endpoint but not its
@@ -153,13 +153,13 @@
 # Internal: can n integers in [0, W] realise any of the given (S, Q-window)
 # targets? Exact in both directions. Returns TRUE / FALSE, or NA when the
 # corridor would still exceed max_cells (caller falls back to the lattice).
-.attainable_target <- function(W, n, tg, max_cells = MAX_LATTICE_CELLS) {
+attainable_target <- function(W, n, tg, max_cells = MAX_LATTICE_CELLS) {
   if (is.null(tg) || !nrow(tg)) {
     return(FALSE)
   }
   ys <- 0:W
   pr <- ys * (W - ys) # each item's contribution to R
-  g <- Reduce(.gcd2, pr[pr > 0])
+  g <- Reduce(gcd, pr[pr > 0])
   if (!length(g) || is.na(g) || g < 1) {
     g <- 1
   }

@@ -16,7 +16,7 @@ BRIMMEST_ROUNDING <- c(
   "anti_trunc"
 )
 
-.expand_rounding <- function(rounding) {
+expand_rounding <- function(rounding) {
   unique(unlist(lapply(rounding, function(r) {
     switch(
       r,
@@ -40,7 +40,7 @@ BRIMMEST_ROUNDING <- c(
 # differ only under "even", which, like roundwork::unround(), lets a tie go
 # either way: software does not reliably round decimal ties to even.
 # Directions follow roundwork: "up" takes ties toward +Inf, "trunc" toward 0.
-.round_exact <- function(num, den, rounding, root = FALSE) {
+round_exact <- function(num, den, rounding, root = FALSE) {
   if (root) {
     fl <- floor(sqrt(num / den))
     fl <- fl + ((fl + 1)^2 * den <= num) - (fl^2 * den > num)
@@ -225,7 +225,7 @@ brimmest <- function(
 ) {
   scoring <- match.arg(scoring)
   engine <- match.arg(engine)
-  rounding <- .expand_rounding(.check_rounding(
+  rounding <- expand_rounding(check_rounding(
     rounding,
     BRIMMEST_ROUNDING,
     several = TRUE
@@ -236,17 +236,17 @@ brimmest <- function(
       "digits_sd"
     )
   }
-  .check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
-  .check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
-  .check_scalar(l, "l")
-  .check_scalar(u, "u")
-  .check_scalar(n, "n", whole = TRUE, min = 2)
-  .check_scalar(n_items, "n_items", whole = TRUE, min = 1)
+  check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
+  check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
+  check_scalar(l, "l")
+  check_scalar(u, "u")
+  check_scalar(n, "n", whole = TRUE, min = 2)
+  check_scalar(n_items, "n_items", whole = TRUE, min = 1)
   md <- digits_mean
   sdd <- digits_sd
 
   k <- as.integer(round(n_items))
-  g <- .scoring_geometry(scoring, k, l, u)
+  g <- scoring_geometry(scoring, k, l, u)
   # both routes work on the integer grid y = mg * (x - l) in 0..W
   if (
     abs(g$mg * l - round(g$mg * l)) > TOLERANCE ||
@@ -300,8 +300,8 @@ brimmest <- function(
     return(out)
   }
   # reject values with more decimals than stated, as both routes assume
-  .unround(mean, md, "up", "mean", "digits_mean")
-  .unround(sd, sdd, "up", "sd", "digits_sd")
+  unround_reported(mean, md, "up", "mean", "digits_mean")
+  unround_reported(sd, sdd, "up", "sd", "digits_sd")
 
   # Two routes to the same verdict, chosen by how much work each implies.
   #
@@ -318,7 +318,7 @@ brimmest <- function(
   # only once the lattice is genuinely large, and is the sole option once the
   # lattice will not fit at all.
   W <- as.integer(round(g$mg * (u - l)))
-  cells <- .lattice_cells(l, u, n, g$mg)
+  cells <- lattice_cells(l, u, n, g$mg)
   affordable <- !is.na(cells) && cells <= max_cells
   use_target <- !affordable ||
     (cells > 1e6 && nn * length(rounding) <= 64)
@@ -328,13 +328,13 @@ brimmest <- function(
   # (constructive search, then corridor sweep); "both" runs the two
   # independent methods and refuses to answer if they disagree.
   certify_one <- function(i, rr) {
-    tg <- .target_states(l, u, n, g$mg, mean[i], sd[i], md, sdd, rr)
-    got_a <- if (engine != "search") .certify_analytic(W, n, tg) else NA
+    tg <- target_states(l, u, n, g$mg, mean[i], sd[i], md, sdd, rr)
+    got_a <- if (engine != "search") certify_analytic(W, n, tg) else NA
     got_s <- NA
     if (engine != "analytic") {
-      got_s <- .certify_fast(W, n, tg, budget = search_budget)
+      got_s <- certify_fast(W, n, tg, budget = search_budget)
       if (is.na(got_s)) {
-        got_s <- .attainable_target(W, n, tg, max_cells = max_cells)
+        got_s <- attainable_target(W, n, tg, max_cells = max_cells)
       }
       if (is.na(got_s) && engine == "search") {
         stop(
@@ -372,7 +372,7 @@ brimmest <- function(
   } else {
     # one lattice per design, reused across every reported tuple and cached so
     # that repeated calls on the same design pay for it once
-    lat <- .lattice_cached(l, u, n, g$mg, max_cells)
+    lat <- lattice_cached(l, u, n, g$mg, max_cells)
     # Both sides are on the 10^-digits reporting grid, so compare them as
     # whole numbers of grid steps rather than as strings: exact, and it keeps
     # a multi-million-row lattice cheap to match against. Integers also
@@ -396,8 +396,8 @@ brimmest <- function(
     hit_mat <- vapply(
       rounding,
       function(rr) {
-        lm <- .round_exact(m_num, m_den, rr)
-        ls <- .round_exact(s_num, s_den, rr, root = TRUE)
+        lm <- round_exact(m_num, m_den, rr)
+        ls <- round_exact(s_num, s_den, rr, root = TRUE)
         span <- max(c(ls$hi, qs), 0) + 1 # same packing for both sides
         key <- qm * span + qs
         # under "even" a tie may round either way, in the mean and SD alike
@@ -415,7 +415,7 @@ brimmest <- function(
       hm <- matrix(hit_mat, nn, length(rounding))
       for (ri in seq_along(rounding)) {
         for (i in seq_len(nn)) {
-          tg <- .target_states(
+          tg <- target_states(
             l,
             u,
             n,
@@ -426,7 +426,7 @@ brimmest <- function(
             sdd,
             rounding[ri]
           )
-          got_a <- .certify_analytic(W, n, tg)
+          got_a <- certify_analytic(W, n, tg)
           if (got_a != hm[i, ri]) {
             stop(
               "engine disagreement at mean = ",
@@ -597,5 +597,5 @@ brimmest_map <- function(data, ..., include_inputs = TRUE) {
   }
 
   res <- tibble::tibble(possible = possible, rules = rules)
-  if (include_inputs) .bind_inputs(data, res) else res
+  if (include_inputs) bind_inputs(data, res) else res
 }

@@ -5,7 +5,7 @@
 
 # Internal: bounds for one EXACT mean (or no mean), with sides already
 # resolved. Returns a list; feasibility gates for band/GRIM are applied here.
-.sd_bounds_core <- function(
+sd_bounds_core <- function(
   lower,
   upper,
   lower_att,
@@ -141,7 +141,7 @@
 
 # Internal: check an optional scalar argument. NULL means "not supplied";
 # anything else must be one finite number (whole and >= `min` if asked).
-.check_scalar <- function(x, name, whole = FALSE, min = -Inf) {
+check_scalar <- function(x, name, whole = FALSE, min = -Inf) {
   if (is.null(x)) {
     return(invisible())
   }
@@ -177,7 +177,7 @@
 # Internal: candidate exact means inside [m_lo, m_hi] for the envelope —
 # a dense grid plus every analytic breakpoint of the piecewise bounds
 # (multiples of 1/n, where both floors and Structure S can kink).
-.candidate_means <- function(m_lo, m_hi, n, grid_n = ENVELOPE_GRID_POINTS) {
+candidate_means <- function(m_lo, m_hi, n, grid_n = ENVELOPE_GRID_POINTS) {
   cand <- seq(m_lo, m_hi, length.out = grid_n)
   if (!is.null(n)) {
     t_range <- ceiling(n * m_lo - TOLERANCE):floor(n * m_hi + TOLERANCE)
@@ -354,17 +354,17 @@ sd_bounds <- function(
       "with scrutiny::decimal_places()"
     )
   }
-  .check_scalar(l, "l")
-  .check_scalar(u, "u")
-  .check_scalar(a, "a")
-  .check_scalar(b, "b")
-  .check_scalar(n, "n", whole = TRUE, min = 2)
-  .check_scalar(mean, "mean")
-  .check_scalar(sd, "sd", min = 0)
-  .check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
-  .check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
+  check_scalar(l, "l")
+  check_scalar(u, "u")
+  check_scalar(a, "a")
+  check_scalar(b, "b")
+  check_scalar(n, "n", whole = TRUE, min = 2)
+  check_scalar(mean, "mean")
+  check_scalar(sd, "sd", min = 0)
+  check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
+  check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
   if (!is.null(rounding)) {
-    .check_rounding(rounding)
+    check_rounding(rounding)
   }
   if (
     is.null(n_items) ||
@@ -458,7 +458,7 @@ sd_bounds <- function(
   lower_w <- scl(lower)
   upper_w <- scl(upper)
   core_w <- function(mm) {
-    r <- .sd_bounds_core(
+    r <- sd_bounds_core(
       lower_w,
       upper_w,
       lower_att,
@@ -516,7 +516,7 @@ sd_bounds <- function(
       return(NA)
     }
     if (!is.null(rounding) && !is.null(digits_sd)) {
-      iv <- .unround(sd, digits_sd, rounding, "sd", "digits_sd")
+      iv <- unround_reported(sd, digits_sd, rounding, "sd", "digits_sd")
       iv$hi >= min_sd - TOLERANCE && iv$lo <= max_sd + TOLERANCE
     } else {
       sd >= min_sd - TOLERANCE && sd <= max_sd + TOLERANCE
@@ -543,7 +543,7 @@ sd_bounds <- function(
   }
 
   # -- rounded/truncated mean: envelope over the rounding interval -------------
-  iv <- .unround(mean, digits_mean, rounding, "mean", "digits_mean")
+  iv <- unround_reported(mean, digits_mean, rounding, "mean", "digits_mean")
   m_lo <- iv$lo
   m_hi <- iv$hi
   band <- feasible_mean_band(lower, upper, lower_att, upper_att, n)
@@ -601,7 +601,7 @@ sd_bounds <- function(
       ))
     }
   } else {
-    cand <- .candidate_means(m_lo2, m_hi2, n * m)
+    cand <- candidate_means(m_lo2, m_hi2, n * m)
   }
 
   results <- lapply(cand, core_w)
@@ -678,7 +678,7 @@ sd_bounds <- function(
 #                   mean (the band is then not mean-conditional) or a degenerate
 #                   band.
 # lower/upper are the EFFECTIVE limits (a supersedes l, b supersedes u).
-.pomp_cols <- function(mean, sd, min_sd, max_sd, lower, upper, n, has_mean) {
+pomp_cols <- function(mean, sd, min_sd, max_sd, lower, upper, n, has_mean) {
   pm <- if (
     !is.null(mean) && !is.null(lower) && !is.null(upper) && (upper - lower) > 0
   ) {

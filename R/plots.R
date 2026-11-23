@@ -1,6 +1,6 @@
 # ggplot2 visualisations of the SD bounds, POMP-normalised bounds, and umbrella.
 
-.bounds_point_layer <- function(pts, xvar, yvar) {
+bounds_point_layer <- function(pts, xvar, yvar) {
   if (is.null(pts[["consistent"]])) {
     pts$consistent <- NA
   }
@@ -80,7 +80,7 @@ sd_bounds_plot <- function(
   expand = 0.03
 ) {
   shade <- match.arg(shade)
-  cur <- .band_mask(data)
+  cur <- band_mask(data)
 
   # Padding is a proportion of the scale width, not a fixed SD amount, so the
   # margin is visually constant across scales of very different widths.
@@ -108,8 +108,8 @@ sd_bounds_plot <- function(
     # such a gap unshaded, which would assert that any SD at all is possible
     # there. See band_polygon().
     # band_polygon() needs the grid spacing to tell a sampling gap from a
-    # genuine one; see .band_step().
-    rings <- band_polygon(cur, by = .band_step(data))
+    # genuine one; see band_step().
+    rings <- band_polygon(cur, by = band_step(data))
     p <- p +
       ggplot2::annotate(
         "rect",
@@ -149,7 +149,7 @@ sd_bounds_plot <- function(
     ggplot2::labs(x = "Mean", y = "SD", title = title) +
     ggplot2::theme_minimal()
   if (!is.null(reports)) {
-    p <- p + .bounds_point_layer(reports, "mean", "sd")
+    p <- p + bounds_point_layer(reports, "mean", "sd")
   }
   p
 }
@@ -188,7 +188,7 @@ sd_bounds_pomp_plot <- function(
 ) {
   reference <- match.arg(reference)
   if (reference == "parity") {
-    cur <- .band_mask(data)
+    cur <- band_mask(data)
     p <- ggplot2::ggplot(cur, ggplot2::aes(x = .data$pomp_mean)) +
       ggplot2::geom_ribbon(
         ggplot2::aes(ymin = .data$floor_parity, ymax = .data$ceil_parity),
@@ -210,7 +210,7 @@ sd_bounds_pomp_plot <- function(
         title = title
       )
     if (!is.null(reports)) {
-      p <- p + .bounds_point_layer(reports, "pomp_mean", "pomp_sd_parity")
+      p <- p + bounds_point_layer(reports, "pomp_mean", "pomp_sd_parity")
     }
   } else {
     shade <- data.frame(
@@ -245,7 +245,7 @@ sd_bounds_pomp_plot <- function(
         title = title
       )
     if (!is.null(reports)) {
-      p <- p + .bounds_point_layer(reports, "pomp_mean", "pomp_sd_sharp")
+      p <- p + bounds_point_layer(reports, "pomp_mean", "pomp_sd_sharp")
     }
   }
   p + ggplot2::theme_minimal()
@@ -373,7 +373,7 @@ umbrella_plot <- function(
     )
   }
 
-  bnd <- if (!is.null(bounds)) .band_mask(bounds)
+  bnd <- if (!is.null(bounds)) band_mask(bounds)
   bounds_layers <- if (!is.null(bnd)) {
     lapply(c("max_sd", "min_sd"), function(col) {
       ggplot2::geom_line(
@@ -424,7 +424,7 @@ umbrella_plot <- function(
   }
 
   if (is_band) {
-    cur <- .band_mask(data)
+    cur <- band_mask(data)
     region <- ggplot2::geom_ribbon(
       data = cur,
       ggplot2::aes(x = .data$mean, ymin = .data$min_sd, ymax = .data$max_sd),

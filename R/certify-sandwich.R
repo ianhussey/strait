@@ -16,9 +16,9 @@
 #   Q = sum(y^2)    the sum of squares, pinned to a window by the SD
 #
 # Layer 1 -- the sandwich screen, O(1) per candidate sum. For a given S the
-# achievable Q values lie between the clustered configuration (.q_min_int,
+# achievable Q values lie between the clustered configuration (q_min_int,
 # every value on the two integers around the mean) and the Structure-S
-# configuration (.q_max_int, as many values as possible at the top of the
+# configuration (q_max_int, as many values as possible at the top of the
 # scale). They also share S's parity, because y^2 = y (mod 2) makes
 # Q = S (mod 2) for every sample. A window that meets no integer of the right
 # parity inside that sandwich is impossible, decided in microseconds.
@@ -47,7 +47,7 @@
 # Internal: the smallest sum of squares of n non-negative integers summing to
 # S -- the clustered configuration, values split between floor(S/n) and one
 # more. This is the integer form of the sd_min_integer() floor.
-.q_min_int <- function(S, n) {
+q_min_int <- function(S, n) {
   m <- S %/% n
   r <- S - n * m
   (n - r) * m * m + r * (m + 1) * (m + 1)
@@ -57,7 +57,7 @@
 # the Structure-S configuration, as many values as possible at cap, one
 # remainder, the rest at 0. The integer form of sd_max_structure_s().
 # A cap of 0 forces S = 0, hence a sum of squares of 0.
-.q_max_int <- function(S, cap) {
+q_max_int <- function(S, cap) {
   cap <- rep(cap, length.out = length(S))
   out <- numeric(length(S))
   pos <- cap > 0
@@ -78,7 +78,7 @@
 # The window arrives as the real interval implied by the reported SD, with
 # endpoint inclusion flags, so an endpoint that the rounding rule excludes
 # must not be admitted even when it lands exactly on an integer.
-.k_window <- function(S, Q_lo, Q_hi, lo_incl, hi_incl, n, W, tol = TOLERANCE) {
+k_window <- function(S, Q_lo, Q_hi, lo_incl, hi_incl, n, W, tol = TOLERANCE) {
   k_lo <- ceiling(Q_lo - tol)
   if (!lo_incl && abs(k_lo - Q_lo) < tol) {
     k_lo <- k_lo + 1
@@ -87,8 +87,8 @@
   if (!hi_incl && abs(k_hi - Q_hi) < tol) {
     k_hi <- k_hi - 1
   }
-  k_lo <- max(k_lo, .q_min_int(S, n))
-  k_hi <- min(k_hi, .q_max_int(S, W))
+  k_lo <- max(k_lo, q_min_int(S, n))
+  k_hi <- min(k_hi, q_max_int(S, W))
   if ((k_lo %% 2) != (S %% 2)) {
     k_lo <- k_lo + 1
   }
@@ -107,7 +107,7 @@
 # Returns a list with `possible` (TRUE, FALSE, or NA when the node budget was
 # reached before the tree was exhausted), `witness` (a non-increasing integer
 # vector on the shifted scale when possible), and `nodes` (the search cost).
-.witness_search <- function(W, n, S, k_lo, k_hi, budget = SEARCH_BUDGET) {
+witness_search <- function(W, n, S, k_lo, k_hi, budget = SEARCH_BUDGET) {
   # Build from the nearer wall. Under y -> W - y the sum becomes n*W - S and
   # the sum of squares shifts by n*W^2 - 2*W*S, so the window travels with it.
   flip <- 2 * S > n * W
@@ -133,7 +133,7 @@
   # This runs once per node and is the whole cost of the search, so it is
   # written against R's overheads rather than for brevity: no ifelse(), which
   # evaluates both arms over the full vector; no pmax()/pmin(); and the
-  # Structure-S ceiling inlined rather than taken from .q_max_int(), whose
+  # Structure-S ceiling inlined rather than taken from q_max_int(), whose
   # recycling and mask-scatter are wasted when the cap is already `ys`.
   children <- function(i, cap, S, k_lo, k_hi) {
     # The i - 1 values after this one are all <= y, so y must be at least
@@ -296,19 +296,19 @@
 }
 
 # Internal: the fast route for one reported tuple under one rounding rule.
-# Takes the (S, Q-window) targets .target_states() already builds, so the
+# Takes the (S, Q-window) targets target_states() already builds, so the
 # endpoint semantics per rounding rule are shared with the corridor DP rather
 # than reimplemented.
 #
 # Returns TRUE / FALSE / NA, with NA meaning "no verdict within budget" --
-# the caller then falls back to .attainable_target().
-.certify_fast <- function(W, n, tg, budget = SEARCH_BUDGET) {
+# the caller then falls back to attainable_target().
+certify_fast <- function(W, n, tg, budget = SEARCH_BUDGET) {
   if (is.null(tg) || !nrow(tg)) {
     return(FALSE)
   }
   unknown <- FALSE
   for (i in seq_len(nrow(tg))) {
-    kw <- .k_window(
+    kw <- k_window(
       tg$S[i],
       tg$Q_lo[i],
       tg$Q_hi[i],
@@ -320,7 +320,7 @@
     if (is.null(kw)) {
       next
     } # layer 1 settles this candidate
-    res <- .witness_search(W, n, tg$S[i], kw[1], kw[2], budget = budget)
+    res <- witness_search(W, n, tg$S[i], kw[1], kw[2], budget = budget)
     if (isTRUE(res$possible)) {
       return(TRUE)
     }

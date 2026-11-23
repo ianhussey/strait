@@ -254,7 +254,7 @@ inferences about a population.
 #| fig-height: 3.2
 qi <- res$data$q[res$data$informative]
 F_obs <- sum(res$data$f[res$data$informative])
-pmf <- data.frame(F = 0:length(qi), p = strait:::.poisbinom_pmf(qi))
+pmf <- data.frame(F = 0:length(qi), p = strait:::poisbinom_pmf(qi))
 ggplot(pmf, aes(F, p, fill = F <= F_obs)) +
   geom_col(width = 0.8) +
   scale_fill_manual(values = c(`TRUE` = "#2c7fb8", `FALSE` = "grey75"),
@@ -316,7 +316,7 @@ rates $\lambda q_i$. The lower bound solves $P(F' \ge F \mid \lambda) =
 #| fig-height: 3.2
 fi <- res$data$f[res$data$informative]
 lam <- seq(0.001, 1, length.out = 400)
-ll <- vapply(lam, strait:::.lambda_loglik, 0, f = fi, q = qi)
+ll <- vapply(lam, strait:::lambda_loglik, 0, f = fi, q = qi)
 s <- res$summary
 si <- function(nm) unlist(s[s$quantity == nm, c("lower", "upper")])
 ggplot(data.frame(lam, rl = exp(ll - max(ll))), aes(lam, rl)) +

@@ -6,7 +6,7 @@
 # not dropped: ggplot2 breaks a ribbon or a line at an NA row, but draws
 # straight across a row that is missing, which would fill in or outline a gap
 # where the band does not exist.
-.band_mask <- function(d) {
+band_mask <- function(d) {
   ok <- is.finite(d$min_sd) & is.finite(d$max_sd)
   if (!is.null(d[["feasible"]])) {
     ok <- ok & d$feasible
@@ -29,7 +29,7 @@
 # the plain spacing, every ordinary interval reads as a gap, and the band is
 # drawn as thousands of slivers. The median remains the fallback for a band
 # built by hand, whose uniform grid makes it right.
-.band_step <- function(d) {
+band_step <- function(d) {
   step <- attr(d, "step")
   if (!is.null(step)) {
     step

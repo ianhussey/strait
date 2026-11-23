@@ -5,7 +5,7 @@
 # Internal: the alpha-free quasi-integer sharp band. `mg` is the granularity
 # multiplier: the affine map w = mg * (x - l) sends the reported grid to the
 # integers, so mg = n_items for mean-scored composites and 1 otherwise.
-.quasi_band <- function(mean, n, l, u, mg) {
+quasi_band <- function(mean, n, l, u, mg) {
   data.frame(
     mean = mean,
     min_sd = sd_min_quasi_integer(mg * (mean - l), n) / mg,
@@ -17,7 +17,7 @@
 # formulas need. `mg` is the granularity multiplier (above); `to_sum` maps a
 # reported mean to the sum-score mean that the alpha bounds are stated in;
 # `sd_div` converts a sum-score SD back to the reported SD's units.
-.scoring_geometry <- function(scoring, k, l, u) {
+scoring_geometry <- function(scoring, k, l, u) {
   switch(
     scoring,
     singleitem = {
@@ -54,7 +54,7 @@
   )
 }
 
-.gcd2 <- function(a, b) {
+gcd <- function(a, b) {
   while (b) {
     t <- b
     b <- a %% b
@@ -67,7 +67,7 @@
 # collapse the duplicates that creates. Distinct attainable pairs routinely
 # round into one reported cell, which is exactly why a rounded lattice can look
 # solid where the exact one is full of holes.
-.round_lattice <- function(d, digits, rounding) {
+round_lattice <- function(d, digits, rounding) {
   if (is.null(digits)) {
     return(d)
   }
@@ -106,7 +106,7 @@
 #
 # Shifted whole-block ORs are used rather than scattering into which(...)
 # indices: the block form is what lets (3) and (4) restrict the work.
-.attainable_lattice <- function(
+attainable_lattice <- function(
   l,
   u,
   n,
@@ -123,7 +123,7 @@
   }
   ys <- 0:W
   pr <- ys * (W - ys) # each item's contribution to R
-  g <- Reduce(.gcd2, pr[pr > 0])
+  g <- Reduce(gcd, pr[pr > 0])
   if (!length(g) || is.na(g) || g < 1) {
     g <- 1
   }
@@ -325,7 +325,7 @@ sd_region_data <- function(
   if (rule == "muilwijk") {
     rule <- "mean"
   } # alias: named for its author
-  .check_rounding(
+  check_rounding(
     rounding,
     setdiff(ROUNDING_METHODS, c("up_or_down", "ceiling_or_floor"))
   )
@@ -341,7 +341,7 @@ sd_region_data <- function(
     scoring <- if (k > 1) "meanscored" else "singleitem"
   }
   scoring <- match.arg(scoring, c("singleitem", "sumscored", "meanscored"))
-  g <- .scoring_geometry(scoring, k, l, u)
+  g <- scoring_geometry(scoring, k, l, u)
 
   # lattice rules: only GRIM/GRIMMER-attainable reported tuples exist, so the
   # region is a set of points, not a band (no curve is defined at the means and
@@ -358,14 +358,14 @@ sd_region_data <- function(
       alpha = if (rule == "integer_alpha") alpha else NULL
     )
     out <- as.data.frame(um[which(um$consistent), c("mean", "sd")])
-    out <- tibble::as_tibble(.round_lattice(out, round_digits, rounding))
+    out <- tibble::as_tibble(round_lattice(out, round_digits, rounding))
     attr(out, "type") <- "points"
     return(out)
   }
 
   # exact lattice rules: the true attainable tuples, with no reporting grid.
   if (rule %in% c("attainable", "attainable_alpha")) {
-    out <- .attainable_lattice(l, u, n, g$mg)[c("mean", "sd")]
+    out <- attainable_lattice(l, u, n, g$mg)[c("mean", "sd")]
     if (rule == "attainable_alpha") {
       mus <- unique(out$mean)
       bd <- do.call(
@@ -400,7 +400,7 @@ sd_region_data <- function(
       out <- out[order(out$mean, out$sd), , drop = FALSE]
     }
     rownames(out) <- NULL
-    out <- tibble::as_tibble(.round_lattice(out, round_digits, rounding))
+    out <- tibble::as_tibble(round_lattice(out, round_digits, rounding))
     attr(out, "type") <- "points"
     return(out)
   }
@@ -409,7 +409,7 @@ sd_region_data <- function(
     by <- (u - l) / MEAN_GRID_DIVISIONS
   }
   m <- seq(l, u, by = by)
-  q <- .quasi_band(m, n, l, u, g$mg)
+  q <- quasi_band(m, n, l, u, g$mg)
   naive <- sd_min_integer(g$mg * m, n) / g$mg # strict Bernoulli floor, off-grid too
 
   d <- switch(
@@ -524,12 +524,12 @@ sd_region_plot <- function(
   shade <- match.arg(shade)
   is_band <- !"sd" %in% names(data)
   if (is_band) {
-    data <- .band_mask(data)
+    data <- band_mask(data)
   } else if ("consistent" %in% names(data)) {
     # full umbrella_data() output: only the consistent tuples exist
     data <- data[!is.na(data$consistent) & data$consistent, , drop = FALSE]
   }
-  ref <- if (!is.null(reference)) .band_mask(reference)
+  ref <- if (!is.null(reference)) band_mask(reference)
 
   p <- ggplot2::ggplot()
   # the region itself first, so the dashed reference stays visible on top of it
@@ -552,7 +552,7 @@ sd_region_plot <- function(
       # limit where no composite exists and `min_sd`/`max_sd` are NA; a ribbon
       # draws nothing there, so assembled shading would leave those means
       # unshaded and imply every SD is possible at them. See band_polygon().
-      rings <- band_polygon(data, by = .band_step(data))
+      rings <- band_polygon(data, by = band_step(data))
       p <- p +
         ggplot2::annotate(
           "rect",
