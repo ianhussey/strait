@@ -1,9 +1,12 @@
 Package: strait
 Title: Bounds Checks for Reported Summary Statistics
 Version: 0.5.0
-Authors@R:
+Authors@R: c(
     person("Ian", "Hussey", , "ian.hussey@unibe.ch", role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0001-8906-7559"))
+           comment = c(ORCID = "0000-0001-8906-7559")),
+    person("Lukas", "Jung", role = "ctb"),
+    person("Jamie", "Cummins", role = "ctb")
+  )
 Description: Forensic meta-science tools for checking whether reported summary statistics measured on a bounded (truncated) scale are trustworthy and on the strait and narrow. When a measure has a known minimum and maximum, the reported mean constrains the standard deviation that is arithmetically possible, so the two are not independent. The package computes, in closed form, the smallest and largest sample standard deviations consistent with a reported mean, sample size and scale range, optionally sharpened by attained extremes, response granularity, or a reported Cronbach's alpha, and flags reports that fall outside those bounds as inconsistent. The idea extends granularity-based consistency checks such as GRIM and GRIMMER (Brown and Heathers (2017) <doi:10.1177/1948550616673876>) to the dispersion of truncated data. Helpers apply the check across a data frame, add percent-of-maximum-possible (POMP) transforms, visualise the feasible envelope of means and standard deviations, and enumerate the grid of jointly GRIM-, GRIMMER- and bounds-consistent values.
 URL: https://doi.org/10.5281/zenodo.21439905
 BugReports: https://github.com/ianhussey/strait/issues
@@ -23,7 +26,6 @@ Suggests:
     extraDistr,
     knitr,
     rmarkdown,
-    kableExtra,
     metafor,
     spelling,
     testthat (>= 3.0.0),
