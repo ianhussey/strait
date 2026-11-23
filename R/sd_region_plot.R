@@ -187,7 +187,7 @@
 #' `l = 1, u = 5, n = 10, digits = 2` there are 491 GRIMMER-consistent reported
 #' pairs against 447 attainable ones rounded to the same grid: 9 percent pass
 #' `"integer"` without being attainable, and none go the other way. At
-#' `l = 0, u = 6, n = 23` with two items the gap is 23,738 against 8,634. Use
+#' `l = 0, u = 6, n = 23` with two items it is 49,030 against 47,871. Use
 #' [brimmest()] to certify a single tuple rather than rounding a lattice to
 #' compare against.
 #'

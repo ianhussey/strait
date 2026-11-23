@@ -40,6 +40,7 @@ library(tibble)
 library(ggplot2)
 library(knitr)
 library(scrutiny)
+library(roundwork)
 
 has_unsum <- requireNamespace("unsum", quietly = TRUE)
 
@@ -423,29 +424,32 @@ x_mi <- c(2, 2, 2, 2, 2, 2, 2, 2.5, 2.5, 2.5)   # 10 people, each a mean of two 
 mi <- tibble(
   quantity = c("n", "exact mean", "exact SD", "reported at 1 dp",
                "brimmest(meanscored, k = 2)",
-               "scrutiny grimmer(items = 2)",
-               "scrutiny grimmer on the sum scale (items = 1)"),
+               "scrutiny grimmer(items_averaged = 2)",
+               "scrutiny grimmer on the sum scale (items_averaged = 1)"),
   value = c(length(x_mi), sprintf("%.4f", mean(x_mi)), sprintf("%.4f", sd(x_mi)),
             "2.2, 0.2",
             as.character(brimmest(l = 1, u = 5, n = 10, mean = 2.2, sd = 0.2,
                                  digits_mean = 1, digits_sd = 1, scoring = "meanscored", n_items = 2)$possible),
             as.character(as.logical(grimmer(x = 2.2, sd = 0.2, n = 10, digits_x = 1,
-                                            digits_sd = 1, items = 2))),
+                                            digits_sd = 1, items_averaged = 2,
+                                            data_type = "integer"))),
             as.character(as.logical(grimmer(x = 4.3, sd = 0.5, n = 10, digits_x = 1,
-                                            digits_sd = 1, items = 1))))
+                                            digits_sd = 1, items_averaged = 1,
+                                            data_type = "integer"))))
 )
-mi |> kable(caption = "A real mean-scored sample that scrutiny's multi-item GRIMMER rejects.")
+mi |> kable(caption = "A real mean-scored sample, and what scrutiny's multi-item GRIMMER makes of it.")
 
 check(all(x_mi * 2 == round(x_mi * 2)), "witness lies on the 1/2 mean-score grid")
 ```
 
 Every value is a legal 2-item mean, the reported pair is what a journal would
-print, and `brimmest()` confirms attainability. `scrutiny::grimmer()` returns
-`FALSE` under every rounding rule when told `items = 2`, while the same data
-expressed on the sum scale passes. This is a **false flag in the `items`
-handling**, distinct from the two issues already filed against `scrutiny`
-(`#85`, the test-2/3 conjunction bug, and `#86`, floating-point boundary errors),
-both of which are single-item problems.
+print, and `brimmest()` confirms attainability. Before version 1.0.0,
+`scrutiny::grimmer()` returned `FALSE` under every rounding rule when told
+`items = 2`, while the same data expressed on the sum scale passed: a **false
+flag in the `items` handling**, distinct from the two issues filed against
+`scrutiny` (`#85`, the test-2/3 conjunction bug, and `#86`, floating-point
+boundary errors), both of which are single-item problems. scrutiny 1.0.0, which
+renamed the argument `items_averaged`, accepts the report.
 
 Because it originates in a dependency and is version-dependent, it is recorded
 here rather than asserted. What *is* asserted is that this package's own test —

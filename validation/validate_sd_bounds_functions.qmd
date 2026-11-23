@@ -41,6 +41,7 @@ library(tibble)
 library(ggplot2)
 library(knitr)
 library(scrutiny)
+library(roundwork)
 library(unsum)
 
 # Dev-time validation: load the package under development from the repo root.
@@ -155,8 +156,8 @@ res_round[["open upper endpoint (up)"]]      <- abs(r_up$min_sd  - sd_min_intege
 res_round[["open lower endpoint (down)"]]    <- abs(r_dn$min_sd  - sd_min_integer(2.40, 20)) < 1e-9
 
 # truncation option
-iv <- unround_interval(2.97, 2, "trunc")
-res_round[["trunc interval [x, x+unit)"]] <- abs(iv$lo - 2.97) < 1e-12 && !iv$hi_incl
+iv <- roundwork::unround(2.97, rounding = "trunc", digits = 2)
+res_round[["trunc interval [x, x+unit)"]] <- abs(iv$lower - 2.97) < 1e-12 && !iv$incl_upper
 
 for (nm in names(res_round)) check(res_round[[nm]], nm)
 kable(tibble(test = names(res_round), passed = unlist(res_round)),
@@ -166,11 +167,13 @@ kable(tibble(test = names(res_round), passed = unlist(res_round)),
 ## scrutiny deference, including the documented-bug witness
 
 GRIM and GRIMMER verdicts are deferred to scrutiny and reported verbatim.
-scrutiny's GRIMMER has documented false-flag cases (see
-`scrutiny_grimmer_issue_draft.md` in this folder); the witness dataset
+Before version 1.0.0, scrutiny's GRIMMER had documented false-flag cases (see
+`scrutiny_grimmer_issue_draft.md` in this folder): the witness dataset
 `c(rep(1, 7), rep(0, 193))` produces mean 0.035 and SD 0.184, reported as
-(0.03, 0.18), which scrutiny flags — while feasibility and the bounds check
-correctly admit it.
+(0.03, 0.18), which scrutiny flagged while feasibility and the bounds check
+correctly admitted it. Its GRIM also passed a mean no integer sum rounds to
+under `rounding = "up"`, which `sd_bounds()` surfaced as a divergence note.
+scrutiny 1.0.0 gets both right, so the checks below now require agreement.
 
 ```{r}
 res_scr <- list()
@@ -178,32 +181,33 @@ res_scr <- list()
 r <- sd_bounds(l = 0, u = 1, n = 200, mean = 0.03, digits_mean = 2,
                sd = 0.18, digits_sd = 2, rounding = "up_or_down", Z = "integer")
 res_scr[["witness: feasible & sd_in_bounds TRUE"]] <- r$feasible && isTRUE(r$sd_in_bounds)
-res_scr[["witness: scrutiny grimmer FALSE (documented false flag)"]] <- isFALSE(r$grimmer)
+res_scr[["witness: scrutiny grimmer TRUE (false flag fixed in scrutiny 1.0.0)"]] <- isTRUE(r$grimmer)
 
 # GRIMMER is scale-free; the bounds check is the complementary test
 r2 <- sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
                 sd = 3.30, digits_sd = 2, rounding = "up_or_down", Z = "integer")
 res_scr[["sd above ceiling: sd_in_bounds FALSE"]] <- isFALSE(r2$sd_in_bounds)
 
-# divergence note fires when scrutiny disagrees with the internal enumeration
+# scrutiny's GRIM agrees with the internal enumeration on the case where it
+# used to pass falsely (no divergence note): 0.075 is excluded under "up"
 r3 <- sd_bounds(l = 0, u = 1, n = 40, mean = 0.07, digits_mean = 2,
                 rounding = "up", Z = "integer")
-res_scr[["documented grim false pass surfaces divergence note"]] <-
-  !r3$feasible && isTRUE(r3$grim) && grepl("disagrees", r3$note)
+res_scr[["former grim false pass: scrutiny and enumeration agree"]] <-
+  !r3$feasible && isFALSE(r3$grim) && !grepl("disagrees", r3$note)
 
 for (nm in names(res_scr)) check(res_scr[[nm]], nm)
 kable(tibble(test = names(res_scr), passed = unlist(res_scr)),
       caption = "scrutiny deference.")
 ```
 
-## GRIMMER misses in the CRAN release of scrutiny
+## GRIMMER misses in scrutiny before 1.0.0
 
-The witness above is a *documented* false flag. There is a second, broader one
-that matters more for anyone installing this package today. scrutiny 0.6.1 —
-the current CRAN release, and therefore what CRAN builds `strait` against —
-carries a bug in GRIMMER's third test that flags attainable values as
-inconsistent (<https://github.com/lhdjung/scrutiny/issues/80>); it warns about
-this on every call. The development version (0.6.2) fixes it.
+The witness above is a *documented* false flag. There was a second, broader
+one: scrutiny 0.6.1 carried a bug in GRIMMER's third test that flagged
+attainable values as inconsistent
+(<https://github.com/lhdjung/scrutiny/issues/80>). scrutiny 1.0.0, which strait
+now requires, fixes it; the check below confirms that on the installed
+version.
 
 This matters because `brimmer()`, `umbrella_data()` and the lattice rules
 defer to scrutiny verbatim and so inherit the false flags. `brimmest()` does
@@ -249,10 +253,9 @@ cat(sprintf("\n=> On scrutiny %s, strait's GRIMMER-dependent verdicts are %s.\n"
             if (length(misses)) "AFFECTED by the upstream bug" else "clean"))
 ```
 
-Until scrutiny 0.6.2 reaches CRAN, GRIMMER verdicts from a CRAN install should
-be read alongside `brimmest()`, and this package should not be submitted to
-CRAN — a forensic tool that false-flags legitimate reports is worse than one
-that is merely slow. See the TODO in `README.md`.
+strait requires scrutiny 1.0.0 or later, whose GRIMMER no longer false-flags
+these reports, so a CRAN install no longer needs `brimmest()` to read its
+GRIMMER verdicts.
 
 ## brimmer(): verdict paths
 
@@ -271,7 +274,7 @@ paths <- tribble(
   "GRIM-impossible mean",
     quote(brimmer(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2,
                           sd = 1.00, digits_sd = 2, Z = "integer")),
-  "scrutiny false-flag witness (only grimmer fails)",
+  "former scrutiny false-flag witness",
     quote(brimmer(l = 0, u = 1, n = 200, mean = 0.03, digits_mean = 2,
                           sd = 0.18, digits_sd = 2, Z = "integer")),
   "mean-free: SD at the parity ceiling",
@@ -288,9 +291,9 @@ verdicts <- paths |>
   ungroup() |>
   select(-call, -res)
 
-expected <- c(TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE)
+expected <- c(TRUE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE)
 check(identical(verdicts$consistent, expected), "brimmer verdict paths")
-kable(verdicts, caption = "Verdict paths. The witness row is inconsistent solely through scrutiny's documented GRIMMER false flag; its note carries the caveat.")
+kable(verdicts, caption = "Verdict paths. The witness row was inconsistent solely through a GRIMMER false flag in scrutiny before 1.0.0, and is consistent now.")
 ```
 
 # Part 2: the complete discrete umbrella (Fünderich enumeration)
@@ -420,9 +423,12 @@ sweep <- sweep |>
   rowwise() |>
   mutate(
     truth   = any(abs(umbrella$mean - m2) <= half & abs(umbrella$sd - s2) <= half),
-    grim_p  = isTRUE(as.logical(unname(scrutiny::grim(x = m2, n = n_u, digits_x = 2)))[1]),
+    grim_p  = isTRUE(as.logical(unname(scrutiny::grim(x = m2, n = n_u, digits_x = 2,
+                                                     items_averaged = 1, data_type = "integer")))[1]),
     grimmer_p = isTRUE(as.logical(unname(scrutiny::grimmer(x = m2, sd = s2, n = n_u,
-                                                           digits_x = 2, digits_sd = 2)))[1]),
+                                                           digits_x = 2, digits_sd = 2,
+                                                           items_averaged = 1,
+                                                           data_type = "integer")))[1]),
     bchk    = list(brimmer(l = l_u, u = u_u, n = n_u,
                                    mean = m2, digits_mean = 2,
                                    sd = s2, digits_sd = 2, Z = "integer")),
@@ -590,10 +596,11 @@ ladder_threshold <- function(mean, n, l, u, digits, C = 3) {
 #| label: closure-cert
 fmt <- function(x, d = 2) formatC(x, format = "f", digits = d)
 closure_samples <- function(m, s) {
-  d <- unsum::closure_generate(mean = fmt(m), sd = fmt(s), n = n_u,
-                               scale_min = l_u, scale_max = u_u,
-                               rounding = "up_or_down", warn_if_empty = FALSE)
-  d$metrics$samples_all
+  # unsum >= 0.3 warns when no sample fits, and returns an S7 object
+  d <- suppressWarnings(unsum::closure_generate(
+    mean = fmt(m), sd = fmt(s), n = n_u, scale_min = l_u, scale_max = u_u,
+    rounding = "up_or_down"))
+  d@metrics_main$samples_all
 }
 
 C_gap  <- 3
@@ -703,8 +710,8 @@ res_cert <- list()
 # (compositions of n over the scale points vs. a reachability DP) must induce
 # the same set of reportable tuples once rounded to the reporting grid
 enum_key <- unique(unlist(lapply(c("up", "down"), function(rr)
-  paste(round(strait:::.round_reported(umbrella$mean, 1, rr) * 10),
-        round(strait:::.round_reported(umbrella$sd,   1, rr) * 10)))))
+  paste(round(roundwork::reround(umbrella$mean, 1, rr) * 10),
+        round(roundwork::reround(umbrella$sd,   1, rr) * 10)))))
 grid_c <- expand.grid(mean = seq(l_u, u_u, by = 0.1),
                       sd   = seq(0, ceiling(sd_max_span_n(l_u, u_u, n_u) * 10) / 10,
                                  by = 0.1))
@@ -1083,7 +1090,8 @@ curve_ok <- !any(is.na(cv$min_sd[cv$feasible])) && !any(is.na(cv$max_sd[cv$feasi
 um <- umbrella_data(n = 12, l = 1, u = 7, digits = 2)
 indep <- with(um, {
   gm <- as.logical(scrutiny::grimmer(x = mean, sd = sd, n = 12, digits_x = 2,
-                                     digits_sd = 2, items = 1, rounding = "up_or_down"))
+                                     digits_sd = 2, items_averaged = 1,
+                                     data_type = "integer", rounding = "up_or_down"))
   ib <- (sd + 0.005) >= min_sd - 1e-9 & (sd - 0.005) <= max_sd + 1e-9
   gm & ib
 })
