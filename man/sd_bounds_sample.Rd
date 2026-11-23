@@ -10,7 +10,7 @@ sd_bounds_sample(
   n,
   mean,
   which = c("max", "min"),
-  Z = c("quasiinteger", "integer")
+  granularity = c("quasiinteger", "integer")
 )
 }
 \arguments{
@@ -22,7 +22,7 @@ sd_bounds_sample(
 
 \item{which}{\code{"max"} (default) or \code{"min"}.}
 
-\item{Z}{\code{"quasiinteger"} (default, one observation may be non-integer) or
+\item{granularity}{\code{"quasiinteger"} (default, one observation may be non-integer) or
 \code{"integer"} (requires a GRIM-consistent mean).}
 }
 \value{
@@ -42,7 +42,7 @@ The maximum places \code{n_l} observations at \code{l} and \code{n_u} at \code{u
 remainder observation on the Structure S curve; the minimum clusters \code{n - 1}
 observations on the two integers bracketing the mean with one free remainder.
 Under the quasi-integer default the single remainder may be non-integer (the
-\verb{Z_\{n-1\}} relaxation used throughout the package); pass \code{Z = "integer"} to
+\verb{Z_\{n-1\}} relaxation used throughout the package); pass \code{granularity = "integer"} to
 require a GRIM-consistent mean, so the whole sample is integer.
 }
 \examples{

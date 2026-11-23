@@ -4,7 +4,7 @@
 \alias{sd_min_two_pin}
 \title{Minimum SD with both observed extremes attained (two-pin floor)}
 \usage{
-sd_min_two_pin(a, b, n, mean = NULL, Z = "continuous")
+sd_min_two_pin(a, b, n, mean = NULL, granularity = "continuous")
 }
 \arguments{
 \item{a, b}{Numeric scalars, observed minimum and maximum (attained).}
@@ -13,7 +13,7 @@ sd_min_two_pin(a, b, n, mean = NULL, Z = "continuous")
 
 \item{mean}{Numeric scalar or NULL. If NULL, the mean-agnostic floor.}
 
-\item{Z}{One of "continuous", "integer", "quasiinteger".}
+\item{granularity}{One of "continuous", "integer", "quasiinteger".}
 }
 \value{
 Numeric scalar, the minimum sample SD.
@@ -34,5 +34,5 @@ sd_min_two_pin(a = 1, b = 7, n = 30)
 
 # knowing the mean sharpens it, and granularity sharpens it again
 sd_min_two_pin(a = 1, b = 7, n = 30, mean = 3)
-sd_min_two_pin(a = 1, b = 7, n = 30, mean = 3, Z = "integer")
+sd_min_two_pin(a = 1, b = 7, n = 30, mean = 3, granularity = "integer")
 }

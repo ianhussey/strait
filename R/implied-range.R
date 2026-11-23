@@ -12,7 +12,7 @@
 #' Each result is found by moving one scale limit inward until [brimmer()] no
 #' longer calls the report consistent, so it can never disagree with the bounds
 #' test. Moving a limit can only narrow the bounds, so the search is a
-#' bisection. Under `Z = "integer"` and `"quasiinteger"` the limit moves along
+#' bisection. Under `granularity = "integer"` and `"quasiinteger"` the limit moves along
 #' the response grid (the integers, or the `1 / n_items` lattice of a
 #' mean-scored composite); under `"continuous"`, to within `1e-6` of the scale
 #' range.
@@ -46,12 +46,12 @@
 #' # an SD near the ceiling of a 1-7 scale: the data must include both a 1
 #' # and a 7
 #' implied_range(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'               sd = 2.83, digits_sd = 2, Z = "integer")
+#'               sd = 2.83, digits_sd = 2, granularity = "integer")
 #'
 #' # a small SD forces only neighbouring values: at least one response of 3 or
 #' # lower, and one of 5 or higher
 #' implied_range(l = 1, u = 7, n = 30, mean = 4.00, digits_mean = 2,
-#'               sd = 0.53, digits_sd = 2, Z = "integer")
+#'               sd = 0.53, digits_sd = 2, granularity = "integer")
 #' @export
 implied_range <- function(
   l = NULL,
@@ -64,19 +64,21 @@ implied_range <- function(
   sd = NULL,
   digits_sd = NULL,
   rounding = "up_or_down",
-  Z = c("continuous", "integer", "quasiinteger"),
+  granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1
 ) {
-  Z <- match.arg(Z)
-  scoring <- match.arg(scoring)
+  granularity <- rlang::arg_match(granularity)
+  scoring <- rlang::arg_match(scoring)
   if (is.null(sd)) {
-    stop("implied_range() needs a reported sd")
+    cli::cli_abort("{.fn implied_range} needs a reported {.arg sd}")
   }
   lower <- if (!is.null(a)) a else l
   upper <- if (!is.null(b)) b else u
   if (is.null(lower) || is.null(upper)) {
-    stop("implied_range() needs both scale limits (l or a, and u or b)")
+    cli::cli_abort(
+      "{.fn implied_range} needs both scale limits ({.arg l} or {.arg a}, and {.arg u} or {.arg b})"
+    )
   }
 
   consistent <- function(l, u, a, b) {
@@ -91,7 +93,7 @@ implied_range <- function(
       sd = sd,
       digits_sd = digits_sd,
       rounding = rounding,
-      Z = Z,
+      granularity = granularity,
       scoring = scoring,
       n_items = n_items
     )$consistent
@@ -114,7 +116,7 @@ implied_range <- function(
     sd = sd,
     digits_sd = digits_sd,
     rounding = rounding,
-    Z = Z,
+    granularity = granularity,
     scoring = scoring,
     n_items = n_items
   )
@@ -129,14 +131,14 @@ implied_range <- function(
     ))
   }
 
-  iv <- if (is.null(mean)) {
+  interval <- if (is.null(mean)) {
     list(lo = lower, hi = upper)
   } else if (is.null(rounding)) {
     list(lo = mean, hi = mean)
   } else {
-    .unround(mean, digits_mean, rounding, "mean", "digits_mean")
+    unround_reported(mean, digits_mean, rounding, "mean", "digits_mean")
   }
-  granular <- Z != "continuous"
+  granular <- granularity != "continuous"
   span <- upper - lower
   # the response grid a granular limit moves along
   unit <- if (scoring == "meanscored") 1 / n_items else 1
@@ -146,7 +148,7 @@ implied_range <- function(
   # ok(0) is known to hold. In grid steps for granular data.
   first_failure <- function(ok, d_max) {
     if (granular) {
-      k_max <- floor(d_max / unit + 1e-9)
+      k_max <- floor(d_max / unit + TOLERANCE)
       if (k_max < 1 || ok(k_max * unit)) {
         return(NA)
       }
@@ -174,29 +176,29 @@ implied_range <- function(
   # observation lies that far in: on the grid of integer data, the bound is
   # the grid value just outside d.
   d_room <- function(to_mean) {
-    min(to_mean, span - if (granular) unit else 1e-9 * span)
+    min(to_mean, span - if (granular) unit else TOLERANCE * span)
   }
-  back <- if (Z == "integer") unit else 0
+  back <- if (granularity == "integer") unit else 0
   # where nothing is forced, the mean's interval, snapped inward to that grid
-  snap <- function(d) if (back > 0) floor(d / back + 1e-9) * back else d
+  snap <- function(d) if (back > 0) floor(d / back + TOLERANCE) * back else d
 
   min_at_most <- if (!is.null(a)) {
     a
   } else {
     d <- first_failure(
       function(d) consistent(lower + d, u, NULL, b),
-      d_room(iv$hi - lower)
+      d_room(interval$hi - lower)
     )
-    if (is.na(d)) lower + snap(iv$hi - lower) else lower + d - back
+    if (is.na(d)) lower + snap(interval$hi - lower) else lower + d - back
   }
   max_at_least <- if (!is.null(b)) {
     b
   } else {
     d <- first_failure(
       function(d) consistent(l, upper - d, a, NULL),
-      d_room(upper - iv$lo)
+      d_room(upper - interval$lo)
     )
-    if (is.na(d)) upper - snap(upper - iv$lo) else upper - d + back
+    if (is.na(d)) upper - snap(upper - interval$lo) else upper - d + back
   }
   result(min_at_most, max_at_least)
 }

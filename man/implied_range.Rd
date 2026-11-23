@@ -15,7 +15,7 @@ implied_range(
   sd = NULL,
   digits_sd = NULL,
   rounding = "up_or_down",
-  Z = c("continuous", "integer", "quasiinteger"),
+  granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1
 )
@@ -41,7 +41,7 @@ implied_range(
 as in scrutiny (default \code{"up_or_down"}); NULL treats inputs as exact. See
 \code{\link[=sd_bounds]{sd_bounds()}} and \code{\link[roundwork:unround]{roundwork::unround()}}.}
 
-\item{Z}{"continuous" (default), "integer", or "quasiinteger".}
+\item{granularity}{"continuous" (default), "integer", or "quasiinteger".}
 
 \item{scoring}{"singleitem" (default), "sumscored", or "meanscored".}
 
@@ -65,7 +65,7 @@ simulating a single sample.
 Each result is found by moving one scale limit inward until \code{\link[=brimmer]{brimmer()}} no
 longer calls the report consistent, so it can never disagree with the bounds
 test. Moving a limit can only narrow the bounds, so the search is a
-bisection. Under \code{Z = "integer"} and \code{"quasiinteger"} the limit moves along
+bisection. Under \code{granularity = "integer"} and \code{"quasiinteger"} the limit moves along
 the response grid (the integers, or the \code{1 / n_items} lattice of a
 mean-scored composite); under \code{"continuous"}, to within \code{1e-6} of the scale
 range.
@@ -93,12 +93,12 @@ narrowing the composite's range would misstate.
 # an SD near the ceiling of a 1-7 scale: the data must include both a 1
 # and a 7
 implied_range(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-              sd = 2.83, digits_sd = 2, Z = "integer")
+              sd = 2.83, digits_sd = 2, granularity = "integer")
 
 # a small SD forces only neighbouring values: at least one response of 3 or
 # lower, and one of 5 or higher
 implied_range(l = 1, u = 7, n = 30, mean = 4.00, digits_mean = 2,
-              sd = 0.53, digits_sd = 2, Z = "integer")
+              sd = 0.53, digits_sd = 2, granularity = "integer")
 }
 \seealso{
 \code{\link[=brimmer]{brimmer()}}, whose question this extends from "is the report

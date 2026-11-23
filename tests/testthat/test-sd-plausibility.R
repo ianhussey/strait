@@ -25,7 +25,7 @@ test_that("chisq2 reproduces the reference table (BDI-II, M = 25, SD = 8)", {
 test_that("the pmf matches extraDistr and the moments match closed forms", {
   skip_if_not_installed("extraDistr")
   m <- 20; mu <- 0.3; rho <- 0.1; phi <- 1 / rho - 1
-  expect_equal(strait:::.bb_pmf(m, mu, rho),
+  expect_equal(strait:::bb_pmf(m, mu, rho),
                extraDistr::dbbinom(0:m, m, mu * phi, (1 - mu) * phi))
   cu <- bb_cumulants(m, mu, rho)
   expect_equal(cu$mean, m * mu)
@@ -37,7 +37,7 @@ test_that("the exact DP matches brute-force enumeration", {
   mu <- 0.4
   rho <- 0.1
   n <- 5
-  pr <- strait:::.bb_pmf(m, mu, rho)
+  pr <- strait:::bb_pmf(m, mu, rho)
   g <- as.matrix(expand.grid(rep(list(0:m), n)))
   w <- apply(g, 1, function(r) prod(pr[r + 1]))
   s2 <- apply(g, 1, stats::var)
@@ -58,8 +58,8 @@ test_that("the exact DP matches brute-force enumeration", {
 test_that("cumulants of S^2 match the exact distribution, including kappa_3", {
   for (n in c(2, 3, 7)) {
     ex <- s2_exact(5, 0.35, 0.2, n = n)[[1]]
-    sc <- strait:::.s2_cumulants(
-      strait:::.cumulants_from_pmf(strait:::.bb_pmf(5, 0.35, 0.2)),
+    sc <- strait:::s2_cumulants(
+      strait:::cumulants_from_pmf(strait:::bb_pmf(5, 0.35, 0.2)),
       n
     )
     e1 <- sum(ex$s2 * ex$prob)
@@ -72,7 +72,7 @@ test_that("cumulants of S^2 match the exact distribution, including kappa_3", {
 test_that("normal-theory checks: nu = n - 1 and kappa_3 = 8 sigma^6/(n-1)^2", {
   # a normal population has g2 = 0 and kappa_3 = kappa_4 = kappa_6 = 0
   cu <- list(k2 = 4, k3 = 0, k4 = 0, k6 = 0, g2 = 0)
-  sc <- strait:::.s2_cumulants(cu, 11)
+  sc <- strait:::s2_cumulants(cu, 11)
   expect_equal(2 * sc$k1^2 / sc$k2, 10)
   expect_equal(sc$k3, 8 * 4^3 / 10^2)
 })
@@ -133,10 +133,10 @@ test_that("the mixture over rho widens the bounds and tau = 0 is the point", {
 })
 
 test_that("truncated-normal nodes stay in [0, 1) and have the right centre", {
-  nodes <- strait:::.rho_nodes(0.01, 0.05, 41)
+  nodes <- strait:::rho_nodes(0.01, 0.05, 41)
   expect_true(all(nodes >= 0 & nodes < 1))
   expect_length(nodes, 41)
-  expect_equal(strait:::.rho_nodes(0.3, 0, 41), 0.3)
+  expect_equal(strait:::rho_nodes(0.3, 0, 41), 0.3)
 })
 
 test_that("hard bounds are the integer floor and the sharp ceiling", {
@@ -276,9 +276,9 @@ test_that("invalid input errors clearly", {
 })
 
 test_that("the exact DP runs once per rho node, not once per p", {
-  real <- strait:::.sq_joint
+  real <- strait:::sq_joint
   calls <- 0
-  local_mocked_bindings(.sq_joint = function(...) {
+  local_mocked_bindings(sq_joint = function(...) {
     calls <<- calls + 1
     real(...)
   })
@@ -323,8 +323,8 @@ test_that("rho_from_summary inverts the moment formula and keeps negatives", {
   expect_equal(r$mu_hat, mu)
   expect_lt(rho_from_summary(0, 10, n = 50, mean = 5, sd = 1)$rho_hat, 0)
   # var_rho is Var(S^2) / [m (m - 1) mu (1 - mu)]^2
-  sc <- strait:::.s2_cumulants(strait:::.cumulants_from_pmf(
-    strait:::.bb_pmf(m, mu, rho)), 50)
+  sc <- strait:::s2_cumulants(strait:::cumulants_from_pmf(
+    strait:::bb_pmf(m, mu, rho)), 50)
   expect_equal(r$var_rho, sc$k2 / (m * (m - 1) * mu * (1 - mu))^2)
 })
 

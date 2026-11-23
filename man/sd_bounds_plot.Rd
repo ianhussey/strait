@@ -21,7 +21,7 @@ spacing used to tell a sampling gap from a genuine one under \code{shade = "outs
 uniform grid, from which the spacing is inferred.}
 
 \item{reports}{Optional data frame of reported values, with \code{mean}, \code{sd},
-and (optionally) \code{consistent}; e.g. the output of \code{\link[=brimmer_multiple]{brimmer_multiple()}}.}
+and (optionally) \code{consistent}; e.g. the output of \code{\link[=brimmer_map]{brimmer_map()}}.}
 
 \item{title}{Optional plot title.}
 
@@ -58,7 +58,7 @@ sd_bounds_plot(curve, title = "Feasible SDs, 1-7 scale, n = 30")
 # overlay reported values, coloured by consistency (the second is
 # above the ceiling, so it plots as inconsistent)
 reports <- data.frame(mean = c(2.97, 3.51), sd = c(2.83, 3.50))
-checked <- brimmer_multiple(reports, l = 1, u = 7, n = 30,
+checked <- brimmer_map(reports, l = 1, u = 7, n = 30,
                             digits_mean = 2, digits_sd = 2)
 sd_bounds_plot(curve, reports = checked)
 

@@ -56,12 +56,13 @@ scrutiny's single rounding methods, such as \code{"up"} (default), \code{"down"}
 by \code{\link[roundwork:reround]{roundwork::reround()}}.}
 }
 \value{
-For band rules, a tibble with \code{mean}, \code{min_sd}, \code{max_sd}, which
-are \code{NA} where no SD is possible; its \code{"step"} attribute is the grid
-spacing \code{by}. For the lattice rules (\code{"integer"}, \code{"integer_alpha"},
-\code{"attainable"}, \code{"attainable_alpha"}), a tibble with \code{mean}, \code{sd}: the
-tuples passing every applicable test. The \code{type} attribute is \code{"band"} or
-\code{"points"}.
+A tibble with \code{mean}, \code{min_sd}, \code{max_sd} and \code{sd}, and a \code{type}
+attribute of \code{"band"} or \code{"points"}. Band rules fill \code{min_sd} and
+\code{max_sd}, which are \code{NA} where no SD is possible, leave \code{sd} \code{NA}, and
+record the grid spacing \code{by} in a \code{"step"} attribute. The lattice rules
+(\code{"integer"}, \code{"integer_alpha"}, \code{"attainable"}, \code{"attainable_alpha"})
+fill \code{sd} with the tuples passing every applicable test and leave
+\code{min_sd} and \code{max_sd} \code{NA}.
 }
 \description{
 The \verb{(mean, min_sd, max_sd)} band, or the lattice of attainable reported

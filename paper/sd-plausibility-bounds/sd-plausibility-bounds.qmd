@@ -430,7 +430,7 @@ the quantiles of the truncated normal, as the plan describes.
 old_nodes <- function(rho, tau, K = 41)
   pmin(pmax(qnorm((seq_len(K) - 0.5) / K, rho, tau), 0), 1 - 1e-6)
 c(clamped_share_at_zero = mean(old_nodes(0.02, 0.03) == 0),
-  truncated_share_at_zero = mean(strait:::.rho_nodes(0.02, 0.03, 41) == 0))
+  truncated_share_at_zero = mean(strait:::rho_nodes(0.02, 0.03, 41) == 0))
 ```
 
 ## 4. Include the prediction's own uncertainty
@@ -471,10 +471,10 @@ the beta-binomial*, and should be described that way.
 #| label: fig-kurtosis
 #| fig-cap: "The 0.1% plausibility interval for the SD (N = 50, M = 25 on 0–63, σ fixed at 8) when γ₂ departs from the beta-binomial's value. The two-moment method takes σ and γ₂ directly. Excess kurtosis widens the interval; a flatter distribution narrows it."
 #| fig-height: 3.2
-cu <- strait:::.cumulants_from_pmf(strait:::.bb_pmf(63, 25 / 63, 0.052))
+cu <- strait:::cumulants_from_pmf(strait:::bb_pmf(63, 25 / 63, 0.052))
 g2s <- seq(-1.2, 3, by = 0.1)
 kb <- do.call(rbind, lapply(g2s, function(g2) {
-  sc <- strait:::.s2_cumulants(modifyList(cu, list(g2 = g2)), 50)
+  sc <- strait:::s2_cumulants(modifyList(cu, list(g2 = g2)), 50)
   nu <- 2 * sc$k1^2 / sc$k2
   data.frame(g2 = g2,
              lower = sqrt(sc$k1 * qchisq(0.001, nu) / nu),
@@ -513,7 +513,7 @@ mu_i <- runif(k, 0.08, 0.7)
 N_i <- sample(30:400, k, replace = TRUE)
 rho_i <- pmax(0, true_rho(mu_i) + rnorm(k, 0, 0.015))
 SD_i <- vapply(seq_len(k), function(i) {
-  pr <- strait:::.bb_pmf(63, mu_i[i], rho_i[i])
+  pr <- strait:::bb_pmf(63, mu_i[i], rho_i[i])
   x <- sample(0:63, N_i[i], replace = TRUE, prob = pr)
   sd(x)
 }, 0)

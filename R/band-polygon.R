@@ -6,12 +6,15 @@
 # not dropped: ggplot2 breaks a ribbon or a line at an NA row, but draws
 # straight across a row that is missing, which would fill in or outline a gap
 # where the band does not exist.
-.band_mask <- function(d) {
+band_mask <- function(d) {
   ok <- is.finite(d$min_sd) & is.finite(d$max_sd)
-  if (!is.null(d[["feasible"]])) ok <- ok & d$feasible
-  for (col in intersect(c("min_sd", "max_sd", "floor_parity", "ceil_parity"),
-                        names(d)))
-    d[[col]][!ok] <- NA_real_
+  if (!is.null(d[["feasible"]])) {
+    ok <- ok & d$feasible
+  }
+  sd_cols <- c("min_sd", "max_sd", "floor_parity", "ceil_parity")
+  for (col_current in intersect(sd_cols, names(d))) {
+    d[[col_current]][!ok] <- NA_real_
+  }
   d
 }
 
@@ -24,10 +27,15 @@
 # the plain spacing, every ordinary interval reads as a gap, and the band is
 # drawn as thousands of slivers. The median remains the fallback for a band
 # built by hand, whose uniform grid makes it right.
-.band_step <- function(d) {
+band_step <- function(d) {
   step <- attr(d, "step")
-  if (!is.null(step)) step
-  else if (nrow(d) > 1) stats::median(diff(d$mean)) else 1
+  if (!is.null(step)) {
+    step
+  } else if (nrow(d) > 1) {
+    stats::median(diff(d$mean))
+  } else {
+    1
+  }
 }
 
 #' A feasible region as closed rings
@@ -60,8 +68,8 @@
 #' @param d A data frame with `mean`, `min_sd` and `max_sd`, e.g. from
 #'   [sd_region_data()] under a band rule.
 #' @param by The mean-grid spacing of `d`, used to tell a gap from jitter.
-#' @return A long-format data frame with `mean`, `y` and a `ring` id, ready for
-#'   `geom_polygon(aes(group = ring))`, or `NULL` if no row is finite.
+#' @return A long-format tibble with `mean`, `y` and a `ring` id, ready for
+#'   `geom_polygon(aes(group = ring))`. Zero rows if no row is finite.
 #' @seealso [sd_region_data()], [sd_region_plot()].
 #' @examples
 #' # a reported alpha leaves stretches near each limit where no composite exists
@@ -75,17 +83,80 @@
 #' @export
 band_polygon <- function(d, by) {
   d <- d[is.finite(d$min_sd) & is.finite(d$max_sd), , drop = FALSE]
-  if (!nrow(d)) return(NULL)
+  if (!nrow(d)) {
+    return(tibble::tibble(mean = numeric(0), y = numeric(0), ring = numeric(0)))
+  }
   d <- d[order(d$mean), , drop = FALSE]
   run <- c(0, cumsum(diff(d$mean) > by * 1.5))
-  out <- do.call(rbind, lapply(unique(run), function(k) {
-    g <- d[run == k, , drop = FALSE]
-    data.frame(mean = c(g$mean, rev(g$mean), g$mean[1]),
-               y    = c(g$max_sd,   rev(g$min_sd),   g$max_sd[1]),
-               ring = k)
-  }))
-  rownames(out) <- NULL
-  out
+  unique(run) |>
+    purrr::map(function(ring) {
+      rows <- d[run == ring, , drop = FALSE]
+      tibble::tibble(
+        mean = c(rows$mean, rev(rows$mean), rows$mean[1]),
+        y = c(rows$max_sd, rev(rows$min_sd), rows$max_sd[1]),
+        ring = ring
+      )
+    }) |>
+    dplyr::bind_rows()
+}
+
+#' The outline of an umbrella grid
+#'
+#' The envelope of a lattice of reportable `(mean, sd)` tuples, as closed
+#' rings: at each mean the lowest and highest consistent SD, handed to
+#' [band_polygon()]. This is what `umbrella_plot(style = "contour")` draws, and
+#' it is returned as data so the outline can be drawn elsewhere, or measured.
+#'
+#' `by` is the spacing that tells a true gap in the umbrella from its ordinary
+#' striping, and it defaults to the median gap between the means that *have* a
+#' consistent tuple rather than to the reporting grid's step. Under integer
+#' granularity only the means an integer sum can round to survive, so on the
+#' reporting grid almost every neighbouring pair of means is a gap; splitting
+#' there would make each stripe its own one-column ring, and a one-column ring
+#' has no width to draw. The median of the realised spacing is the striping's
+#' own period, so the stripes join into the envelope and only a true stretch
+#' of infeasible means still splits the region.
+#'
+#' The contour therefore claims less than the tuples do: it says which
+#' `(mean, sd)` pairs are near the region the tests admit, not which are in it.
+#'
+#' @param data Output of [umbrella_data()], or an already-filtered lattice from
+#'   `sd_region_data(rule = "integer")`: anything with `mean` and `sd`,
+#'   filtered by `consistent` when that column is present.
+#' @param by Mean spacing that separates a true gap from the striping;
+#'   defaults to the median spacing between the means that have a consistent
+#'   tuple. Give it explicitly to keep a narrow true gap from being bridged.
+#' @return A tibble with `mean`, `y` and a `ring` id, as [band_polygon()]
+#'   returns. Zero rows if no tuple is consistent.
+#' @seealso [umbrella_plot()] to draw it, [band_polygon()] for the ring
+#'   construction, [umbrella_data()] for the lattice.
+#' @examples
+#' grid <- umbrella_data(l = 1, u = 3, n = 12, digits = 1)
+#' rings <- umbrella_contour(grid)
+#'
+#' # one region here, and it spans the scale
+#' length(unique(rings$ring))
+#' range(rings$mean)
+#' @export
+umbrella_contour <- function(data, by = NULL) {
+  points <- if ("consistent" %in% names(data)) {
+    data[!is.na(data$consistent) & data$consistent, , drop = FALSE]
+  } else {
+    data
+  }
+
+  means <- sort(unique(points$mean))
+  index <- match(points$mean, means)
+  envelope <- tibble::tibble(
+    mean = means,
+    min_sd = as.vector(tapply(points$sd, index, min)),
+    max_sd = as.vector(tapply(points$sd, index, max))
+  )
+  if (is.null(by)) {
+    by <- if (length(means) > 1) stats::median(diff(means)) else 1
+  }
+
+  band_polygon(envelope, by = by)
 }
 
 #' The count-parity correction to the mean-conditional ceiling
@@ -139,7 +210,7 @@ sd_delta <- function(mean, n, lower, upper, tol = 1e-9) {
   R <- upper - lower
   nl <- n * (upper - mean) / R
   nu <- n * (mean - lower) / R
-  muil <- n * (upper - mean) * (mean - lower)   # SS of the uncorrected bound
-  ss <- muil - frac(nl, tol) * frac(nu, tol) * R^2  # SS of the sharp bound
-  ifelse(muil <= 0, 1, pmax(0, ss) / muil)
+  muil <- n * (upper - mean) * (mean - lower) # SS of the uncorrected bound
+  ss <- muil - frac(nl, tol) * frac(nu, tol) * R^2 # SS of the sharp bound
+  dplyr::if_else(muil <= 0, 1, pmax(0, ss) / muil)
 }

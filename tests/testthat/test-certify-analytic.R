@@ -10,15 +10,15 @@ brute_states <- function(n, W) {
   data.frame(S = rowSums(grid), Q = rowSums(grid^2))
 }
 
-test_that(".hit_deficit reproduces brute-force attainability on small designs", {
+test_that("hit_deficit reproduces brute-force attainability on small designs", {
   for (n in c(3L, 5L)) for (W in c(4L, 6L)) {
     b <- brute_states(n, W)
     for (s in unique(b$S)) {
       qs <- unique(b$Q[b$S == s])
-      Qx <- .q_max_cnt(s, W, n)
+      Qx <- q_max_cnt(s, W, n)
       for (q in seq(min(qs), max(qs))) {
         expect_identical(
-          .hit_deficit(s, W, n, Qx - q, Qx - q),
+          hit_deficit(s, W, n, Qx - q, Qx - q),
           q %in% qs
         )
       }
@@ -26,16 +26,16 @@ test_that(".hit_deficit reproduces brute-force attainability on small designs", 
   }
 })
 
-test_that(".analytic_window agrees with .witness_search run to exhaustion", {
+test_that("analytic_window agrees with witness_search run to exhaustion", {
   set.seed(42)
   W <- 9L; n <- 14L
   for (rep in 1:300) {
     S <- sample.int(n * W - 1L, 1L)
-    Qn <- .q_min_int(S, n); Qx <- .q_max_cnt(S, W, n)
+    Qn <- q_min_int(S, n); Qx <- q_max_cnt(S, W, n)
     k_lo <- sample(seq(Qn, Qx), 1L)
     k_hi <- min(Qx, k_lo + sample(0:10, 1L))
-    got_s <- .witness_search(W, n, S, k_lo, k_hi, budget = 1e7)$possible
-    expect_identical(.analytic_window(W, n, S, k_lo, k_hi), got_s)
+    got_s <- witness_search(W, n, S, k_lo, k_hi, budget = 1e7)$possible
+    expect_identical(analytic_window(W, n, S, k_lo, k_hi), got_s)
   }
 })
 
@@ -85,13 +85,13 @@ test_that("engine = 'both' finds no disagreement on a wide design (targeted rout
   expect_identical(r$rules, s$rules)
 })
 
-test_that("brimmest_multiple passes engine through as a call constant", {
+test_that("brimmest_map passes engine through as a call constant", {
   reports <- data.frame(mean = c(3.0, 1.3), sd = c(1.0, 0.9))
-  r <- brimmest_multiple(reports, l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
+  r <- brimmest_map(reports, l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
                          engine = "both")
   expect_identical(r$possible, c(TRUE, FALSE))
   expect_error(
-    brimmest_multiple(cbind(reports, engine = "analytic"),
+    brimmest_map(cbind(reports, engine = "analytic"),
                       l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1),
     "constant"
   )
@@ -109,40 +109,40 @@ test_that("lattice boundary bug is fixed: trunc-rounded reports on exact rationa
   expect_true(r$possible)
 })
 
-test_that(".round_exact matches roundwork's forward rounding away from boundaries", {
+test_that("round_exact matches roundwork's forward rounding away from boundaries", {
   set.seed(11)
   num <- round(runif(400, -8000, 8000)) * 7 + 3  # whole numbers, odd thirteenths
   den <- 13
   x <- num / den
   for (d in 0:2) {
     p <- num * 10^d
-    expect_identical(.round_exact(p, den, "up")$lo,
+    expect_identical(round_exact(p, den, "up")$lo,
                      round(roundwork::round_up(x, d) * 10^d))
-    expect_identical(.round_exact(p, den, "floor")$lo,
+    expect_identical(round_exact(p, den, "floor")$lo,
                      round(roundwork::round_floor(x, d) * 10^d))
-    expect_identical(.round_exact(p, den, "trunc")$lo,
+    expect_identical(round_exact(p, den, "trunc")$lo,
                      round(roundwork::round_trunc(x, d) * 10^d))
-    expect_identical(.round_exact(p, den, "anti_trunc")$lo,
+    expect_identical(round_exact(p, den, "anti_trunc")$lo,
                      round(roundwork::round_anti_trunc(x, d) * 10^d))
   }
 })
 
-test_that(".round_exact files boundary values where the exact value belongs", {
+test_that("round_exact files boundary values where the exact value belongs", {
   # 113/25 = 4.52 exactly; scaled as a double it is 451.99999999999994
-  expect_identical(.round_exact(113 * 100, 25, "trunc")$lo, 452)
-  expect_identical(.round_exact(113 * 100, 25, "floor")$lo, 452)
-  expect_identical(.round_exact(-113 * 100, 25, "trunc")$lo, -452)
-  expect_identical(.round_exact(-113 * 100, 25, "ceiling")$lo, -452)
+  expect_identical(round_exact(113 * 100, 25, "trunc")$lo, 452)
+  expect_identical(round_exact(113 * 100, 25, "floor")$lo, 452)
+  expect_identical(round_exact(-113 * 100, 25, "trunc")$lo, -452)
+  expect_identical(round_exact(-113 * 100, 25, "ceiling")$lo, -452)
   # ties: toward +Inf (up), toward -Inf (down); "even" lets them go either way
-  expect_identical(.round_exact(4525, 10, "up")$lo, 453)
-  expect_identical(.round_exact(-125, 10, "up")$lo, -12)
-  expect_identical(.round_exact(-125, 10, "down")$lo, -13)
-  expect_identical(unlist(.round_exact(4525, 10, "even")), c(lo = 452, hi = 453))
+  expect_identical(round_exact(4525, 10, "up")$lo, 453)
+  expect_identical(round_exact(-125, 10, "up")$lo, -12)
+  expect_identical(round_exact(-125, 10, "down")$lo, -13)
+  expect_identical(unlist(round_exact(4525, 10, "even")), c(lo = 452, hi = 453))
   # an SD as sqrt(num / den): sd = 0.475 exactly is a tie at 2 decimals
-  expect_identical(.round_exact(4 * 47.5^2, 4, "up", root = TRUE)$lo, 48)
-  expect_identical(.round_exact(4 * 47.5^2, 4, "down", root = TRUE)$lo, 47)
+  expect_identical(round_exact(4 * 47.5^2, 4, "up", root = TRUE)$lo, 48)
+  expect_identical(round_exact(4 * 47.5^2, 4, "down", root = TRUE)$lo, 47)
   # a hair above the tie is no tie: (47.5^2 * 4 + 1) / 4 rounds up either way
-  expect_identical(.round_exact(4 * 47.5^2 + 1, 4, "down", root = TRUE)$lo, 48)
+  expect_identical(round_exact(4 * 47.5^2 + 1, 4, "down", root = TRUE)$lo, 48)
 })
 
 test_that("an SD a hair off a rounding tie is not snapped onto it", {
@@ -151,7 +151,7 @@ test_that("an SD a hair off a rounding tie is not snapped onto it", {
   # under the tie and round it down to 0.47.
   n <- 33017; S <- 11353
   nss <- n * S - S^2
-  expect_identical(.round_exact(nss * 10^4, n * (n - 1), "down",
+  expect_identical(round_exact(nss * 10^4, n * (n - 1), "down",
                                 root = TRUE)$lo, 48)
 })
 

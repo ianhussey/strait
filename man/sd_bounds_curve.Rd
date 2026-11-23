@@ -8,7 +8,7 @@ sd_bounds_curve(
   l,
   u,
   n,
-  Z = "quasiinteger",
+  granularity = "quasiinteger",
   scoring = "singleitem",
   n_items = 1,
   alpha = NULL,
@@ -20,7 +20,7 @@ sd_bounds_curve(
 
 \item{n}{Integer scalar, sample size.}
 
-\item{Z}{granularity; \code{"quasiinteger"} (default) gives a hole-free floor.}
+\item{granularity}{\code{"quasiinteger"} (default) gives a hole-free floor.}
 
 \item{scoring, n_items, alpha}{As in \code{\link[=sd_bounds]{sd_bounds()}}.}
 

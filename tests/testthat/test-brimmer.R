@@ -1,6 +1,6 @@
 test_that("brimmer() returns a verdict with POMP columns", {
   r <- brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-               sd = 2.83, digits_sd = 2, Z = "integer")
+               sd = 2.83, digits_sd = 2, granularity = "integer")
   expect_true(all(c("consistent", "failed_tests", "min_sd", "max_sd",
                     "feasible", "in_scale_range", "grim", "grimmer",
                     "sd_in_bounds", "pomp_mean", "pomp_sd_parity",
@@ -11,7 +11,7 @@ test_that("brimmer() returns a verdict with POMP columns", {
 
 test_that("an SD below the floor fails the bounds test", {
   r <- brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-               sd = 0.10, digits_sd = 2, Z = "quasiinteger")
+               sd = 0.10, digits_sd = 2, granularity = "quasiinteger")
   expect_false(r$consistent)
   expect_true(grepl("bounds", r$failed_tests))
   expect_lt(r$pomp_sd_sharp, 0)          # below the band -> negative
@@ -19,7 +19,7 @@ test_that("an SD below the floor fails the bounds test", {
 
 test_that("a GRIM-impossible mean fails grim, not feasibility", {
   r <- brimmer(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2,
-               sd = 1.00, digits_sd = 2, Z = "integer")
+               sd = 1.00, digits_sd = 2, granularity = "integer")
   expect_false(r$consistent)
   expect_true(grepl("grim", r$failed_tests))
   # 3.51 is inside [1, 7]; only its granularity is impossible, so the
@@ -30,51 +30,51 @@ test_that("a GRIM-impossible mean fails grim, not feasibility", {
 
 test_that("pomp_sd_parity is linear and mean-independent", {
   p1 <- brimmer(l = 1, u = 7, n = 30, mean = 4, sd = 1.0, digits_sd = 6,
-                rounding = NULL, Z = "continuous")
+                rounding = NULL, granularity = "continuous")
   p2 <- brimmer(l = 1, u = 7, n = 30, mean = 4, sd = 2.0, digits_sd = 6,
-                rounding = NULL, Z = "continuous")
+                rounding = NULL, granularity = "continuous")
   p3 <- brimmer(l = 1, u = 7, n = 30, mean = 6, sd = 1.0, digits_sd = 6,
-                rounding = NULL, Z = "continuous")
+                rounding = NULL, granularity = "continuous")
   expect_equal(p2$pomp_sd_parity, 2 * p1$pomp_sd_parity)
   expect_equal(p3$pomp_sd_parity, p1$pomp_sd_parity)
 })
 
 test_that("pomp_sd_sharp is 1 at the ceiling and 0 at the floor", {
   mx <- sd_bounds(l = 1, u = 5, n = 9, mean = 3)$max_sd
-  mn <- sd_bounds(l = 1, u = 5, n = 9, mean = 2.44, Z = "quasiinteger")$min_sd
+  mn <- sd_bounds(l = 1, u = 5, n = 9, mean = 2.44, granularity = "quasiinteger")$min_sd
   sh1 <- brimmer(l = 1, u = 5, n = 9, mean = 3, sd = mx, digits_sd = 9,
-                 rounding = NULL, Z = "continuous")$pomp_sd_sharp
+                 rounding = NULL, granularity = "continuous")$pomp_sd_sharp
   sh0 <- brimmer(l = 1, u = 5, n = 9, mean = 2.44, sd = mn, digits_sd = 9,
-                 rounding = NULL, Z = "quasiinteger")$pomp_sd_sharp
+                 rounding = NULL, granularity = "quasiinteger")$pomp_sd_sharp
   expect_equal(sh1, 1, tolerance = 1e-6)
   expect_equal(sh0, 0, tolerance = 1e-6)
 })
 
-test_that("brimmer_multiple() equals a row-wise loop, incl. duplicates", {
+test_that("brimmer_map() equals a row-wise loop, incl. duplicates", {
   df <- expand.grid(mean = c(2.90, 2.97, 3.50), sd = c(0.10, 1.50, 2.83))
   df <- rbind(df, df[1:3, ])
-  mult <- brimmer_multiple(df, l = 1, u = 7, n = 30, digits_mean = 2,
-                           digits_sd = 2, Z = "integer")
+  mult <- brimmer_map(df, l = 1, u = 7, n = 30, digits_mean = 2,
+                           digits_sd = 2, granularity = "integer")
   roww <- do.call(rbind, lapply(seq_len(nrow(df)), function(i)
     brimmer(l = 1, u = 7, n = 30, mean = df$mean[i], digits_mean = 2,
-            sd = df$sd[i], digits_sd = 2, Z = "integer")))
+            sd = df$sd[i], digits_sd = 2, granularity = "integer")))
   expect_equal(mult$consistent, roww$consistent)
   expect_equal(mult$min_sd, roww$min_sd)
   expect_equal(mult$pomp_sd_sharp, roww$pomp_sd_sharp)
 })
 
-test_that("brimmer_multiple() honours include_inputs and column/constant collisions", {
+test_that("brimmer_map() honours include_inputs and column/constant collisions", {
   df <- data.frame(mean = c(3, 4), sd = c(1.5, 1.6))
-  keep <- brimmer_multiple(df, l = 1, u = 7, n = 30, digits_mean = 1,
-                           digits_sd = 1, Z = "integer")
-  drop <- brimmer_multiple(df, l = 1, u = 7, n = 30, digits_mean = 1,
-                           digits_sd = 1, Z = "integer",
+  keep <- brimmer_map(df, l = 1, u = 7, n = 30, digits_mean = 1,
+                           digits_sd = 1, granularity = "integer")
+  drop <- brimmer_map(df, l = 1, u = 7, n = 30, digits_mean = 1,
+                           digits_sd = 1, granularity = "integer",
                            include_inputs = FALSE)
   expect_true(all(c("mean", "sd") %in% names(keep)))
   expect_false("mean" %in% setdiff(names(drop), names(keep)))
   expect_equal(nrow(drop), nrow(df))
   df$n <- 30
-  expect_error(brimmer_multiple(df, n = 30, l = 1, u = 7,
+  expect_error(brimmer_map(df, n = 30, l = 1, u = 7,
                                 digits_mean = 1, digits_sd = 1, sd = 1))
 })
 
@@ -110,22 +110,22 @@ test_that("brim() reports the band narrowed by attained extremes", {
 
 test_that("brim() agrees with brimmer()'s mean-side verdict", {
   for (mu in c(2.97, 3.51, 7.5)) {
-    b  <- brim(l = 1, u = 7, n = 30, mean = mu, digits_mean = 2, Z = "integer")
+    b  <- brim(l = 1, u = 7, n = 30, mean = mu, digits_mean = 2, granularity = "integer")
     bm <- brimmer(l = 1, u = 7, n = 30, mean = mu, digits_mean = 2,
-                  sd = NULL, Z = "integer")
+                  sd = NULL, granularity = "integer")
     expect_identical(b$in_scale_range, bm$in_scale_range)
     expect_identical(b$grim, bm$grim)
   }
 })
 
 test_that("in_scale_range and grim are independent, and neither double-counts", {
-  # the four combinations on a 1-7 scale at n = 30, under Z = "integer":
+  # the four combinations on a 1-7 scale at n = 30, under granularity = "integer":
   #   3.50  in range,     GRIM ok      -> passes
   #   3.51  in range,     30*x = 105.3 -> grim only
   #   7.50  out of range, 30*x = 225   -> in_scale_range only
   #   7.51  out of range, 30*x = 225.3 -> both
   f <- function(mu) brim(l = 1, u = 7, n = 30, mean = mu, digits_mean = 2,
-                         Z = "integer")
+                         granularity = "integer")
   expect_identical(f(3.50)$failed_tests, "")
   expect_identical(f(3.51)$failed_tests, "grim")
   expect_identical(f(7.50)$failed_tests, "in_scale_range")
@@ -138,7 +138,7 @@ test_that("in_scale_range and grim are independent, and neither double-counts", 
 
 test_that("brimmer() nests the mean-side tests under the SD-side ones", {
   f <- function(mu) brimmer(l = 1, u = 7, n = 30, mean = mu, digits_mean = 2,
-                            sd = 1.00, digits_sd = 2, Z = "integer")
+                            sd = 1.00, digits_sd = 2, granularity = "integer")
   # every brim() failure is still reported by brimmer(), plus the SD-side ones
   expect_identical(f(3.51)$failed_tests, "grim,grimmer")
   expect_identical(f(7.50)$failed_tests, "in_scale_range,grimmer")
@@ -146,19 +146,19 @@ test_that("brimmer() nests the mean-side tests under the SD-side ones", {
   for (mu in c(3.50, 3.51, 7.50, 7.51)) {
     expect_identical(f(mu)$in_scale_range,
                      brim(l = 1, u = 7, n = 30, mean = mu, digits_mean = 2,
-                          Z = "integer")$in_scale_range)
+                          granularity = "integer")$in_scale_range)
   }
 })
 
-test_that("in_scale_range is NA when there is no mean, and Z-independent", {
+test_that("in_scale_range is NA when there is no mean, and granularity-independent", {
   sd_only <- brimmer(l = 1, u = 7, n = 30, sd = 2.00, digits_sd = 2)
   expect_true(is.na(sd_only$in_scale_range))
   # the predicate is bounds-only, so granularity must not change it
   for (z in c("continuous", "integer", "quasiinteger")) {
     expect_false(brimmer(l = 1, u = 7, n = 30, mean = 7.5, digits_mean = 1,
-                         sd = 1.0, digits_sd = 1, Z = z)$in_scale_range)
+                         sd = 1.0, digits_sd = 1, granularity = z)$in_scale_range)
     expect_true(brimmer(l = 1, u = 7, n = 30, mean = 3.5, digits_mean = 1,
-                        sd = 1.0, digits_sd = 1, Z = z)$in_scale_range)
+                        sd = 1.0, digits_sd = 1, granularity = z)$in_scale_range)
   }
 })
 
@@ -174,7 +174,7 @@ test_that("feasibility is a residual, fired only when no named test explains it"
   # SD 1.1 rather than 1.0: integer sums with mean 6.0 and SD 1.0 at n = 6 fail
   # GRIMMER's parity test (sum 36, sum of squares 221).
   r <- brimmer(l = 5, u = 10, n = 6, mean = 6.0, digits_mean = 1,
-               sd = 1.1, digits_sd = 1, Z = "integer",
+               sd = 1.1, digits_sd = 1, granularity = "integer",
                scoring = "sumscored", n_items = 5, alpha = 0.90)
   expect_false(r$consistent)
   expect_identical(r$failed_tests, "feasibility")
@@ -186,7 +186,7 @@ test_that("feasibility is a residual, fired only when no named test explains it"
 test_that("a missing input gives a missing verdict, not a pass", {
   for (z in c("continuous", "integer")) {
     r <- brimmer(l = 1, u = 7, n = 30, mean = 3, digits_mean = 1, sd = NA,
-                 digits_sd = 1, Z = z)
+                 digits_sd = 1, granularity = z)
     expect_identical(r$consistent, NA)
     expect_identical(r$failed_tests, NA_character_)
     expect_match(r$note, "missing input: sd")
@@ -199,20 +199,20 @@ test_that("a missing input gives a missing verdict, not a pass", {
                         digits_mean = 1)$consistent, NA)
 })
 
-test_that("brimmer_multiple() handles NA rows, factors and NULL constants", {
+test_that("brimmer_map() handles NA rows, factors and NULL constants", {
   df <- data.frame(mean = c(3, 3), sd = c(1, NA), n = 30,
-                   Z = factor("integer"))
-  r <- brimmer_multiple(df, l = 1, u = 7, digits_mean = 1, digits_sd = 1)
+                   granularity = factor("integer"))
+  r <- brimmer_map(df, l = 1, u = 7, digits_mean = 1, digits_sd = 1)
   expect_identical(r$consistent, c(TRUE, NA))
   expect_s3_class(r, "tbl_df")
   # rounding = NULL treats the inputs as exact rather than falling back to
   # the default unrounding
   # the ceiling at mean 4 is 3.051: an exact 3.1 is above it, a 3.1 rounded
   # from [3.05, 3.15] is not
-  ex <- brimmer_multiple(data.frame(mean = 4, sd = 3.1), l = 1, u = 7,
+  ex <- brimmer_map(data.frame(mean = 4, sd = 3.1), l = 1, u = 7,
                          n = 30, rounding = NULL)
   expect_false(ex$consistent)
-  rd <- brimmer_multiple(data.frame(mean = 4, sd = 3.1), l = 1, u = 7,
+  rd <- brimmer_map(data.frame(mean = 4, sd = 3.1), l = 1, u = 7,
                          n = 30, digits_mean = 0, digits_sd = 1)
   expect_identical(rd$consistent, TRUE)
 })
@@ -240,6 +240,6 @@ test_that("rounding methods unround as roundwork does, also at 0", {
   # trunc sends all of (-0.1, 0.1) to 0, so a truncated 0 admits small
   # negative means
   r <- sd_bounds(l = -3, u = 3, n = 10, mean = 0, digits_mean = 1,
-                 rounding = "trunc", Z = "quasiinteger")
+                 rounding = "trunc", granularity = "quasiinteger")
   expect_match(r$note, "\\[-0\\.1, 0\\.1\\]")
 })

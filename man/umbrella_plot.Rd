@@ -8,11 +8,14 @@ umbrella_plot(
   data,
   bounds = NULL,
   title = NULL,
-  style = c("points", "tiles"),
+  style = c("points", "tiles", "contour"),
   fill = "grey30",
   point_colour = "black",
   point_size = NULL,
+  line_colour = "grey30",
+  contour_by = NULL,
   reference_colour = "grey35",
+  shade = c("outside", "none"),
   expand = 0.03
 )
 }
@@ -27,7 +30,8 @@ dashed lines on top of \code{data}.}
 
 \item{title}{Optional plot title.}
 
-\item{style}{For a lattice, \code{"points"} (default) or \code{"tiles"}; see Details.}
+\item{style}{For a lattice, \code{"points"} (default), \code{"tiles"}, or
+\code{"contour"}; see Details.}
 
 \item{fill}{Fill colour of a band.}
 
@@ -35,7 +39,16 @@ dashed lines on top of \code{data}.}
 value chosen from the number of points, since a size that reads well for a
 few hundred is a solid mass at twenty thousand.}
 
+\item{line_colour}{Colour of the outline under \code{style = "contour"}.}
+
+\item{contour_by}{Mean spacing that separates a true gap in the umbrella
+from its striping under \code{style = "contour"}; see \code{\link[=umbrella_contour]{umbrella_contour()}}.}
+
 \item{reference_colour}{Colour of the \code{bounds} lines.}
+
+\item{shade}{\code{"outside"} (default) shades the panel where the umbrella is
+not, as \code{\link[=sd_bounds_plot]{sd_bounds_plot()}} does; \code{"none"} leaves it clear, so the plot can
+be layered over another.}
 
 \item{expand}{Padding as a proportion of the scale width, as in
 \code{\link[=sd_bounds_plot]{sd_bounds_plot()}}.}
@@ -48,8 +61,8 @@ Draws the umbrella of a design: its reportable \verb{(mean, sd)} tuples, or the
 continuous region they are drawn from. What is drawn follows from \code{data}.
 }
 \details{
-A lattice of tuples, such as \code{\link[=umbrella_data]{umbrella_data()}} output, is drawn in one of two
-styles. \code{style = "points"} (default) greys the whole panel and draws only the
+A lattice of tuples, such as \code{\link[=umbrella_data]{umbrella_data()}} output, is drawn in one of
+three styles. \code{style = "points"} (default) greys the whole panel and draws only the
 consistent tuples. Nothing else is drawn, because nothing else exists: every
 other cell of the grid is a value that cannot be reported. This matches the
 convention of \code{\link[=sd_bounds_plot]{sd_bounds_plot()}} and \code{\link[=sd_region_plot]{sd_region_plot()}}, where shading marks
@@ -65,9 +78,14 @@ it spends two thirds of its ink, in the most saturated colour, on impossible
 tuples, and GRIMMER's verdict alternating between adjacent SDs produces
 interference banding that obscures the striping.
 
+\code{style = "contour"} draws the outline of the consistent tuples instead of the
+tuples themselves: at each mean, the lowest and highest consistent SD, from
+\code{\link[=umbrella_contour]{umbrella_contour()}}. Where the striping of the lattice would only add noise,
+this shows the shape of the umbrella.
+
 A band, with \code{min_sd} and \code{max_sd} instead of \code{sd}, is the umbrella itself,
 filled in \code{fill}. \code{\link[=sd_bounds_curve]{sd_bounds_curve()}} gives the sharp one: under its default
-\code{Z = "quasiinteger"}, every \verb{(mean, SD)} of \code{n} values in \verb{[l, u]} that are
+\code{granularity = "quasiinteger"}, every \verb{(mean, SD)} of \code{n} values in \verb{[l, u]} that are
 whole numbers, except possibly one, which lets the mean take any value. The
 tuples of a lattice are this region rounded to the reporting grid and
 thinned by GRIM and GRIMMER, so the region is their outline, free of the
@@ -97,6 +115,9 @@ umbrella_plot(grid, title = "n = 12, 1-3 scale")
 
 # the previous look, separating the two ways a tuple can be ruled out
 umbrella_plot(grid, style = "tiles")
+
+# the outline of the consistent tuples
+umbrella_plot(grid, style = "contour")
 
 # the continuous umbrella that the tuples are drawn from
 umbrella_plot(sd_bounds_curve(l = 1, u = 3, n = 12))

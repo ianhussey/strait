@@ -5,105 +5,211 @@
 
 # Internal: bounds for one EXACT mean (or no mean), with sides already
 # resolved. Returns a list; feasibility gates for band/GRIM are applied here.
-.sd_bounds_core <- function(lower, upper, lower_att, upper_att,
-                            n, mean, Z, alpha, k_items) {
-  res <- list(min_sd = 0, max_sd = Inf, feasible = TRUE,
-              min_rule = "s >= 0", max_rule = "unbounded", note = NA_character_)
-  fail <- function(note) list(min_sd = NA_real_, max_sd = NA_real_, feasible = FALSE,
-                              min_rule = NA_character_, max_rule = NA_character_, note = note)
+sd_bounds_core <- function(
+  lower,
+  upper,
+  lower_att,
+  upper_att,
+  n,
+  mean,
+  granularity,
+  alpha,
+  k_items
+) {
+  out <- list(
+    min_sd = 0,
+    max_sd = Inf,
+    feasible = TRUE,
+    min_rule = "s >= 0",
+    max_rule = "unbounded",
+    note = NA_character_
+  )
+  fail <- function(note) {
+    list(
+      min_sd = NA_real_,
+      max_sd = NA_real_,
+      feasible = FALSE,
+      min_rule = NA_character_,
+      max_rule = NA_character_,
+      note = note
+    )
+  }
 
   # feasibility: mean inside the band implied by walls/pins
   if (!is.null(mean) && (!is.null(lower) || !is.null(upper))) {
     band <- feasible_mean_band(lower, upper, lower_att, upper_att, n)
-    if (mean < band[1] - 1e-9 || mean > band[2] + 1e-9)
-      return(fail(if (lower_att || upper_att)
-        sprintf("mean outside the feasible band [%.6g, %.6g] implied by the attained extreme(s)",
-                band[1], band[2])
-        else "mean outside [l, u]"))
+    if (mean < band[1] - TOLERANCE || mean > band[2] + TOLERANCE) {
+      return(fail(
+        if (lower_att || upper_att) {
+          sprintf(
+            "mean outside the feasible band [%.6g, %.6g] implied by the attained extreme(s)",
+            band[1],
+            band[2]
+          )
+        } else {
+          "mean outside [l, u]"
+        }
+      ))
+    }
   }
   # feasibility: GRIM under strict integer
-  if (identical(Z, "integer") && !is.null(mean) && !is_grim_consistent(mean, n))
-    return(fail("mean is GRIM-inconsistent: no strictly integer sample has this mean"))
+  if (
+    identical(granularity, "integer") &&
+      !is.null(mean) &&
+      !is_grim_consistent(mean, n)
+  ) {
+    return(fail(
+      "mean is GRIM-inconsistent: no strictly integer sample has this mean"
+    ))
+  }
 
   # alpha branch (walls only; enforced by the dispatcher)
   if (!is.null(alpha)) {
-    ab <- sd_bounds_alpha(lower, upper, n, mean, Z, alpha, k_items)
-    if (!ab$feasible)
-      return(fail("alpha floor exceeds alpha ceiling: no sample satisfies all constraints"))
-    res$min_sd <- ab$min_sd
-    res$max_sd <- ab$max_sd
-    res$min_rule <- if (ab$min_sd > 0) ab$min_rule else "s >= 0"
-    res$max_rule <- "alpha ceiling"
-    if (!is.na(ab$note)) res$note <- ab$note
-    return(res)
+    alpha_bounds <- sd_bounds_alpha(
+      lower,
+      upper,
+      n,
+      mean,
+      granularity,
+      alpha,
+      k_items
+    )
+    if (!alpha_bounds$feasible) {
+      return(fail(
+        "alpha floor exceeds alpha ceiling: no sample satisfies all constraints"
+      ))
+    }
+    out$min_sd <- alpha_bounds$min_sd
+    out$max_sd <- alpha_bounds$max_sd
+    out$min_rule <- if (alpha_bounds$min_sd > 0) {
+      alpha_bounds$min_rule
+    } else {
+      "s >= 0"
+    }
+    out$max_rule <- "alpha ceiling"
+    if (!is.na(alpha_bounds$note)) {
+      out$note <- alpha_bounds$note
+    }
+    return(out)
   }
 
   # ceiling: min over applicable ceilings
   if (!is.null(lower) && !is.null(upper)) {
     if (is.null(n)) {
-      res$max_sd <- sd_max_span(lower, upper); res$max_rule <- "span/sqrt(2) (n = 2 maximum)"
+      out$max_sd <- sd_max_span(lower, upper)
+      out$max_rule <- "span/sqrt(2) (n = 2 maximum)"
     } else if (is.null(mean)) {
-      res$max_sd <- sd_max_span_n(lower, upper, n); res$max_rule <- "parity ceiling"
+      out$max_sd <- sd_max_span_n(lower, upper, n)
+      out$max_rule <- "parity ceiling"
     } else {
-      res$max_sd <- sd_max_structure_s(mean, n, lower, upper)
-      res$max_rule <- "Structure S (sharp mean-conditional ceiling)"
+      out$max_sd <- sd_max_structure_s(mean, n, lower, upper)
+      out$max_rule <- "Structure S (sharp mean-conditional ceiling)"
     }
   }
 
   # floor: max over applicable floors
   bump <- function(candidate, rule) {
-    if (candidate > res$min_sd + 1e-12) { res$min_sd <<- candidate; res$min_rule <<- rule }
+    if (candidate > out$min_sd + TOLERANCE_TIGHT) {
+      out$min_sd <<- candidate
+      out$min_rule <<- rule
+    }
   }
-  if (Z %in% c("integer", "quasiinteger") && !is.null(mean)) {
-    fl <- if (Z == "integer") sd_min_integer(mean, n) else sd_min_quasi_integer(mean, n)
-    bump(fl, sprintf("%s floor (range-free)", Z))
+  if (granularity %in% c("integer", "quasiinteger") && !is.null(mean)) {
+    floor_sd <- if (granularity == "integer") {
+      sd_min_integer(mean, n)
+    } else {
+      sd_min_quasi_integer(mean, n)
+    }
+    bump(floor_sd, sprintf("%s floor (range-free)", granularity))
   }
   if (!is.null(n)) {
     if (lower_att && upper_att) {
-      bump(sd_min_two_pin(lower, upper, n, mean, Z),
-           if (is.null(mean)) "two-pin floor W/sqrt(2(n-1))" else "two-pin attained floor")
+      bump(
+        sd_min_two_pin(lower, upper, n, mean, granularity),
+        if (is.null(mean)) {
+          "two-pin floor W/sqrt(2(n-1))"
+        } else {
+          "two-pin attained floor"
+        }
+      )
     } else if (upper_att && !is.null(mean)) {
-      bump(sd_min_one_pin(upper, n, mean, Z, side = "max"), "one-pin attained floor (max)")
+      bump(
+        sd_min_one_pin(upper, n, mean, granularity, side = "max"),
+        "one-pin attained floor (max)"
+      )
     } else if (lower_att && !is.null(mean)) {
-      bump(sd_min_one_pin(lower, n, mean, Z, side = "min"), "one-pin attained floor (min)")
+      bump(
+        sd_min_one_pin(lower, n, mean, granularity, side = "min"),
+        "one-pin attained floor (min)"
+      )
     }
   }
 
-  if (res$min_sd > res$max_sd + 1e-9)
+  if (out$min_sd > out$max_sd + TOLERANCE) {
     return(fail("floor exceeds ceiling: no sample satisfies all constraints"))
-  res
+  }
+  out
 }
 
 # Internal: check an optional scalar argument. NULL means "not supplied";
 # anything else must be one finite number (whole and >= `min` if asked).
-.check_scalar <- function(x, name, whole = FALSE, min = -Inf) {
-  if (is.null(x)) return(invisible())
-  if (!is.numeric(x) || length(x) != 1L || is.na(x) || !is.finite(x))
-    stop(sprintf("`%s` must be a single finite number, not %s", name,
-                 if (length(x) == 1L) format(x) else
-                   paste("a vector of length", length(x))), call. = FALSE)
-  if (whole && abs(x - round(x)) > 1e-9)
-    stop(sprintf("`%s` must be a whole number, not %s", name, format(x)),
-         call. = FALSE)
-  if (x < min)
-    stop(sprintf("`%s` must be at least %s, not %s", name, format(min),
-                 format(x)), call. = FALSE)
+check_scalar <- function(
+  x,
+  name,
+  whole = FALSE,
+  min = -Inf,
+  call = rlang::caller_env()
+) {
+  if (is.null(x)) {
+    return(invisible())
+  }
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || !is.finite(x)) {
+    actual <- if (length(x) == 1L) {
+      format(x)
+    } else {
+      paste("a vector of length", length(x))
+    }
+    cli::cli_abort(
+      "{.arg {name}} must be a single finite number, not {actual}",
+      call = call
+    )
+  }
+  if (whole && abs(x - round(x)) > TOLERANCE) {
+    cli::cli_abort(
+      "{.arg {name}} must be a whole number, not {format(x)}",
+      call = call
+    )
+  }
+  if (x < min) {
+    cli::cli_abort(
+      "{.arg {name}} must be at least {format(min)}, not {format(x)}",
+      call = call
+    )
+  }
   invisible()
 }
 
 # Internal: candidate exact means inside [m_lo, m_hi] for the envelope —
 # a dense grid plus every analytic breakpoint of the piecewise bounds
 # (multiples of 1/n, where both floors and Structure S can kink).
-.candidate_means <- function(m_lo, m_hi, n, grid_n = 401) {
-  cand <- seq(m_lo, m_hi, length.out = grid_n)
+candidate_means <- function(m_lo, m_hi, n, grid_n = ENVELOPE_GRID_POINTS) {
+  candidates <- seq(m_lo, m_hi, length.out = grid_n)
   if (!is.null(n)) {
-    t_range <- ceiling(n * m_lo - 1e-9):floor(n * m_hi + 1e-9)
-    if (length(t_range) && length(t_range) <= 5000)
-      cand <- c(cand, t_range / n,
-                pmax(m_lo, pmin(m_hi, t_range / n + 1e-12)),
-                pmax(m_lo, pmin(m_hi, t_range / n - 1e-12)))
+    t_range <- ceiling(n * m_lo - TOLERANCE):floor(n * m_hi + TOLERANCE)
+    if (length(t_range) && length(t_range) <= 5000) {
+      candidates <- c(
+        candidates,
+        t_range / n,
+        pmax(m_lo, pmin(m_hi, t_range / n + 1e-12)),
+        pmax(m_lo, pmin(m_hi, t_range / n - 1e-12))
+      )
+    }
   }
-  sort(unique(pmax(m_lo, pmin(m_hi, cand))))
+  candidates |>
+    pmin(m_hi) |>
+    pmax(m_lo) |>
+    unique() |>
+    sort()
 }
 
 #' Bounds of the sample SD under a chosen set of constraints
@@ -130,14 +236,14 @@
 #'   such as `"up_or_down"`, `"up"`, `"even"` or `"trunc"` (see
 #'   [roundwork::unround()]; requires `digits_mean`). The returned bounds
 #'   are then the ENVELOPE over all exact means consistent with the report,
-#'   intersected with the feasible mean band. Under `Z = "integer"` the
+#'   intersected with the feasible mean band. Under `granularity = "integer"` the
 #'   envelope enumerates the GRIM-consistent means in the interval exactly.
 #' * `sd`, `digits_sd` — optionally, the reported SD and its decimal places.
 #'   The SD never changes the bounds; it enables the report-consistency
 #'   columns: `sd_in_bounds` (does the SD's own rounding interval overlap
-#'   `[min_sd, max_sd]`?) and, under `Z = "integer"` with `rounding` set, the
+#'   `[min_sd, max_sd]`?) and, under `granularity = "integer"` with `rounding` set, the
 #'   GRIMMER verdict.
-#' * `Z` — granularity: `"continuous"` (none; the default), `"integer"` (all
+#' * `granularity` — granularity: `"continuous"` (none; the default), `"integer"` (all
 #'   observations on the grid), or `"quasiinteger"` (all but one on the grid;
 #'   defined at every mean, the GRIM-free relaxation). For mean-scored data the
 #'   grid is the 1/`n_items` mean-score lattice, not the integers.
@@ -156,7 +262,7 @@
 #'
 #' GRIM and GRIMMER verdicts are DEFERRED to the scrutiny package
 #' (`scrutiny::grim()`, `scrutiny::grimmer()`) rather than reimplemented:
-#' under `Z = "integer"` with `rounding` set, the `grim` column carries
+#' under `granularity = "integer"` with `rounding` set, the `grim` column carries
 #' scrutiny's verdict on the mean and (when `sd` is supplied) the `grimmer`
 #' column scrutiny's verdict on the (mean, sd) pair. The bounds themselves are
 #' computed from this package's own enumeration of GRIM-consistent means; when
@@ -182,7 +288,7 @@
 #'   scrutiny: `"up_or_down"`, `"ceiling_or_floor"`, `"up"`, `"down"`,
 #'   `"even"`, `"ceiling"`, `"floor"`, `"trunc"`, `"anti_trunc"`, or one of
 #'   the `"ties_*"` methods. See [roundwork::unround()].
-#' @param Z "continuous" (default), "integer", or "quasiinteger".
+#' @param granularity "continuous" (default), "integer", or "quasiinteger".
 #' @param scoring "singleitem" (default), "sumscored", or "meanscored".
 #' @param n_items Positive whole number of response items (default 1). Must be
 #'   1 for `scoring = "singleitem"`.
@@ -200,78 +306,142 @@
 #' sd_bounds(l = 1, u = 5)                         # range-only ceiling
 #' sd_bounds(l = 1, u = 5, n = 9)                  # parity ceiling
 #' sd_bounds(l = 1, u = 5, n = 9, mean = 2)        # sharp mean-conditional
-#' sd_bounds(l = 1, u = 5, n = 9, mean = 2.44, Z = "quasiinteger")
-#' sd_bounds(a = 2, b = 4, n = 9, mean = 2.44, Z = "integer")   # attained
-#' sd_bounds(l = 1, b = 4, n = 9, mean = 3.5, Z = "integer")    # mixed
+#' sd_bounds(l = 1, u = 5, n = 9, mean = 2.44, granularity = "quasiinteger")
+#' sd_bounds(a = 2, b = 4, n = 9, mean = 2.44, granularity = "integer")   # attained
+#' sd_bounds(l = 1, b = 4, n = 9, mean = 3.5, granularity = "integer")    # mixed
 #'
 #' # reported mean rounded to 2 dp: envelope over [2.965, 2.975];
 #' # GRIM verdict deferred to scrutiny
 #' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'           rounding = "up_or_down", Z = "integer")
+#'           rounding = "up_or_down", granularity = "integer")
 #' # with a reported SD: adds scrutiny's GRIMMER verdict and the bounds check
 #' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'           sd = 2.83, digits_sd = 2, rounding = "up_or_down", Z = "integer")
+#'           sd = 2.83, digits_sd = 2, rounding = "up_or_down", granularity = "integer")
 #' # truncated reporting
 #' sd_bounds(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
-#'           rounding = "trunc", Z = "quasiinteger")
+#'           rounding = "trunc", granularity = "quasiinteger")
 #'
 #' # sum-scored 3-item composite (l, u, mean in sum units) with alpha
-#' sd_bounds(l = 3, u = 15, n = 20, mean = 9, Z = "integer",
+#' sd_bounds(l = 3, u = 15, n = 20, mean = 9, granularity = "integer",
 #'           scoring = "sumscored", n_items = 3, alpha = 0.8)
 #' # the same composite reported as an item mean (l, u, mean in mean units)
-#' sd_bounds(l = 1, u = 5, n = 20, mean = 3, Z = "integer",
+#' sd_bounds(l = 1, u = 5, n = 20, mean = 3, granularity = "integer",
 #'           scoring = "meanscored", n_items = 3, alpha = 0.8)
 #' @export
-sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
-                      n = NULL, mean = NULL, digits_mean = NULL,
-                      sd = NULL, digits_sd = NULL, rounding = NULL,
-                      Z = c("continuous", "integer", "quasiinteger"),
-                      scoring = c("singleitem", "sumscored", "meanscored"),
-                      n_items = 1, alpha = NULL) {
-
+sd_bounds <- function(
+  l = NULL,
+  u = NULL,
+  a = NULL,
+  b = NULL,
+  n = NULL,
+  mean = NULL,
+  digits_mean = NULL,
+  sd = NULL,
+  digits_sd = NULL,
+  rounding = NULL,
+  granularity = c("continuous", "integer", "quasiinteger"),
+  scoring = c("singleitem", "sumscored", "meanscored"),
+  n_items = 1,
+  alpha = NULL
+) {
   # new_tibble(), not tibble(): this runs once per mean in the curve and grid
   # builders, and tibble()'s checks cost a hundred times the bounds themselves
-  out <- function(r) tibble::new_tibble(list(
-    min_sd = r$min_sd, max_sd = r$max_sd, feasible = r$feasible,
-    min_rule = r$min_rule, max_rule = r$max_rule,
-    grim = r$grim, grimmer = r$grimmer, sd_in_bounds = r$sd_in_bounds,
-    note = r$note
-  ), nrow = 1L)
+  as_row <- function(bounds) {
+    tibble::new_tibble(
+      list(
+        min_sd = bounds$min_sd,
+        max_sd = bounds$max_sd,
+        feasible = bounds$feasible,
+        min_rule = bounds$min_rule,
+        max_rule = bounds$max_rule,
+        grim = bounds$grim,
+        grimmer = bounds$grimmer,
+        sd_in_bounds = bounds$sd_in_bounds,
+        note = bounds$note
+      ),
+      nrow = 1L
+    )
+  }
 
   # -- validate ----------------------------------------------------------------
-  Z <- match.arg(Z)
+  # match.arg(), not rlang::arg_match(): a hot path, run once per mean by the
+  # curve and grid builders, where arg_match() would double its cost
+  granularity <- match.arg(granularity)
   scoring <- match.arg(scoring)
-  if (is.character(mean) || is.character(sd))
-    stop("mean and sd must be numeric, with their decimal places in ",
-         "digits_mean and digits_sd, as in scrutiny; count them from strings ",
-         "with scrutiny::decimal_places()")
-  .check_scalar(l, "l"); .check_scalar(u, "u")
-  .check_scalar(a, "a"); .check_scalar(b, "b")
-  .check_scalar(n, "n", whole = TRUE, min = 2)
-  .check_scalar(mean, "mean"); .check_scalar(sd, "sd", min = 0)
-  .check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
-  .check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
-  if (!is.null(rounding)) .check_rounding(rounding)
-  if (is.null(n_items) || length(n_items) != 1 || n_items < 1 ||
-      abs(n_items - round(n_items)) > 1e-9)
-    stop("n_items must be a positive whole number")
+  if (is.character(mean) || is.character(sd)) {
+    cli::cli_abort(paste(
+      "{.arg mean} and {.arg sd} must be numeric, with their decimal places in",
+      "{.arg digits_mean} and {.arg digits_sd}, as in scrutiny; count them from",
+      "strings with {.fn scrutiny::decimal_places}"
+    ))
+  }
+  check_scalar(l, "l")
+  check_scalar(u, "u")
+  check_scalar(a, "a")
+  check_scalar(b, "b")
+  check_scalar(n, "n", whole = TRUE, min = 2)
+  check_scalar(mean, "mean")
+  check_scalar(sd, "sd", min = 0)
+  check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
+  check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
+  if (!is.null(rounding)) {
+    check_rounding(rounding)
+  }
+  if (
+    is.null(n_items) ||
+      length(n_items) != 1 ||
+      n_items < 1 ||
+      abs(n_items - round(n_items)) > TOLERANCE
+  ) {
+    cli::cli_abort("{.arg n_items} must be a positive whole number")
+  }
   n_items <- as.integer(round(n_items))
   if (scoring == "singleitem") {
-    if (n_items != 1L) stop("scoring = 'singleitem' requires n_items = 1")
-    if (!is.null(alpha))
-      stop("scoring = 'singleitem' cannot take alpha (a single item has no ",
-           "internal consistency); use scoring = 'sumscored' or 'meanscored'")
+    if (n_items != 1L) {
+      cli::cli_abort(
+        "{.code scoring = 'singleitem'} requires {.code n_items = 1}"
+      )
+    }
+    if (!is.null(alpha)) {
+      cli::cli_abort(paste(
+        "{.code scoring = 'singleitem'} cannot take {.arg alpha} (a single",
+        "item has no internal consistency); use {.code scoring = 'sumscored'}",
+        "or {.code 'meanscored'}"
+      ))
+    }
   }
-  if (!is.null(mean) && is.null(n)) stop("mean-conditional bounds require n")
-  if (!is.null(rounding) && is.null(mean)) stop("rounding requires a mean")
-  if (!is.null(rounding) && is.null(digits_mean))
-    stop("rounding requires digits_mean (decimal places of the reported mean)")
-  if (!is.null(sd) && !is.null(rounding) && is.null(digits_sd))
-    stop("a reported sd with rounding requires digits_sd")
-  if (!is.null(l) && !is.null(u) && u <= l) stop("need u > l")
-  if (!is.null(a) && !is.null(b) && b < a) stop("need b >= a")
-  if (!is.null(a) && !is.null(l) && a < l) stop("observed minimum a cannot lie below the wall l")
-  if (!is.null(b) && !is.null(u) && b > u) stop("observed maximum b cannot lie above the wall u")
+  if (!is.null(mean) && is.null(n)) {
+    cli::cli_abort("mean-conditional bounds require {.arg n}")
+  }
+  if (!is.null(rounding) && is.null(mean)) {
+    cli::cli_abort("{.arg rounding} requires a {.arg mean}")
+  }
+  if (!is.null(rounding) && is.null(digits_mean)) {
+    cli::cli_abort(
+      "{.arg rounding} requires {.arg digits_mean} (decimal places of the reported mean)"
+    )
+  }
+  if (!is.null(sd) && !is.null(rounding) && is.null(digits_sd)) {
+    cli::cli_abort(
+      "a reported {.arg sd} with {.arg rounding} requires {.arg digits_sd}"
+    )
+  }
+  if (!is.null(l) && !is.null(u) && u <= l) {
+    cli::cli_abort("need {.arg u} > {.arg l}")
+  }
+  if (!is.null(a) && !is.null(b) && b < a) {
+    cli::cli_abort("need {.arg b} >= {.arg a}")
+  }
+  if (!is.null(a) && !is.null(l) && a < l) {
+    cli::cli_abort(
+      "observed minimum {.arg a} cannot lie below the wall {.arg l}"
+    )
+  }
+  if (!is.null(b) && !is.null(u) && b > u) {
+    cli::cli_abort(
+      "observed maximum {.arg b} cannot lie above the wall {.arg u}"
+    )
+  }
 
   # -- granularity multiplier (m) and alpha item count (k) ---------------------
   # m rescales the reported (mean-score) scale to the integer sum scale on which
@@ -285,20 +455,32 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
   k <- n_items
   # granular limits must lie on the response grid: the integers, or the
   # 1/n_items lattice of a mean-scored composite (w = m * x maps it to them)
-  if (Z %in% c("integer", "quasiinteger")) {
-    lims <- c(l, u, a, b) * m
-    if (length(lims) && any(abs(lims - round(lims)) > 1e-9))
-      stop("integer/quasiinteger constraints require limits on the response ",
-           "grid (whole numbers, or multiples of 1/n_items for mean-scored ",
-           "data)")
+  if (granularity %in% c("integer", "quasiinteger")) {
+    limits <- c(l, u, a, b) * m
+    if (length(limits) && any(abs(limits - round(limits)) > TOLERANCE)) {
+      cli::cli_abort(paste(
+        "integer/quasiinteger constraints require limits on the response",
+        "grid (whole numbers, or multiples of 1/n_items for mean-scored",
+        "data)"
+      ))
+    }
   }
   if (!is.null(alpha)) {
-    if (alpha >= 1) stop("alpha must be < 1")
-    if (k == 1L) alpha <- NULL              # alpha is inert at k = 1
-    else if (is.null(l) || is.null(u) || is.null(n) || is.null(mean))
-      stop("alpha bounds require l, u, n, and mean")
-    else if (!is.null(a) || !is.null(b))
-      stop("alpha with attained extremes is not supported (open problem)")
+    if (alpha >= 1) {
+      cli::cli_abort("{.arg alpha} must be < 1")
+    }
+    if (k == 1L) {
+      # alpha is inert at k = 1
+      alpha <- NULL
+    } else if (is.null(l) || is.null(u) || is.null(n) || is.null(mean)) {
+      cli::cli_abort(
+        "{.arg alpha} bounds require {.arg l}, {.arg u}, {.arg n}, and {.arg mean}"
+      )
+    } else if (!is.null(a) || !is.null(b)) {
+      cli::cli_abort(
+        "{.arg alpha} with attained extremes is not supported (open problem)"
+      )
+    }
   }
 
   # -- resolve sides: attained supersedes wall ---------------------------------
@@ -308,14 +490,28 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
   upper_att <- !is.null(b)
 
   # scaled (w = m * x) copies for the integer-grid core; SD outputs divide by m.
-  scl <- function(x) if (is.null(x)) NULL else x * m
-  lower_w <- scl(lower); upper_w <- scl(upper)
-  core_w <- function(mm) {
-    r <- .sd_bounds_core(lower_w, upper_w, lower_att, upper_att, n,
-                         if (is.null(mm)) NULL else mm * m, Z, alpha, k)
-    if (!is.na(r$min_sd)) r$min_sd <- r$min_sd / m
-    if (!is.na(r$max_sd) && is.finite(r$max_sd)) r$max_sd <- r$max_sd / m
-    r
+  scale_to_grid <- function(x) if (is.null(x)) NULL else x * m
+  lower_w <- scale_to_grid(lower)
+  upper_w <- scale_to_grid(upper)
+  core_w <- function(exact_mean) {
+    bounds <- sd_bounds_core(
+      lower_w,
+      upper_w,
+      lower_att,
+      upper_att,
+      n,
+      scale_to_grid(exact_mean),
+      granularity,
+      alpha,
+      k
+    )
+    if (!is.na(bounds$min_sd)) {
+      bounds$min_sd <- bounds$min_sd / m
+    }
+    if (!is.na(bounds$max_sd) && is.finite(bounds$max_sd)) {
+      bounds$max_sd <- bounds$max_sd / m
+    }
+    bounds
   }
 
   # -- scrutiny verdicts (deferred, never reimplemented) -----------------------
@@ -323,101 +519,203 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
   # mean is a rounded report (rounding set) and the data are strictly integer.
   # scrutiny has documented floating-point boundary bugs; verdicts are reported
   # verbatim and any divergence from our own enumeration is surfaced in `note`.
-  grim_v <- NA
-  grimmer_v <- NA
-  if (Z == "integer" && !is.null(rounding) && !is.null(mean)) {
+  grim_verdict <- NA
+  grimmer_verdict <- NA
+  if (granularity == "integer" && !is.null(rounding) && !is.null(mean)) {
     # items_averaged is m, not n_items: a sum score is a whole number per
     # person, so only mean-scored data are averages of several items.
-    grim_v <- isTRUE(as.logical(unname(scrutiny::grim(
-      x = mean, n = n, digits_x = digits_mean, items_averaged = m,
-      data_type = "integer", rounding = rounding)))[1])
-    if (!is.null(sd))
-      grimmer_v <- isTRUE(as.logical(unname(scrutiny::grimmer(
-        x = mean, sd = sd, n = n, digits_x = digits_mean, digits_sd = digits_sd,
-        items_averaged = m, data_type = "integer", rounding = rounding)))[1])
+    grim_verdict <- scrutiny::grim(
+      x = mean,
+      n = n,
+      digits_x = digits_mean,
+      items_averaged = m,
+      data_type = "integer",
+      rounding = rounding
+    ) |>
+      as.logical() |>
+      dplyr::first() |>
+      isTRUE()
+    if (!is.null(sd)) {
+      grimmer_verdict <- scrutiny::grimmer(
+        x = mean,
+        sd = sd,
+        n = n,
+        digits_x = digits_mean,
+        digits_sd = digits_sd,
+        items_averaged = m,
+        data_type = "integer",
+        rounding = rounding
+      ) |>
+        as.logical() |>
+        dplyr::first() |>
+        isTRUE()
+    }
   }
 
   # helper: does the reported sd (as an interval if rounded) overlap the bounds
   sd_check <- function(min_sd, max_sd) {
-    if (is.null(sd) || is.na(min_sd)) return(NA)
+    if (is.null(sd) || is.na(min_sd)) {
+      return(NA)
+    }
     if (!is.null(rounding) && !is.null(digits_sd)) {
-      iv <- .unround(sd, digits_sd, rounding, "sd", "digits_sd")
-      iv$hi >= min_sd - 1e-9 && iv$lo <= max_sd + 1e-9
+      # the error belongs to sd_bounds(), this closure's parent
+      interval <- unround_reported(
+        sd,
+        digits_sd,
+        rounding,
+        "sd",
+        "digits_sd",
+        call = rlang::env_parent()
+      )
+      interval$hi >= min_sd - TOLERANCE && interval$lo <= max_sd + TOLERANCE
     } else {
-      sd >= min_sd - 1e-9 && sd <= max_sd + 1e-9
+      sd >= min_sd - TOLERANCE && sd <= max_sd + TOLERANCE
     }
   }
-  finish <- function(r, extra_note = NULL) {
-    r$grim <- grim_v; r$grimmer <- grimmer_v
-    r$sd_in_bounds <- sd_check(r$min_sd, r$max_sd)
-    if (!is.null(extra_note))
-      r$note <- if (is.na(r$note)) extra_note else paste(r$note, extra_note, sep = "; ")
-    out(r)
+  finish <- function(bounds, extra_note = NULL) {
+    bounds$grim <- grim_verdict
+    bounds$grimmer <- grimmer_verdict
+    bounds$sd_in_bounds <- sd_check(bounds$min_sd, bounds$max_sd)
+    if (!is.null(extra_note)) {
+      bounds$note <- if (is.na(bounds$note)) {
+        extra_note
+      } else {
+        paste(bounds$note, extra_note, sep = "; ")
+      }
+    }
+    as_row(bounds)
   }
 
   # -- exact-mean path ---------------------------------------------------------
   if (is.null(rounding) || is.null(mean)) {
-    r <- core_w(mean)
-    return(finish(r))
+    return(finish(core_w(mean)))
   }
 
   # -- rounded/truncated mean: envelope over the rounding interval -------------
-  iv <- .unround(mean, digits_mean, rounding, "mean", "digits_mean")
-  m_lo <- iv$lo; m_hi <- iv$hi
+  interval <- unround_reported(
+    mean,
+    digits_mean,
+    rounding,
+    "mean",
+    "digits_mean"
+  )
+  m_lo <- interval$lo
+  m_hi <- interval$hi
   band <- feasible_mean_band(lower, upper, lower_att, upper_att, n)
-  m_lo2 <- max(m_lo, band[1]); m_hi2 <- min(m_hi, band[2])
-  if (m_lo2 > m_hi2 + 1e-12)
-    return(finish(list(min_sd = NA_real_, max_sd = NA_real_, feasible = FALSE,
-                       min_rule = NA_character_, max_rule = NA_character_,
-                       note = sprintf(
-                         "no mean in the rounding interval [%.6g, %.6g] lies in the feasible band [%.6g, %.6g]",
-                         m_lo, m_hi, band[1], band[2]))))
+  m_lo_band <- max(m_lo, band[1])
+  m_hi_band <- min(m_hi, band[2])
+  if (m_lo_band > m_hi_band + TOLERANCE_TIGHT) {
+    return(finish(list(
+      min_sd = NA_real_,
+      max_sd = NA_real_,
+      feasible = FALSE,
+      min_rule = NA_character_,
+      max_rule = NA_character_,
+      note = sprintf(
+        "no mean in the rounding interval [%.6g, %.6g] lies in the feasible band [%.6g, %.6g]",
+        m_lo,
+        m_hi,
+        band[1],
+        band[2]
+      )
+    )))
+  }
 
   divergence <- NULL
-  if (Z == "integer") {
+  if (granularity == "integer") {
     # exact: enumerate the GRIM-consistent means in the interval. Under the
     # 1/n_items mean grid a mean is GRIM-consistent when n * m * mean is an
     # integer, so enumerate over nm = n * m.
     nm <- n * m
-    t_range <- ceiling(nm * m_lo2 - 1e-9):floor(nm * m_hi2 + 1e-9)
-    cand <- t_range[t_range >= nm * m_lo2 - 1e-9 & t_range <= nm * m_hi2 + 1e-9] / nm
-    if (!iv$lo_incl) cand <- cand[abs(cand - m_lo) > 1e-9]
-    if (!iv$hi_incl) cand <- cand[abs(cand - m_hi) > 1e-9]
+    t_range <- ceiling(nm * m_lo_band - TOLERANCE):floor(
+      nm * m_hi_band + TOLERANCE
+    )
+    candidates <- t_range[
+      t_range >= nm * m_lo_band - TOLERANCE &
+        t_range <= nm * m_hi_band + TOLERANCE
+    ] /
+      nm
+    if (!interval$lo_incl) {
+      candidates <- candidates[abs(candidates - m_lo) > TOLERANCE]
+    }
+    if (!interval$hi_incl) {
+      candidates <- candidates[abs(candidates - m_hi) > TOLERANCE]
+    }
     # surface any disagreement with scrutiny's deferred GRIM verdict
-    if (!is.na(grim_v) && grim_v != (length(cand) > 0))
+    if (!is.na(grim_verdict) && grim_verdict != (length(candidates) > 0)) {
       divergence <- "scrutiny::grim verdict disagrees with the package's GRIM-mean enumeration (a known scrutiny floating-point boundary case)"
-    if (!length(cand))
-      return(finish(list(min_sd = NA_real_, max_sd = NA_real_, feasible = FALSE,
-                         min_rule = NA_character_, max_rule = NA_character_,
-                         note = "no GRIM-consistent mean lies in the rounding interval: the reported mean is not attainable by integer data at this n"),
-                    extra_note = divergence))
+    }
+    if (!length(candidates)) {
+      return(finish(
+        list(
+          min_sd = NA_real_,
+          max_sd = NA_real_,
+          feasible = FALSE,
+          min_rule = NA_character_,
+          max_rule = NA_character_,
+          note = "no GRIM-consistent mean lies in the rounding interval: the reported mean is not attainable by integer data at this n"
+        ),
+        extra_note = divergence
+      ))
+    }
   } else {
-    cand <- .candidate_means(m_lo2, m_hi2, n * m)
+    candidates <- candidate_means(m_lo_band, m_hi_band, n * m)
   }
 
-  results <- lapply(cand, core_w)
-  ok <- vapply(results, function(r) r$feasible, logical(1))
-  if (!any(ok))
-    return(finish(list(min_sd = NA_real_, max_sd = NA_real_, feasible = FALSE,
-                       min_rule = NA_character_, max_rule = NA_character_,
-                       note = "no mean in the rounding interval yields a feasible constraint set"),
-                  extra_note = divergence))
+  results <- purrr::map(candidates, core_w)
+  ok <- purrr::map_lgl(results, "feasible")
+  if (!any(ok)) {
+    return(finish(
+      list(
+        min_sd = NA_real_,
+        max_sd = NA_real_,
+        feasible = FALSE,
+        min_rule = NA_character_,
+        max_rule = NA_character_,
+        note = "no mean in the rounding interval yields a feasible constraint set"
+      ),
+      extra_note = divergence
+    ))
+  }
   results <- results[ok]
 
-  mins <- vapply(results, function(r) r$min_sd, numeric(1))
-  maxs <- vapply(results, function(r) r$max_sd, numeric(1))
-  i_min <- which.min(mins); i_max <- which.max(maxs)
-  finish(list(
-    min_sd = mins[i_min], max_sd = maxs[i_max], feasible = TRUE,
-    min_rule = sprintf("%s (envelope over rounding interval)", results[[i_min]]$min_rule),
-    max_rule = sprintf("%s (envelope over rounding interval)", results[[i_max]]$max_rule),
-    note = sprintf("mean treated as %s-%s to %d dp: envelope over [%.6g, %.6g]%s",
-                   if (rounding %in% c("trunc", "anti_trunc", "ceiling", "floor"))
-                     "truncated" else "rounded",
-                   rounding, as.integer(digits_mean), m_lo, m_hi,
-                   if (m_lo2 > m_lo || m_hi2 < m_hi)
-                     sprintf(", clipped to feasible [%.6g, %.6g]", m_lo2, m_hi2) else "")
-  ), extra_note = divergence)
+  mins <- purrr::map_dbl(results, "min_sd")
+  maxs <- purrr::map_dbl(results, "max_sd")
+  i_min <- which.min(mins)
+  i_max <- which.max(maxs)
+  finish(
+    list(
+      min_sd = mins[i_min],
+      max_sd = maxs[i_max],
+      feasible = TRUE,
+      min_rule = sprintf(
+        "%s (envelope over rounding interval)",
+        results[[i_min]]$min_rule
+      ),
+      max_rule = sprintf(
+        "%s (envelope over rounding interval)",
+        results[[i_max]]$max_rule
+      ),
+      note = sprintf(
+        "mean treated as %s-%s to %d dp: envelope over [%.6g, %.6g]%s",
+        if (rounding %in% c("trunc", "anti_trunc", "ceiling", "floor")) {
+          "truncated"
+        } else {
+          "rounded"
+        },
+        rounding,
+        as.integer(digits_mean),
+        m_lo,
+        m_hi,
+        if (m_lo_band > m_lo || m_hi_band < m_hi) {
+          sprintf(", clipped to feasible [%.6g, %.6g]", m_lo_band, m_hi_band)
+        } else {
+          ""
+        }
+      )
+    ),
+    extra_note = divergence
+  )
 }
 
 # ---- Layer 4b: percent-of-maximum-possible (POMP) transforms -----------------
@@ -438,16 +736,39 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
 #                   mean (the band is then not mean-conditional) or a degenerate
 #                   band.
 # lower/upper are the EFFECTIVE limits (a supersedes l, b supersedes u).
-.pomp_cols <- function(mean, sd, min_sd, max_sd, lower, upper, n, has_mean) {
-  pm <- if (!is.null(mean) && !is.null(lower) && !is.null(upper) && (upper - lower) > 0)
-    (mean - lower) / (upper - lower) else NA_real_
-  parity_max <- if (!is.null(lower) && !is.null(upper) && !is.null(n))
-    sd_max_span_n(lower, upper, n) else NA_real_
-  ps_parity <- if (!is.null(sd) && !is.na(parity_max) && parity_max > 0)
-    sd / parity_max else NA_real_
-  ps_sharp <- if (!is.null(sd) && has_mean && !is.na(min_sd) && !is.na(max_sd) &&
-                  is.finite(max_sd) && (max_sd - min_sd) > 1e-12)
-    (sd - min_sd) / (max_sd - min_sd) else NA_real_
-  list(pomp_mean = pm, pomp_sd_parity = ps_parity, pomp_sd_sharp = ps_sharp)
+pomp_cols <- function(mean, sd, min_sd, max_sd, lower, upper, n, has_mean) {
+  pomp_mean <- if (
+    !is.null(mean) && !is.null(lower) && !is.null(upper) && (upper - lower) > 0
+  ) {
+    (mean - lower) / (upper - lower)
+  } else {
+    NA_real_
+  }
+  parity_max <- if (!is.null(lower) && !is.null(upper) && !is.null(n)) {
+    sd_max_span_n(lower, upper, n)
+  } else {
+    NA_real_
+  }
+  pomp_sd_parity <- if (!is.null(sd) && !is.na(parity_max) && parity_max > 0) {
+    sd / parity_max
+  } else {
+    NA_real_
+  }
+  pomp_sd_sharp <- if (
+    !is.null(sd) &&
+      has_mean &&
+      !is.na(min_sd) &&
+      !is.na(max_sd) &&
+      is.finite(max_sd) &&
+      (max_sd - min_sd) > TOLERANCE_TIGHT
+  ) {
+    (sd - min_sd) / (max_sd - min_sd)
+  } else {
+    NA_real_
+  }
+  list(
+    pomp_mean = pomp_mean,
+    pomp_sd_parity = pomp_sd_parity,
+    pomp_sd_sharp = pomp_sd_sharp
+  )
 }
-

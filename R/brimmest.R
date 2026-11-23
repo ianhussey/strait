@@ -4,15 +4,30 @@
 
 # The rounding methods brimmest() certifies against. A certificate needs a
 # definite direction, so the compound methods stand for their two parts.
-BRIMMEST_ROUNDING <- c("up_or_down", "ceiling_or_floor", "up", "down",
-                       "even", "ceiling", "floor", "trunc", "anti_trunc")
+BRIMMEST_ROUNDING <- c(
+  "up_or_down",
+  "ceiling_or_floor",
+  "up",
+  "down",
+  "even",
+  "ceiling",
+  "floor",
+  "trunc",
+  "anti_trunc"
+)
 
-.expand_rounding <- function(rounding) {
-  unique(unlist(lapply(rounding, function(r) switch(r,
-    up_or_down = c("up", "down"),
-    ceiling_or_floor = c("ceiling", "floor"),
-    r
-  ))))
+expand_rounding <- function(rounding) {
+  rounding |>
+    purrr::map(function(method) {
+      switch(
+        method,
+        up_or_down = c("up", "down"),
+        ceiling_or_floor = c("ceiling", "floor"),
+        method
+      )
+    }) |>
+    unlist() |>
+    unique()
 }
 
 # Internal: forward-round lattice values to whole numbers of reporting-grid
@@ -28,34 +43,35 @@ BRIMMEST_ROUNDING <- c("up_or_down", "ceiling_or_floor", "up", "down",
 # differ only under "even", which, like roundwork::unround(), lets a tie go
 # either way: software does not reliably round decimal ties to even.
 # Directions follow roundwork: "up" takes ties toward +Inf, "trunc" toward 0.
-.round_exact <- function(num, den, rounding, root = FALSE) {
+round_exact <- function(num, den, rounding, root = FALSE) {
   if (root) {
-    fl <- floor(sqrt(num / den))
-    fl <- fl + ((fl + 1)^2 * den <= num) - (fl^2 * den > num)
-    on_int <- fl^2 * den == num
-    half <- sign(4 * num - (2 * fl + 1)^2 * den)
+    whole <- floor(sqrt(num / den))
+    whole <- whole + ((whole + 1)^2 * den <= num) - (whole^2 * den > num)
+    on_int <- whole^2 * den == num
+    half <- sign(4 * num - (2 * whole + 1)^2 * den)
   } else {
-    fl <- floor(num / den)
-    rem <- num - fl * den
-    fl <- fl + (rem >= den) - (rem < 0)
-    rem <- num - fl * den
+    whole <- floor(num / den)
+    rem <- num - whole * den
+    whole <- whole + (rem >= den) - (rem < 0)
+    rem <- num - whole * den
     on_int <- rem == 0
     half <- sign(2 * rem - den)
   }
   nonneg <- num >= 0
-  up <- fl + (half >= 0)
-  down <- fl + (half > 0)
-  val <- switch(rounding,
+  up <- whole + (half >= 0)
+  down <- whole + (half > 0)
+  steps <- switch(
+    rounding,
     up = up,
     down = down,
     even = return(list(lo = down, hi = up)),
-    ceiling = fl + !on_int,
-    floor = fl,
-    trunc = ifelse(nonneg, fl, fl + !on_int),
-    anti_trunc = ifelse(nonneg, fl + !on_int, fl),
-    stop("unknown rounding method: ", rounding)
+    ceiling = whole + !on_int,
+    floor = whole,
+    trunc = dplyr::if_else(nonneg, whole, whole + !on_int),
+    anti_trunc = dplyr::if_else(nonneg, whole + !on_int, whole),
+    cli::cli_abort("unknown rounding method: {.val {rounding}}")
   )
-  list(lo = val, hi = val)
+  list(lo = steps, hi = steps)
 }
 
 #' BRIMMEST: certify whether a reported (mean, SD) is attainable
@@ -195,59 +211,95 @@ BRIMMEST_ROUNDING <- c("up_or_down", "ceiling_or_floor", "up", "down",
 #' brimmest(l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
 #'          mean = c(3.0, 1.3, 2.5), sd = c(1.0, 0.9, 1.2))
 #' @export
-brimmest <- function(l, u, n, mean, sd, digits_mean, digits_sd,
-                     rounding = "up_or_down",
-                    scoring = c("singleitem", "sumscored", "meanscored"),
-                    n_items = 1, max_cells = 2e7, search_budget = 2e5,
-                    engine = c("analytic", "search", "both")) {
-  scoring <- match.arg(scoring)
-  engine <- match.arg(engine)
-  rounding <- .expand_rounding(.check_rounding(rounding, BRIMMEST_ROUNDING,
-                                               several = TRUE))
-  if (missing(digits_mean) || missing(digits_sd))
-    stop("reported decimal places are required: give digits_mean and ",
-         "digits_sd")
-  .check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
-  .check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
-  .check_scalar(l, "l"); .check_scalar(u, "u")
-  .check_scalar(n, "n", whole = TRUE, min = 2)
-  .check_scalar(n_items, "n_items", whole = TRUE, min = 1)
-  md <- digits_mean
-  sdd <- digits_sd
+brimmest <- function(
+  l,
+  u,
+  n,
+  mean,
+  sd,
+  digits_mean,
+  digits_sd,
+  rounding = "up_or_down",
+  scoring = c("singleitem", "sumscored", "meanscored"),
+  n_items = 1,
+  max_cells = 2e7,
+  search_budget = 2e5,
+  engine = c("analytic", "search", "both")
+) {
+  scoring <- rlang::arg_match(scoring)
+  engine <- rlang::arg_match(engine)
+  rounding <- rounding |>
+    check_rounding(BRIMMEST_ROUNDING, several = TRUE) |>
+    expand_rounding()
+  if (missing(digits_mean) || missing(digits_sd)) {
+    cli::cli_abort(
+      "reported decimal places are required: give {.arg digits_mean} and {.arg digits_sd}"
+    )
+  }
+  check_scalar(digits_mean, "digits_mean", whole = TRUE, min = 0)
+  check_scalar(digits_sd, "digits_sd", whole = TRUE, min = 0)
+  check_scalar(l, "l")
+  check_scalar(u, "u")
+  check_scalar(n, "n", whole = TRUE, min = 2)
+  check_scalar(n_items, "n_items", whole = TRUE, min = 1)
 
   k <- as.integer(round(n_items))
-  g <- .scoring_geometry(scoring, k, l, u)
+  geometry <- scoring_geometry(scoring, k, l, u)
+  mg <- geometry$mg
   # both routes work on the integer grid y = mg * (x - l) in 0..W
-  if (abs(g$mg * l - round(g$mg * l)) > 1e-9 ||
-      abs(g$mg * u - round(g$mg * u)) > 1e-9 || u <= l)
-    stop("l and u must lie on the response grid (whole numbers, or ",
-         "multiples of 1/n_items for mean-scored data), with u > l")
+  if (
+    abs(mg * l - round(mg * l)) > TOLERANCE ||
+      abs(mg * u - round(mg * u)) > TOLERANCE ||
+      u <= l
+  ) {
+    cli::cli_abort(
+      "{.arg l} and {.arg u} must lie on the response grid (whole numbers, or multiples of 1/{.arg n_items} for mean-scored data), with {.code u > l}"
+    )
+  }
 
-  if (!is.numeric(mean) || !is.numeric(sd))
-    stop("mean and sd must be numeric")
-  nn <- max(length(mean), length(sd))
-  mean <- rep(mean, length.out = nn)
-  sd <- rep(sd, length.out = nn)
-  if (any(sd < 0, na.rm = TRUE)) stop("sd must not be negative")
+  if (!is.numeric(mean) || !is.numeric(sd)) {
+    cli::cli_abort("{.arg mean} and {.arg sd} must be numeric")
+  }
+  n_reports <- max(length(mean), length(sd))
+  mean <- rep(mean, length.out = n_reports)
+  sd <- rep(sd, length.out = n_reports)
+  if (any(sd < 0, na.rm = TRUE)) {
+    cli::cli_abort("{.arg sd} must not be negative")
+  }
 
   # scrutiny's NA rule: a missing mean or SD gets a missing verdict
   ok <- !is.na(mean) & !is.na(sd)
   if (!all(ok)) {
-    out <- tibble::tibble(mean = mean, sd = sd, possible = NA,
-                          rules = NA_character_)
+    out <- tibble::tibble(
+      mean = mean,
+      sd = sd,
+      possible = NA,
+      rules = NA_character_
+    )
     if (any(ok)) {
-      res <- brimmest(l, u, n, mean[ok], sd[ok], md, sdd,
-                      rounding = rounding, scoring = scoring,
-                      n_items = n_items, max_cells = max_cells,
-                      search_budget = search_budget, engine = engine)
-      out$possible[ok] <- res$possible
-      out$rules[ok] <- res$rules
+      known <- brimmest(
+        l,
+        u,
+        n,
+        mean[ok],
+        sd[ok],
+        digits_mean,
+        digits_sd,
+        rounding = rounding,
+        scoring = scoring,
+        n_items = n_items,
+        max_cells = max_cells,
+        search_budget = search_budget,
+        engine = engine
+      )
+      out$possible[ok] <- known$possible
+      out$rules[ok] <- known$rules
     }
     return(out)
   }
   # reject values with more decimals than stated, as both routes assume
-  .unround(mean, md, "up", "mean", "digits_mean")
-  .unround(sd, sdd, "up", "sd", "digits_sd")
+  unround_reported(mean, digits_mean, "up", "mean", "digits_mean")
+  unround_reported(sd, digits_sd, "up", "sd", "digits_sd")
 
   # Two routes to the same verdict, chosen by how much work each implies.
   #
@@ -263,91 +315,136 @@ brimmest <- function(l, u, n, mean, sd, digits_mean, digits_sd,
   # targeted route even for one tuple; the targeted route earns its overhead
   # only once the lattice is genuinely large, and is the sole option once the
   # lattice will not fit at all.
-  W <- as.integer(round(g$mg * (u - l)))
-  cells <- .lattice_cells(l, u, n, g$mg)
+  W <- as.integer(round(mg * (u - l)))
+  cells <- lattice_cells(l, u, n, mg)
   affordable <- !is.na(cells) && cells <= max_cells
   use_target <- !affordable ||
-    (cells > 1e6 && nn * length(rounding) <= 64)
+    (cells > 1e6 && n_reports * length(rounding) <= 64)
+
+  targets_of <- function(i, rule) {
+    target_states(l, u, n, mg, mean[i], sd[i], digits_mean, digits_sd, rule)
+  }
+  abort_disagreement <- function(i, rule, verdict_analytic, other, verdict) {
+    cli::cli_abort(c(
+      "engine disagreement at mean = {mean[i]}, sd = {sd[i]}, rounding = {.val {rule}}: analytic says {verdict_analytic}, {other} says {verdict}.",
+      "i" = "This is a bug; please report it with these inputs."
+    ))
+  }
 
   # One target certified under one rounding rule, by the requested engine.
   # "analytic" is total (never NA); "search" keeps the original escalation
   # (constructive search, then corridor sweep); "both" runs the two
   # independent methods and refuses to answer if they disagree.
-  certify_one <- function(i, rr) {
-    tg <- .target_states(l, u, n, g$mg, mean[i], sd[i], md, sdd, rr)
-    got_a <- if (engine != "search") .certify_analytic(W, n, tg) else NA
-    got_s <- NA
-    if (engine != "analytic") {
-      got_s <- .certify_fast(W, n, tg, budget = search_budget)
-      if (is.na(got_s)) got_s <- .attainable_target(W, n, tg,
-                                                    max_cells = max_cells)
-      if (is.na(got_s) && engine == "search") stop(
-        "this design is too large to certify at the requested precision; ",
-        "raise max_cells, or report to fewer decimal places")
+  certify_one <- function(i, rule) {
+    targets <- targets_of(i, rule)
+    verdict_analytic <- if (engine != "search") {
+      certify_analytic(W, n, targets)
+    } else {
+      NA
     }
-    if (engine == "both" && !is.na(got_s) && got_a != got_s) stop(
-      "engine disagreement at mean = ", mean[i], ", sd = ", sd[i],
-      ", rounding = ", rr, ": analytic says ", got_a, ", search says ",
-      got_s, ". This is a bug; please report it with these inputs.")
-    if (engine == "search") got_s else got_a
+    verdict_search <- NA
+    if (engine != "analytic") {
+      verdict_search <- certify_fast(W, n, targets, budget = search_budget)
+      if (is.na(verdict_search)) {
+        verdict_search <- attainable_target(
+          W,
+          n,
+          targets,
+          max_cells = max_cells
+        )
+      }
+      if (is.na(verdict_search) && engine == "search") {
+        cli::cli_abort(c(
+          "this design is too large to certify at the requested precision",
+          "i" = "Raise {.arg max_cells}, or report to fewer decimal places."
+        ))
+      }
+    }
+    if (
+      engine == "both" &&
+        !is.na(verdict_search) &&
+        verdict_analytic != verdict_search
+    ) {
+      abort_disagreement(i, rule, verdict_analytic, "search", verdict_search)
+    }
+    if (engine == "search") verdict_search else verdict_analytic
   }
 
   if (use_target) {
-    hit_mat <- vapply(rounding, function(rr) {
-      vapply(seq_len(nn), function(i) certify_one(i, rr), logical(1))
-    }, logical(nn))
+    hits <- rounding |>
+      purrr::map(function(rule) {
+        purrr::map_lgl(seq_len(n_reports), function(i) certify_one(i, rule))
+      }) |>
+      unlist()
   } else {
     # one lattice per design, reused across every reported tuple and cached so
     # that repeated calls on the same design pay for it once
-    lat <- .lattice_cached(l, u, n, g$mg, max_cells)
+    lattice <- lattice_cached(l, u, n, mg, max_cells)
     # Both sides are on the 10^-digits reporting grid, so compare them as
     # whole numbers of grid steps rather than as strings: exact, and it keeps
     # a multi-million-row lattice cheap to match against. Integers also
     # sidestep the negative zero some rounding rules return at 0, which
     # compares equal but formats differently.
-    qm <- round(mean * 10^md)
-    qs <- round(sd * 10^sdd)
+    report_mean_steps <- round(mean * 10^digits_mean)
+    report_sd_steps <- round(sd * 10^digits_sd)
     # the lattice's mean and SD on the reporting grid, as whole-number ratios:
-    # mean * 10^md = (l * n * mg + S) * 10^md / (n * mg), and
-    # (sd * 10^sdd)^2 = nss * 10^(2 * sdd) / (n * (n - 1) * mg^2)
-    m_num <- (round(l * g$mg) * n + lat$S) * 10^md
-    m_den <- n * g$mg
-    s_num <- lat$nss * 10^(2 * sdd)
-    s_den <- n * (n - 1) * g$mg^2
-    if (max(4 * s_num, abs(m_num)) >= 2^53)
-      stop("the lattice is too fine to round exactly at this precision; ",
-           "report to fewer decimal places")
-    hit_mat <- vapply(rounding, function(rr) {
-      lm <- .round_exact(m_num, m_den, rr)
-      ls <- .round_exact(s_num, s_den, rr, root = TRUE)
-      span <- max(c(ls$hi, qs), 0) + 1         # same packing for both sides
-      key <- qm * span + qs
-      # under "even" a tie may round either way, in the mean and SD alike
-      key %in% (lm$lo * span + ls$lo) | key %in% (lm$lo * span + ls$hi) |
-        key %in% (lm$hi * span + ls$lo) | key %in% (lm$hi * span + ls$hi)
-    }, logical(nn))
-    if (engine == "both") {
-      # cross-check the lattice verdicts against the analytic engine, tuple
-      # by tuple -- two entirely independent computations of the same answer
-      hm <- matrix(hit_mat, nn, length(rounding))
-      for (ri in seq_along(rounding)) for (i in seq_len(nn)) {
-        tg <- .target_states(l, u, n, g$mg, mean[i], sd[i], md, sdd,
-                             rounding[ri])
-        got_a <- .certify_analytic(W, n, tg)
-        if (got_a != hm[i, ri]) stop(
-          "engine disagreement at mean = ", mean[i], ", sd = ", sd[i],
-          ", rounding = ", rounding[ri], ": analytic says ", got_a,
-          ", lattice says ", hm[i, ri],
-          ". This is a bug; please report it with these inputs.")
+    # mean * 10^digits_mean = (l * n * mg + S) * 10^digits_mean / (n * mg),
+    # and (sd * 10^digits_sd)^2 = nss * 10^(2 * digits_sd) /
+    # (n * (n - 1) * mg^2)
+    m_num <- (round(l * mg) * n + lattice$S) * 10^digits_mean
+    m_den <- n * mg
+    s_num <- lattice$nss * 10^(2 * digits_sd)
+    s_den <- n * (n - 1) * mg^2
+    if (max(4 * s_num, abs(m_num)) >= 2^53) {
+      cli::cli_abort(c(
+        "the lattice is too fine to round exactly at this precision",
+        "i" = "Report to fewer decimal places."
+      ))
+    }
+    hits <- rounding |>
+      purrr::map(function(rule) {
+        mean_steps <- round_exact(m_num, m_den, rule)
+        sd_steps <- round_exact(s_num, s_den, rule, root = TRUE)
+        span <- max(c(sd_steps$hi, report_sd_steps), 0) + 1 # same packing
+        key <- report_mean_steps * span + report_sd_steps
+        # under "even" a tie may round either way, in the mean and SD alike
+        key %in%
+          (mean_steps$lo * span + sd_steps$lo) |
+          key %in% (mean_steps$lo * span + sd_steps$hi) |
+          key %in% (mean_steps$hi * span + sd_steps$lo) |
+          key %in% (mean_steps$hi * span + sd_steps$hi)
+      }) |>
+      unlist()
+  }
+  hit_mat <- matrix(hits, n_reports, length(rounding))
+
+  if (!use_target && engine == "both") {
+    # cross-check the lattice verdicts against the analytic engine, tuple by
+    # tuple -- two entirely independent computations of the same answer
+    for (j in seq_along(rounding)) {
+      for (i in seq_len(n_reports)) {
+        verdict_analytic <- certify_analytic(W, n, targets_of(i, rounding[j]))
+        if (verdict_analytic != hit_mat[i, j]) {
+          abort_disagreement(
+            i,
+            rounding[j],
+            verdict_analytic,
+            "lattice",
+            hit_mat[i, j]
+          )
+        }
       }
     }
   }
-  dim(hit_mat) <- c(nn, length(rounding))
 
-  rules <- apply(hit_mat, 1L, function(z) paste(rounding[z], collapse = ","))
-  tibble::tibble(mean = mean, sd = sd,
-                 possible = as.logical(rowSums(hit_mat) > 0),
-                 rules = rules)
+  tibble::tibble(
+    mean = mean,
+    sd = sd,
+    possible = rowSums(hit_mat) > 0,
+    rules = purrr::map_chr(seq_len(n_reports), function(i) {
+      paste(rounding[hit_mat[i, ]], collapse = ",")
+    })
+  )
 }
 
 # ---- Batch certification -----------------------------------------------------
@@ -357,7 +454,7 @@ brimmest <- function(l, u, n, mean, sd, digits_mean, digits_sd,
 #' Applies [brimmest()] to each row of a data frame. Columns of `data` whose
 #' names match [brimmest()] arguments are taken per row; any argument given in
 #' `...` is a constant broadcast to every row. Supplying one name both ways is
-#' an error. The counterpart of [brimmer_multiple()] for the exact test.
+#' an error. The counterpart of [brimmer_map()] for the exact test.
 #'
 #' Rows are **grouped by design** and each group certified in a single
 #' [brimmest()] call, which is the whole point of the function: one attainable
@@ -384,7 +481,7 @@ brimmest <- function(l, u, n, mean, sd, digits_mean, digits_sd,
 #'   none), optionally with `data` prepended. Unlike [brimmest()], the reported
 #'   `mean` and `sd` are not echoed back: they are already columns of `data`
 #'   when supplied that way, and repeating them would collide.
-#' @seealso [brimmest()] for one design at a time, [brimmer_multiple()] for the
+#' @seealso [brimmest()] for one design at a time, [brimmer_map()] for the
 #'   closed-form screen to run first.
 #' @examples
 #' reports <- data.frame(mean = c(3.0, 1.3, 2.5),
@@ -393,74 +490,108 @@ brimmest <- function(l, u, n, mean, sd, digits_mean, digits_sd,
 #' # one design, one lattice. Rows 2 and 3 are both impossible, for different
 #' # reasons: row 3 already fails GRIM and GRIMMER, while row 2 clears every
 #' # closed-form screen and is caught only here.
-#' brimmest_multiple(reports, l = 1, u = 5, n = 9, digits_mean = 1,
+#' brimmest_map(reports, l = 1, u = 5, n = 9, digits_mean = 1,
 #'                   digits_sd = 1)
 #'
 #' # designs may vary per row; rows sharing one are certified together
 #' mixed <- data.frame(mean = c(3.0, 1.3, 4.0),
 #'                     sd   = c(1.0, 0.9, 1.5),
 #'                     n    = c(9, 9, 12))
-#' brimmest_multiple(mixed, l = 1, u = 5, digits_mean = 1, digits_sd = 1,
+#' brimmest_map(mixed, l = 1, u = 5, digits_mean = 1, digits_sd = 1,
 #'                   include_inputs = FALSE)
 #' @export
-brimmest_multiple <- function(data, ..., include_inputs = TRUE) {
-  if (!is.data.frame(data)) stop("data must be a data frame")
-  row_args <- c("l", "u", "n", "mean", "sd", "digits_mean", "digits_sd",
-                "scoring", "n_items")
-  call_args <- c("rounding", "max_cells", "search_budget", "engine")
-  consts <- list(...)
-  unknown <- setdiff(names(consts), c(row_args, call_args))
-  if (length(unknown))
-    stop("unknown constant argument(s): ", paste(unknown, collapse = ", "))
-  clash <- intersect(call_args, names(data))
-  if (length(clash))
-    stop(paste(clash, collapse = ", "), " applies to the whole call, not to ",
-         "one row; supply it as a constant rather than a column")
-
-  N <- nrow(data)
-  if (!N) stop("data has no rows")
-  resolve <- function(nm) {
-    incol <- nm %in% names(data)
-    incon <- nm %in% names(consts) && !is.null(consts[[nm]])
-    if (incol && incon)
-      stop(sprintf("'%s' supplied as both a column and a constant", nm))
-    v <- if (incol) data[[nm]]
-         else if (incon) rep(consts[[nm]], length.out = N)
-    if (is.factor(v)) as.character(v) else v
+brimmest_map <- function(data, ..., include_inputs = TRUE) {
+  if (!is.data.frame(data)) {
+    cli::cli_abort("{.arg data} must be a data frame")
   }
-  cols <- lapply(row_args, resolve); names(cols) <- row_args
-  present <- row_args[!vapply(cols, is.null, logical(1))]
-  for (nm in c("l", "u", "n", "mean", "sd", "digits_mean", "digits_sd"))
-    if (!(nm %in% present))
-      stop(sprintf("'%s' is required (as a column of data or a constant)", nm))
+  row_args <- c(
+    "l",
+    "u",
+    "n",
+    "mean",
+    "sd",
+    "digits_mean",
+    "digits_sd",
+    "scoring",
+    "n_items"
+  )
+  call_args <- c("rounding", "max_cells", "search_budget", "engine")
+  constants <- list(...)
+  unknown <- setdiff(names(constants), c(row_args, call_args))
+  if (length(unknown)) {
+    cli::cli_abort("unknown constant argument{?s}: {.arg {unknown}}")
+  }
+  clash <- intersect(call_args, names(data))
+  if (length(clash)) {
+    cli::cli_abort(
+      "{.arg {clash}} appl{?ies/y} to the whole call, not to one row; supply {?it/them} as a constant rather than a column"
+    )
+  }
 
-  passthru <- consts[intersect(call_args, names(consts))]
+  n_rows <- nrow(data)
+  if (!n_rows) {
+    cli::cli_abort("{.arg data} has no rows")
+  }
+  resolve <- function(name) {
+    in_data <- name %in% names(data)
+    in_constants <- name %in% names(constants) && !is.null(constants[[name]])
+    if (in_data && in_constants) {
+      cli::cli_abort(
+        "{.arg {name}} supplied as both a column and a constant"
+      )
+    }
+    values <- if (in_data) {
+      data[[name]]
+    } else if (in_constants) {
+      rep(constants[[name]], length.out = n_rows)
+    }
+    if (is.factor(values)) as.character(values) else values
+  }
+  cols <- row_args |>
+    rlang::set_names() |>
+    purrr::map(resolve)
+  present <- names(purrr::discard(cols, is.null))
+  for (name in c("l", "u", "n", "mean", "sd", "digits_mean", "digits_sd")) {
+    if (!(name %in% present)) {
+      cli::cli_abort(
+        "{.arg {name}} is required (as a column of data or a constant)"
+      )
+    }
+  }
+
+  passthru <- constants[intersect(call_args, names(constants))]
 
   # Group by design, not by row. brimmest() amortises one lattice across every
   # tuple it is handed, and it also uses the number of tuples to choose its
   # route, so handing it a whole group at once is both cheaper and better
   # routed than calling it per row would be.
   design <- setdiff(present, c("mean", "sd"))
-  fmt <- function(nm) format(cols[[nm]], nsmall = 6, trim = TRUE)
-  gkey <- do.call(paste, c(lapply(design, fmt), sep = "\r"))
+  design_key <- cols[design] |>
+    purrr::map(format, nsmall = 6, trim = TRUE) |>
+    purrr::reduce(paste, sep = "\r")
 
-  possible <- rep(NA, N)
-  rules <- rep(NA_character_, N)
-  for (g in unique(gkey)) {
-    ix <- which(gkey == g)
-    args <- lapply(design, function(nm) cols[[nm]][ix[1]])
-    names(args) <- design
-    mu <- cols$mean[ix]
-    sg <- cols$sd[ix]
-    tk <- paste(format(mu, nsmall = 6, trim = TRUE),
-                format(sg, nsmall = 6, trim = TRUE), sep = "\r")
-    uk <- !duplicated(tk)
-    r <- do.call(brimmest, c(args, list(mean = mu[uk], sd = sg[uk]), passthru))
-    back <- match(tk, tk[uk])
-    possible[ix] <- r$possible[back]
-    rules[ix] <- r$rules[back]
+  possible <- rep(NA, n_rows)
+  rules <- rep(NA_character_, n_rows)
+  for (key_current in unique(design_key)) {
+    rows <- which(design_key == key_current)
+    args <- purrr::map(cols[design], function(col) col[rows[1]])
+    means <- cols$mean[rows]
+    sds <- cols$sd[rows]
+    tuple_key <- paste(
+      format(means, nsmall = 6, trim = TRUE),
+      format(sds, nsmall = 6, trim = TRUE),
+      sep = "\r"
+    )
+    first <- !duplicated(tuple_key)
+    certified <- do.call(
+      brimmest,
+      c(args, list(mean = means[first], sd = sds[first]), passthru)
+    )
+    back <- match(tuple_key, tuple_key[first])
+    possible[rows] <- certified$possible[back]
+    rules[rows] <- certified$rules[back]
   }
 
-  res <- tibble::tibble(possible = possible, rules = rules)
-  if (include_inputs) .bind_inputs(data, res) else res
+  out <- tibble::tibble(possible = possible, rules = rules)
+  if (include_inputs) bind_inputs(data, out) else out
 }

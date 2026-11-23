@@ -16,3 +16,7 @@
 ^CITATION\.cff$
 ^TODO\.md$
 ^\.claude$
+^air\.toml$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$

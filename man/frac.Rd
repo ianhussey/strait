@@ -4,7 +4,7 @@
 \alias{frac}
 \title{Fractional part, robust to floating-point dust near an integer}
 \usage{
-frac(x, tol = 1e-09)
+frac(x, tol = TOLERANCE)
 }
 \arguments{
 \item{x}{Numeric vector.}

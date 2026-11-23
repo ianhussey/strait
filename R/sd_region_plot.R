@@ -5,8 +5,8 @@
 # Internal: the alpha-free quasi-integer sharp band. `mg` is the granularity
 # multiplier: the affine map w = mg * (x - l) sends the reported grid to the
 # integers, so mg = n_items for mean-scored composites and 1 otherwise.
-.quasi_band <- function(mean, n, l, u, mg) {
-  data.frame(
+quasi_band <- function(mean, n, l, u, mg) {
+  tibble::tibble(
     mean = mean,
     min_sd = sd_min_quasi_integer(mg * (mean - l), n) / mg,
     max_sd = sd_max_structure_s(mg * (mean - l), n, 0, mg * (u - l)) / mg
@@ -17,34 +17,63 @@
 # formulas need. `mg` is the granularity multiplier (above); `to_sum` maps a
 # reported mean to the sum-score mean that the alpha bounds are stated in;
 # `sd_div` converts a sum-score SD back to the reported SD's units.
-.scoring_geometry <- function(scoring, k, l, u) {
-  switch(scoring,
+scoring_geometry <- function(scoring, k, l, u) {
+  switch(
+    scoring,
     singleitem = {
-      if (k != 1L) stop("scoring = 'singleitem' requires n_items = 1")
+      if (k != 1L) {
+        cli::cli_abort(
+          "{.code scoring = \"singleitem\"} requires {.code n_items = 1}"
+        )
+      }
       list(mg = 1, item_l = l, item_u = u, to_sum = function(m) m, sd_div = 1)
     },
-    meanscored = list(mg = k, item_l = l, item_u = u,
-                      to_sum = function(m) k * m, sd_div = k),
-    sumscored  = {
-      if (abs(l / k - round(l / k)) > 1e-9 || abs(u / k - round(u / k)) > 1e-9)
-        stop("scoring = 'sumscored' needs l and u divisible by n_items ",
-             "(they are the composite's limits, k times the per-item limits)")
-      list(mg = 1, item_l = l / k, item_u = u / k,
-           to_sum = function(m) m, sd_div = 1)
+    meanscored = list(
+      mg = k,
+      item_l = l,
+      item_u = u,
+      to_sum = function(m) k * m,
+      sd_div = k
+    ),
+    sumscored = {
+      if (
+        abs(l / k - round(l / k)) > TOLERANCE ||
+          abs(u / k - round(u / k)) > TOLERANCE
+      ) {
+        cli::cli_abort(
+          "{.code scoring = \"sumscored\"} needs {.arg l} and {.arg u} divisible by {.arg n_items} (they are the composite's limits, k times the per-item limits)"
+        )
+      }
+      list(
+        mg = 1,
+        item_l = l / k,
+        item_u = u / k,
+        to_sum = function(m) m,
+        sd_div = 1
+      )
     }
   )
 }
 
-.gcd2 <- function(a, b) { while (b) { t <- b; b <- a %% b; a <- t }; a }
+gcd <- function(a, b) {
+  while (b) {
+    remainder <- a %% b
+    a <- b
+    b <- remainder
+  }
+  a
+}
 
 # Internal: round a lattice of (mean, sd) pairs to reporting precision and
 # collapse the duplicates that creates. Distinct attainable pairs routinely
 # round into one reported cell, which is exactly why a rounded lattice can look
 # solid where the exact one is full of holes.
-.round_lattice <- function(d, digits, rounding) {
-  if (is.null(digits)) return(d)
+round_lattice <- function(d, digits, rounding) {
+  if (is.null(digits)) {
+    return(d)
+  }
   d$mean <- roundwork::reround(d$mean, digits, rounding)
-  d$sd   <- roundwork::reround(d$sd,   digits, rounding)
+  d$sd <- roundwork::reround(d$sd, digits, rounding)
   # some rounding rules return negative zero at 0, which compares equal but
   # prints and string-matches differently; normalise it away
   d$mean[d$mean == 0] <- 0
@@ -78,22 +107,38 @@
 #
 # Shifted whole-block ORs are used rather than scattering into which(...)
 # indices: the block form is what lets (3) and (4) restrict the work.
-.attainable_lattice <- function(l, u, n, mg = 1, max_cells = 2e7) {
+attainable_lattice <- function(
+  l,
+  u,
+  n,
+  mg = 1,
+  max_cells = MAX_LATTICE_CELLS
+) {
   W <- mg * (u - l)
-  if (abs(W - round(W)) > 1e-9)
-    stop("l, u and n_items must put the scale limits on the integer grid")
+  if (abs(W - round(W)) > TOLERANCE) {
+    cli::cli_abort(
+      "{.arg l}, {.arg u} and {.arg n_items} must put the scale limits on the integer grid"
+    )
+  }
   W <- as.integer(round(W))
-  if (W < 1L) stop("the scale limits must span at least one grid step")
+  if (W < 1L) {
+    cli::cli_abort("the scale limits must span at least one grid step")
+  }
   ys <- 0:W
-  pr <- ys * (W - ys)                     # each item's contribution to R
-  g  <- Reduce(.gcd2, pr[pr > 0])
-  if (!length(g) || is.na(g) || g < 1) g <- 1
-  pm <- max(pr) / g                       # per-item span of the R axis
-  Smax <- n * W; Rmax <- n * pm
-  if ((Smax + 1) * (Rmax + 1) > max_cells)
-    stop("the exact lattice is too large to enumerate here (",
-         format(Smax + 1), " x ", format(Rmax + 1), " cells); use ",
-         "rule = 'integer' with a reporting precision instead")
+  pr <- ys * (W - ys) # each item's contribution to R
+  g <- Reduce(gcd, pr[pr > 0])
+  if (!length(g) || is.na(g) || g < 1) {
+    g <- 1
+  }
+  pm <- max(pr) / g # per-item span of the R axis
+  Smax <- n * W
+  Rmax <- n * pm
+  if ((Smax + 1) * (Rmax + 1) > max_cells) {
+    cli::cli_abort(c(
+      "the exact lattice is too large to enumerate here ({format(Smax + 1)} x {format(Rmax + 1)} cells)",
+      "i" = "Use {.code rule = \"integer\"} with a reporting precision instead."
+    ))
+  }
 
   z <- as.raw(0)
   A <- matrix(z, Smax + 1L, Rmax + 1L)
@@ -101,35 +146,71 @@
   A[1L, 1L] <- as.raw(1)
   drs <- pr / g
   for (t in seq_len(n)) {
-    Sh <- (t - 1L) * W; Rh <- (t - 1L) * pm      # frontier before this item
-    So <- t * W;        Ro <- t * pm             # frontier after it
-    hl <- floor(So / 2) + 1L                     # rows computed; rest mirrored
+    Sh <- (t - 1L) * W
+    Rh <- (t - 1L) * pm # frontier before this item
+    So <- t * W
+    Ro <- t * pm # frontier after it
+    hl <- floor(So / 2) + 1L # rows computed; rest mirrored
     B[1L:(So + 1L), 1L:(Ro + 1L)] <- z
     for (i in seq_along(ys)) {
-      v <- ys[i]; dr <- drs[i]
+      v <- ys[i]
+      dr <- drs[i]
       r_hi <- min(Sh + 1L + v, hl)
-      if (r_hi < 1L + v) next
+      if (r_hi < 1L + v) {
+        next
+      }
       B[(1L + v):r_hi, (1L + dr):(Rh + 1L + dr)] <-
         B[(1L + v):r_hi, (1L + dr):(Rh + 1L + dr)] |
         A[1L:(r_hi - v), 1L:(Rh + 1L), drop = FALSE]
     }
-    if (hl < So + 1L)                            # y -> W - y symmetry
+    if (hl < So + 1L) {
+      # y -> W - y symmetry
       B[(hl + 1L):(So + 1L), 1L:(Ro + 1L)] <-
         B[(So + 1L - hl):1L, 1L:(Ro + 1L), drop = FALSE]
-    tmp <- A; A <- B; B <- tmp
+    }
+    swap <- A
+    A <- B
+    B <- swap
   }
 
-  w  <- which(A != z)
-  nr <- Smax + 1L
-  S  <- (w - 1L) %% nr
-  Q  <- W * S - ((w - 1L) %/% nr) * g
+  live <- which(A != z) - 1L
+  n_rows <- Smax + 1L
+  S <- live %% n_rows
+  Q <- W * S - (live %/% n_rows) * g
   # n times the sum of squares, a whole number, so that brimmest() can round
   # the SD exactly; ss = nss / n is translation-free
   nss <- n * Q - S^2
-  out <- data.frame(mean = l + S / (n * mg),
-                    sd   = sqrt(pmax(0, nss) / (n * (n - 1))) / mg,
-                    S = S, nss = nss)
-  out[order(out$mean, out$sd), , drop = FALSE]
+  means <- l + S / (n * mg)
+  sds <- sqrt(pmax(0, nss) / (n * (n - 1))) / mg
+  # new_tibble() rather than tibble(): the lattice can run to millions of rows
+  ord <- order(means, sds)
+  tibble::new_tibble(
+    list(mean = means[ord], sd = sds[ord], S = S[ord], nss = nss[ord]),
+    nrow = length(ord)
+  )
+}
+
+# Internal: give a region the same columns whatever its rule, so that
+# sd_region_data() is type-stable: a band leaves `sd` NA, a lattice
+# `min_sd` and `max_sd`.
+region_columns <- function(region, type) {
+  template <- c("mean", "min_sd", "max_sd", "sd")
+  for (column in setdiff(template, names(region))) {
+    region[[column]] <- rep(NA_real_, nrow(region))
+  }
+  out <- tibble::as_tibble(region[template])
+  attr(out, "type") <- type
+  out
+}
+
+# Internal: is `data` a band (`min_sd`, `max_sd`) rather than a lattice of
+# tuples (`sd`)? sd_region_data() has both columns and says which in its
+# `type` attribute; sd_bounds_curve() output has no `sd` at all.
+is_band <- function(data) {
+  sd <- data[["sd"]]
+  is.null(sd) ||
+    identical(attr(data, "type"), "band") ||
+    (length(sd) > 0 && all(is.na(sd)))
 }
 
 #' Feasible-region data for one constraint set
@@ -219,12 +300,13 @@
 #'   by [roundwork::reround()].
 #' @param by Optional mean-grid spacing (default `(u - l) / 1000`); ignored by
 #'   the lattice rules, which step by `10^-digits`.
-#' @return For band rules, a tibble with `mean`, `min_sd`, `max_sd`, which
-#'   are `NA` where no SD is possible; its `"step"` attribute is the grid
-#'   spacing `by`. For the lattice rules (`"integer"`, `"integer_alpha"`,
-#'   `"attainable"`, `"attainable_alpha"`), a tibble with `mean`, `sd`: the
-#'   tuples passing every applicable test. The `type` attribute is `"band"` or
-#'   `"points"`.
+#' @return A tibble with `mean`, `min_sd`, `max_sd` and `sd`, and a `type`
+#'   attribute of `"band"` or `"points"`. Band rules fill `min_sd` and
+#'   `max_sd`, which are `NA` where no SD is possible, leave `sd` `NA`, and
+#'   record the grid spacing `by` in a `"step"` attribute. The lattice rules
+#'   (`"integer"`, `"integer_alpha"`, `"attainable"`, `"attainable_alpha"`)
+#'   fill `sd` with the tuples passing every applicable test and leave
+#'   `min_sd` and `max_sd` `NA`.
 #' @examples
 #' # a band rule returns (mean, min_sd, max_sd) across the scale
 #' band <- sd_region_data(l = 1, u = 5, n = 7, rule = "quasi")
@@ -236,96 +318,191 @@
 #' head(pts)
 #' attr(pts, "type")
 #' @export
-sd_region_data <- function(l, u, n,
-                           rule = c("quasi", "range", "range_n", "mean", "muilwijk",
-                                    "mean_naive_floor", "mestdagh",
-                                    "pesant_regin", "alpha", "integer",
-                                    "integer_alpha", "attainable",
-                                    "attainable_alpha"),
-                           scoring = NULL,
-                           n_items = 1, alpha = NULL, digits = 2, by = NULL,
-                           round_digits = NULL, rounding = "up") {
-  rule <- match.arg(rule)
-  if (rule == "muilwijk") rule <- "mean"          # alias: named for its author
-  .check_rounding(rounding, setdiff(ROUNDING_METHODS,
-                                    c("up_or_down", "ceiling_or_floor")))
-  if (rule %in% c("alpha", "integer_alpha", "attainable_alpha") && is.null(alpha))
-    stop(sprintf("rule = '%s' requires alpha", rule))
+sd_region_data <- function(
+  l,
+  u,
+  n,
+  rule = c(
+    "quasi",
+    "range",
+    "range_n",
+    "mean",
+    "muilwijk",
+    "mean_naive_floor",
+    "mestdagh",
+    "pesant_regin",
+    "alpha",
+    "integer",
+    "integer_alpha",
+    "attainable",
+    "attainable_alpha"
+  ),
+  scoring = NULL,
+  n_items = 1,
+  alpha = NULL,
+  digits = 2,
+  by = NULL,
+  round_digits = NULL,
+  rounding = "up"
+) {
+  rule <- rlang::arg_match(rule)
+  # alias: named for its author
+  if (rule == "muilwijk") {
+    rule <- "mean"
+  }
+  check_rounding(
+    rounding,
+    setdiff(ROUNDING_METHODS, c("up_or_down", "ceiling_or_floor"))
+  )
+  if (
+    rule %in% c("alpha", "integer_alpha", "attainable_alpha") && is.null(alpha)
+  ) {
+    cli::cli_abort("{.arg rule} = {.val {rule}} requires {.arg alpha}")
+  }
   k <- n_items
   # back-compatible default: a composite is in mean-score units unless told
   # otherwise, and one item is a single item.
-  if (is.null(scoring)) scoring <- if (k > 1) "meanscored" else "singleitem"
-  scoring <- match.arg(scoring, c("singleitem", "sumscored", "meanscored"))
-  g <- .scoring_geometry(scoring, k, l, u)
+  if (is.null(scoring)) {
+    scoring <- if (k > 1) "meanscored" else "singleitem"
+  }
+  scoring <- rlang::arg_match(
+    scoring,
+    c("singleitem", "sumscored", "meanscored")
+  )
+  geometry <- scoring_geometry(scoring, k, l, u)
 
   # lattice rules: only GRIM/GRIMMER-attainable reported tuples exist, so the
   # region is a set of points, not a band (no curve is defined at the means and
   # SDs that strictly integer data cannot produce).
   if (rule %in% c("integer", "integer_alpha")) {
-    um <- umbrella_data(l = l, u = u, n = n, digits = digits, Z = "integer",
-                        scoring = scoring, n_items = k,
-                        alpha = if (rule == "integer_alpha") alpha else NULL)
-    out <- as.data.frame(um[which(um$consistent), c("mean", "sd")])
-    out <- tibble::as_tibble(.round_lattice(out, round_digits, rounding))
-    attr(out, "type") <- "points"
-    return(out)
+    umbrella <- umbrella_data(
+      l = l,
+      u = u,
+      n = n,
+      digits = digits,
+      granularity = "integer",
+      scoring = scoring,
+      n_items = k,
+      alpha = if (rule == "integer_alpha") alpha else NULL
+    )
+    out <- umbrella[which(umbrella$consistent), c("mean", "sd")] |>
+      tibble::as_tibble() |>
+      round_lattice(round_digits, rounding)
+    return(region_columns(out, "points"))
   }
 
   # exact lattice rules: the true attainable tuples, with no reporting grid.
   if (rule %in% c("attainable", "attainable_alpha")) {
-    out <- .attainable_lattice(l, u, n, g$mg)[c("mean", "sd")]
+    out <- attainable_lattice(l, u, n, geometry$mg)[c("mean", "sd")]
     if (rule == "attainable_alpha") {
-      mus <- unique(out$mean)
-      bd <- do.call(rbind, lapply(mus, function(mu) {
-        d <- sd_bounds(l = l, u = u, n = n, mean = mu, Z = "integer",
-                       scoring = scoring, n_items = k, alpha = alpha)
-        data.frame(mean = mu, min_sd = d$min_sd, max_sd = d$max_sd,
-                   ok = isTRUE(d$feasible) && !is.na(d$min_sd))
-      }))
-      out <- merge(out, bd, by = "mean")
-      out <- out[out$ok & out$sd >= out$min_sd - 1e-9 & out$sd <= out$max_sd + 1e-9,
-                 c("mean", "sd"), drop = FALSE]
-      out <- out[order(out$mean, out$sd), , drop = FALSE]
+      bounds <- unique(out$mean) |>
+        purrr::map(function(mean_current) {
+          bound <- sd_bounds(
+            l = l,
+            u = u,
+            n = n,
+            mean = mean_current,
+            granularity = "integer",
+            scoring = scoring,
+            n_items = k,
+            alpha = alpha
+          )
+          tibble::tibble(
+            mean = mean_current,
+            min_sd = bound$min_sd,
+            max_sd = bound$max_sd,
+            ok = isTRUE(bound$feasible) && !is.na(bound$min_sd)
+          )
+        }) |>
+        dplyr::bind_rows()
+      # the lattice is already sorted by mean and then sd, and the join keeps
+      # its row order
+      out <- out |>
+        dplyr::inner_join(bounds, by = "mean")
+      out <- out[
+        out$ok &
+          out$sd >= out$min_sd - TOLERANCE &
+          out$sd <= out$max_sd + TOLERANCE,
+        c("mean", "sd")
+      ]
     }
-    rownames(out) <- NULL
-    out <- tibble::as_tibble(.round_lattice(out, round_digits, rounding))
-    attr(out, "type") <- "points"
-    return(out)
+    out <- round_lattice(out, round_digits, rounding)
+    return(region_columns(out, "points"))
   }
 
-  if (is.null(by)) by <- (u - l) / 1000
-  m <- seq(l, u, by = by)
-  q <- .quasi_band(m, n, l, u, g$mg)
-  naive <- sd_min_integer(g$mg * m, n) / g$mg  # strict Bernoulli floor, off-grid too
+  if (is.null(by)) {
+    by <- (u - l) / MEAN_GRID_DIVISIONS
+  }
+  grid <- seq(l, u, by = by)
+  mg <- geometry$mg
+  quasi <- quasi_band(grid, n, l, u, mg)
+  naive <- sd_min_integer(mg * grid, n) / mg # strict Bernoulli floor, off-grid too
 
-  d <- switch(rule,
-    range        = data.frame(mean = m, min_sd = 0,      max_sd = sd_max_span(l, u)),
-    range_n      = data.frame(mean = m, min_sd = 0,      max_sd = sd_max_span_n(l, u, n)),
-    mean         = data.frame(mean = m, min_sd = 0,      max_sd = sd_max_muilwijk(m, n, l, u)),
-    mean_naive_floor = data.frame(mean = m, min_sd = naive,
-                                  max_sd = sd_max_muilwijk(m, n, l, u)),
-    mestdagh     = data.frame(mean = m, min_sd = 0,      max_sd = q$max_sd),
-    pesant_regin = data.frame(mean = m, min_sd = q$min_sd,   max_sd = sd_max_span_n(l, u, n)),
-    quasi        = data.frame(mean = m, min_sd = q$min_sd,   max_sd = q$max_sd),
-    alpha        = {
-      cc <- (k - 1) / k
-      D  <- 1 - cc * alpha
-      if (k < 2) stop("rule = 'alpha' needs n_items >= 2 (alpha is inert at one item)")
-      if (D <= 1e-12) stop("alpha too high for this n_items")
-      ceil_a <- sqrt((n / (n - 1)) *
-                     v_max_alpha(g$to_sum(m), k, n, g$item_l, g$item_u) / D) / g$sd_div
-      data.frame(mean = m,
-                 min_sd = q$min_sd / sqrt(D),          # alpha-amplified quasi-integer floor
-                 max_sd = pmin(ceil_a, q$max_sd))      # alpha can only tighten
+  out <- switch(
+    rule,
+    range = tibble::tibble(
+      mean = grid,
+      min_sd = 0,
+      max_sd = sd_max_span(l, u)
+    ),
+    range_n = tibble::tibble(
+      mean = grid,
+      min_sd = 0,
+      max_sd = sd_max_span_n(l, u, n)
+    ),
+    mean = tibble::tibble(
+      mean = grid,
+      min_sd = 0,
+      max_sd = sd_max_muilwijk(grid, n, l, u)
+    ),
+    mean_naive_floor = tibble::tibble(
+      mean = grid,
+      min_sd = naive,
+      max_sd = sd_max_muilwijk(grid, n, l, u)
+    ),
+    mestdagh = tibble::tibble(mean = grid, min_sd = 0, max_sd = quasi$max_sd),
+    pesant_regin = tibble::tibble(
+      mean = grid,
+      min_sd = quasi$min_sd,
+      max_sd = sd_max_span_n(l, u, n)
+    ),
+    quasi = tibble::tibble(
+      mean = grid,
+      min_sd = quasi$min_sd,
+      max_sd = quasi$max_sd
+    ),
+    alpha = {
+      D <- 1 - (k - 1) / k * alpha
+      if (k < 2) {
+        cli::cli_abort(
+          "{.code rule = \"alpha\"} needs {.code n_items >= 2} (alpha is inert at one item)"
+        )
+      }
+      if (D <= TOLERANCE_TIGHT) {
+        cli::cli_abort("{.arg alpha} too high for this {.arg n_items}")
+      }
+      v_max <- v_max_alpha(
+        geometry$to_sum(grid),
+        k,
+        n,
+        geometry$item_l,
+        geometry$item_u
+      )
+      ceil_alpha <- sqrt((n / (n - 1)) * v_max / D) / geometry$sd_div
+      tibble::tibble(
+        mean = grid,
+        min_sd = quasi$min_sd / sqrt(D), # alpha-amplified quasi-integer floor
+        max_sd = pmin(ceil_alpha, quasi$max_sd) # alpha can only tighten
+      )
     }
   )
   # an empty band (floor above ceiling) is infeasible, not a negative region
-  bad <- d$min_sd > d$max_sd + 1e-12
-  d$min_sd[bad] <- NA_real_; d$max_sd[bad] <- NA_real_
-  d <- tibble::as_tibble(d)
-  attr(d, "type") <- "band"
-  attr(d, "step") <- by
-  d
+  bad <- out$min_sd > out$max_sd + TOLERANCE_TIGHT
+  out$min_sd[bad] <- NA_real_
+  out$max_sd[bad] <- NA_real_
+  out <- region_columns(out, "band")
+  attr(out, "step") <- by
+  out
 }
 
 #' Plot the feasible SD region for a constraint set
@@ -372,66 +549,117 @@ sd_region_data <- function(l, u, n,
 #'                                           rule = "quasi", n_items = 2))
 #' }
 #' @export
-sd_region_plot <- function(data, reference = NULL, title = NULL,
-                           shade = c("outside", "inside"), expand = 0.03,
-                           fill = "grey85", line_colour = "black",
-                           reference_colour = "grey45",
-                           point_colour = "#1d4ed8", point_size = 0.5) {
-  shade <- match.arg(shade)
-  is_band <- !"sd" %in% names(data)
+sd_region_plot <- function(
+  data,
+  reference = NULL,
+  title = NULL,
+  shade = c("outside", "inside"),
+  expand = 0.03,
+  fill = "grey85",
+  line_colour = "black",
+  reference_colour = "grey45",
+  point_colour = "#1d4ed8",
+  point_size = 0.5
+) {
+  shade <- rlang::arg_match(shade)
+  is_band <- is_band(data)
   if (is_band) {
-    data <- .band_mask(data)
+    data <- band_mask(data)
   } else if ("consistent" %in% names(data)) {
     # full umbrella_data() output: only the consistent tuples exist
     data <- data[!is.na(data$consistent) & data$consistent, , drop = FALSE]
   }
-  ref <- if (!is.null(reference)) .band_mask(reference)
+  reference_masked <- if (!is.null(reference)) band_mask(reference)
 
   p <- ggplot2::ggplot()
   # the region itself first, so the dashed reference stays visible on top of it
   if (is_band) {
     if (shade == "inside") {
-      p <- p + ggplot2::geom_ribbon(data = data,
-                                    ggplot2::aes(x = .data$mean,
-                                                 ymin = .data$min_sd,
-                                                 ymax = .data$max_sd),
-                                    fill = fill, na.rm = TRUE)
+      p <- p +
+        ggplot2::geom_ribbon(
+          data = data,
+          ggplot2::aes(
+            x = .data$mean,
+            ymin = .data$min_sd,
+            ymax = .data$max_sd
+          ),
+          fill = fill,
+          na.rm = TRUE
+        )
     } else {
       # Knock the feasible rings out of a shaded panel rather than assembling
       # the shading around them. The alpha rules leave stretches near each
       # limit where no composite exists and `min_sd`/`max_sd` are NA; a ribbon
       # draws nothing there, so assembled shading would leave those means
       # unshaded and imply every SD is possible at them. See band_polygon().
-      rings <- band_polygon(data, by = .band_step(data))
-      p <- p + ggplot2::annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf,
-                                 ymax = Inf, fill = "grey10", alpha = 0.12)
-      if (!is.null(rings))
-        p <- p + ggplot2::geom_polygon(data = rings,
-          ggplot2::aes(x = .data$mean, y = .data$y, group = .data$ring),
-          inherit.aes = FALSE, fill = "white")
+      rings <- band_polygon(data, by = band_step(data))
+      p <- p +
+        ggplot2::annotate(
+          "rect",
+          xmin = -Inf,
+          xmax = Inf,
+          ymin = -Inf,
+          ymax = Inf,
+          fill = "grey10",
+          alpha = 0.12
+        )
+      if (nrow(rings)) {
+        p <- p +
+          ggplot2::geom_polygon(
+            data = rings,
+            ggplot2::aes(x = .data$mean, y = .data$y, group = .data$ring),
+            inherit.aes = FALSE,
+            fill = "white"
+          )
+      }
     }
   }
 
-  if (!is.null(ref)) {
+  if (!is.null(reference_masked)) {
     p <- p +
-      ggplot2::geom_line(data = ref, ggplot2::aes(.data$mean, .data$max_sd),
-                         colour = reference_colour, linetype = "dashed",
-                         linewidth = 0.25, na.rm = TRUE) +
-      ggplot2::geom_line(data = ref, ggplot2::aes(.data$mean, .data$min_sd),
-                         colour = reference_colour, linetype = "dashed",
-                         linewidth = 0.25, na.rm = TRUE)
+      ggplot2::geom_line(
+        data = reference_masked,
+        ggplot2::aes(.data$mean, .data$max_sd),
+        colour = reference_colour,
+        linetype = "dashed",
+        linewidth = 0.25,
+        na.rm = TRUE
+      ) +
+      ggplot2::geom_line(
+        data = reference_masked,
+        ggplot2::aes(.data$mean, .data$min_sd),
+        colour = reference_colour,
+        linetype = "dashed",
+        linewidth = 0.25,
+        na.rm = TRUE
+      )
   }
 
   if (is_band) {
     p <- p +
-      ggplot2::geom_line(data = data, ggplot2::aes(.data$mean, .data$max_sd),
-                         colour = line_colour, linewidth = 0.4, na.rm = TRUE) +
-      ggplot2::geom_line(data = data, ggplot2::aes(.data$mean, .data$min_sd),
-                         colour = line_colour, linewidth = 0.4, na.rm = TRUE)
+      ggplot2::geom_line(
+        data = data,
+        ggplot2::aes(.data$mean, .data$max_sd),
+        colour = line_colour,
+        linewidth = 0.4,
+        na.rm = TRUE
+      ) +
+      ggplot2::geom_line(
+        data = data,
+        ggplot2::aes(.data$mean, .data$min_sd),
+        colour = line_colour,
+        linewidth = 0.4,
+        na.rm = TRUE
+      )
   } else {
-    p <- p + ggplot2::geom_point(data = data, ggplot2::aes(.data$mean, .data$sd),
-                                 colour = point_colour, size = point_size,
-                                 na.rm = TRUE)
+    p <- p +
+      ggplot2::geom_point(
+        data = data,
+        ggplot2::aes(.data$mean, .data$sd),
+        colour = point_colour,
+        size = point_size,
+        na.rm = TRUE
+      )
   }
 
   # limits are set from the data rather than left to ggplot2, because the
@@ -439,12 +667,17 @@ sd_region_plot <- function(data, reference = NULL, title = NULL,
   # width so the margin is constant across scales of very different widths.
   means <- range(c(data$mean, reference$mean), na.rm = TRUE)
   pad <- expand * diff(means)
-  y_hi <- max(c(if (is_band) data$max_sd else data$sd, ref$max_sd),
-              na.rm = TRUE)
+  y_hi <- max(
+    c(if (is_band) data$max_sd else data$sd, reference_masked$max_sd),
+    na.rm = TRUE
+  )
 
   p +
-    ggplot2::coord_cartesian(xlim = means + c(-pad, pad),
-                             ylim = c(-pad, y_hi + pad), expand = FALSE) +
+    ggplot2::coord_cartesian(
+      xlim = means + c(-pad, pad),
+      ylim = c(-pad, y_hi + pad),
+      expand = FALSE
+    ) +
     ggplot2::labs(x = "Mean", y = "Sample standard deviation", title = title) +
     ggplot2::theme_minimal() +
     ggplot2::theme(panel.grid.minor = ggplot2::element_blank())

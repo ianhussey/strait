@@ -101,7 +101,7 @@ test_that("a failing value with q = 0 is flagged, warned about and excluded", {
   # scrutiny itself never fails a value on a full grid, so such a failure
   # can only reach grim_aggregate() from outside (a pasted verdict, a wrong
   # N). Stub the observed verdicts to exercise the flag.
-  local_mocked_bindings(.grim_observed = function(...) c(FALSE, FALSE, FALSE))
+  local_mocked_bindings(grim_observed = function(...) c(FALSE, FALSE, FALSE))
   expect_warning(res <- agg(dat), "extraction or reporting error")
   expect_true(res$data$flag_impossible[1])
   expect_false(res$data$informative[1])
@@ -117,11 +117,11 @@ test_that("q and mean_q are exactly 0 when every ending passes", {
 })
 
 test_that("Poisson-binomial pmf sums to 1 and matches dbinom for equal q", {
-  pmf <- strait:::.poisbinom_pmf(c(0.1, 0.5, 0.73, 0.2, 0.99))
+  pmf <- strait:::poisbinom_pmf(c(0.1, 0.5, 0.73, 0.2, 0.99))
   expect_equal(sum(pmf), 1)
   expect_length(pmf, 6)
   for (q in c(0.05, 0.3, 0.7)) {
-    expect_equal(strait:::.poisbinom_pmf(rep(q, 12)), dbinom(0:12, 12, q))
+    expect_equal(strait:::poisbinom_pmf(rep(q, 12)), dbinom(0:12, 12, q))
   }
 })
 
@@ -185,7 +185,7 @@ test_that("conf_level and support_c are validated; CI label keeps decimals", {
 test_that("the CI is NA with a warning when even lambda = 1 is rejected", {
   # three failures where each fails with probability 0.05 at most
   expect_warning(
-    ci <- strait:::.lambda_ci(c(1, 1, 1), rep(0.05, 3), 0.9),
+    ci <- strait:::lambda_ci(c(1, 1, 1), rep(0.05, 3), 0.9),
     "rejected"
   )
   expect_equal(ci, c(NA_real_, NA_real_))

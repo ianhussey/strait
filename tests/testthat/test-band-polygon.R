@@ -26,9 +26,10 @@ test_that("band_polygon() leaves an ungapped band as one ring", {
 })
 
 test_that("band_polygon() handles degenerate input", {
-  expect_null(band_polygon(data.frame(mean = 1, min_sd = NA, max_sd = NA), by = 0.1))
-  expect_null(band_polygon(data.frame(mean = numeric(0), min_sd = numeric(0),
-                                      max_sd = numeric(0)), by = 0.1))
+  empty <- tibble::tibble(mean = numeric(0), y = numeric(0), ring = numeric(0))
+  expect_identical(band_polygon(data.frame(mean = 1, min_sd = NA, max_sd = NA), by = 0.1), empty)
+  expect_identical(band_polygon(data.frame(mean = numeric(0), min_sd = numeric(0),
+                                           max_sd = numeric(0)), by = 0.1), empty)
 })
 
 test_that("sd_delta() is exactly the gap between the two ceilings", {
@@ -86,4 +87,57 @@ test_that("sd_region_plot() supports both shading conventions", {
   expect_s3_class(sd_region_plot(sd_region_data(0, 3, 7, rule = "alpha",
                                                 n_items = 2, alpha = 0.70)),
                   "ggplot")
+})
+
+test_that("umbrella_contour() is the envelope of the consistent tuples", {
+  um <- suppressWarnings(umbrella_data(l = 1, u = 3, n = 12, digits = 1))
+  pts <- um[um$consistent, c("mean", "sd")]
+  rings <- umbrella_contour(um)
+  # one region, spanning the means that have a consistent tuple, and reaching
+  # the extreme SDs those tuples take
+  length(unique(rings$ring)) |> expect_equal(1L)
+  range(rings$mean) |> expect_equal(range(pts$mean))
+  range(rings$y) |> expect_equal(range(pts$sd))
+  # it filters by `consistent` itself, so an already-filtered lattice gives
+  # the same rings
+  umbrella_contour(pts) |> expect_equal(rings)
+  nrow(umbrella_contour(um[0, ])) |> expect_equal(0L)
+})
+
+test_that("the contour joins GRIM's stripes but splits a genuine gap", {
+  # at two decimals only the means an integer sum rounds to survive, so the
+  # reporting grid's own step would make every stripe a zero-width ring
+  striped <- suppressWarnings(umbrella_data(l = 1, u = 5, n = 25, digits = 2))
+  pts <- striped[striped$consistent, c("mean", "sd")]
+  expect_gt(min(diff(sort(unique(pts$mean)))), 0.01)
+  expect_equal(length(unique(umbrella_contour(pts)$ring)), 1L)
+  # forcing the reporting step back in splits it into one ring per stripe
+  by_grid <- umbrella_contour(pts, by = 0.01)
+  expect_equal(length(unique(by_grid$ring)), length(unique(pts$mean)))
+  # a reported alpha leaves stretches of infeasible means, which stay split
+  gapped <- suppressWarnings(umbrella_data(
+    l = 0, u = 3, n = 7, digits = 2, scoring = "meanscored", n_items = 2,
+    alpha = 0.70
+  ))
+  gapped <- gapped[gapped$consistent, c("mean", "sd")]
+  expect_gt(length(unique(umbrella_contour(gapped)$ring)), 1L)
+})
+
+test_that("umbrella_plot() draws the contour, shaded or not", {
+  um <- suppressWarnings(umbrella_data(l = 1, u = 3, n = 12, digits = 1))
+  umbrella_plot(um, style = "contour") |> expect_s3_class("ggplot")
+  # the shading is a layer, so "none" has one layer fewer
+  n_layers <- function(p) length(p$layers)
+  expect_equal(
+    n_layers(umbrella_plot(um, shade = "none")),
+    n_layers(umbrella_plot(um)) - 1L
+  )
+  # and the ring is left unfilled, so what is underneath shows through
+  contour_none <- umbrella_plot(um, style = "contour", shade = "none")
+  expect_true(is.na(contour_none$layers[[1]]$aes_params$fill))
+  expect_identical(
+    umbrella_plot(um, style = "contour")$layers[[2]]$aes_params$fill,
+    "white"
+  )
+  expect_error(umbrella_plot(sd_bounds_curve(1, 3, 12), style = "contour"))
 })
