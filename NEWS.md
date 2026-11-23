@@ -2,6 +2,10 @@
 
 ## New features
 
+* `umbrella_plot(style = "contour")` draws the outline of the consistent
+  tuples rather than the tuples, and `umbrella_contour()` returns that outline
+  as data. `umbrella_plot(shade = "none")` leaves the panel unshaded.
+
 * `implied_range()` finds the range a consistent report forces the data to
   cover: the smallest observation is at most `min_at_most` and the largest at
   least `max_at_least`. An SD near the ceiling of a 1-7 scale, for instance,

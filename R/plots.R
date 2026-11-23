@@ -256,8 +256,8 @@ sd_bounds_pomp_plot <- function(
 #' Draws the umbrella of a design: its reportable `(mean, sd)` tuples, or the
 #' continuous region they are drawn from. What is drawn follows from `data`.
 #'
-#' A lattice of tuples, such as [umbrella_data()] output, is drawn in one of two
-#' styles. `style = "points"` (default) greys the whole panel and draws only the
+#' A lattice of tuples, such as [umbrella_data()] output, is drawn in one of
+#' three styles. `style = "points"` (default) greys the whole panel and draws only the
 #' consistent tuples. Nothing else is drawn, because nothing else exists: every
 #' other cell of the grid is a value that cannot be reported. This matches the
 #' convention of [sd_bounds_plot()] and [sd_region_plot()], where shading marks
@@ -272,6 +272,11 @@ sd_bounds_pomp_plot <- function(
 #' it spends two thirds of its ink, in the most saturated colour, on impossible
 #' tuples, and GRIMMER's verdict alternating between adjacent SDs produces
 #' interference banding that obscures the striping.
+#'
+#' `style = "contour"` draws the outline of the consistent tuples instead of the
+#' tuples themselves: at each mean, the lowest and highest consistent SD, from
+#' [umbrella_contour()]. Where the striping of the lattice would only add noise,
+#' this shows the shape of the umbrella.
 #'
 #' A band, with `min_sd` and `max_sd` instead of `sd`, is the umbrella itself,
 #' filled in `fill`. [sd_bounds_curve()] gives the sharp one: under its default
@@ -306,12 +311,19 @@ sd_bounds_pomp_plot <- function(
 #' @param bounds Optional band, such as [sd_bounds_curve()] output, drawn as
 #'   dashed lines on top of `data`.
 #' @param title Optional plot title.
-#' @param style For a lattice, `"points"` (default) or `"tiles"`; see Details.
+#' @param style For a lattice, `"points"` (default), `"tiles"`, or
+#'   `"contour"`; see Details.
 #' @param fill Fill colour of a band.
 #' @param point_colour,point_size Point appearance. `point_size` defaults to a
 #'   value chosen from the number of points, since a size that reads well for a
 #'   few hundred is a solid mass at twenty thousand.
+#' @param line_colour Colour of the outline under `style = "contour"`.
+#' @param contour_by Mean spacing that separates a true gap in the umbrella
+#'   from its striping under `style = "contour"`; see [umbrella_contour()].
 #' @param reference_colour Colour of the `bounds` lines.
+#' @param shade `"outside"` (default) shades the panel where the umbrella is
+#'   not, as [sd_bounds_plot()] does; `"none"` leaves it clear, so the plot can
+#'   be layered over another.
 #' @param expand Padding as a proportion of the scale width, as in
 #'   [sd_bounds_plot()].
 #' @return A ggplot object.
@@ -321,6 +333,9 @@ sd_bounds_pomp_plot <- function(
 #'
 #' # the previous look, separating the two ways a tuple can be ruled out
 #' umbrella_plot(grid, style = "tiles")
+#'
+#' # the outline of the consistent tuples
+#' umbrella_plot(grid, style = "contour")
 #'
 #' # the continuous umbrella that the tuples are drawn from
 #' umbrella_plot(sd_bounds_curve(l = 1, u = 3, n = 12))
@@ -332,22 +347,30 @@ umbrella_plot <- function(
   data,
   bounds = NULL,
   title = NULL,
-  style = c("points", "tiles"),
+  style = c("points", "tiles", "contour"),
   fill = "grey30",
   point_colour = "black",
   point_size = NULL,
+  line_colour = "grey30",
+  contour_by = NULL,
   reference_colour = "grey35",
+  shade = c("outside", "none"),
   expand = 0.03
 ) {
   style <- match.arg(style)
+  shade <- match.arg(shade)
   is_band <- !"sd" %in% names(data)
   if (is_band && !all(c("min_sd", "max_sd") %in% names(data))) {
     stop(
       "`data` needs `mean` and `sd` (a lattice) or `mean`, `min_sd`, and `max_sd` (a band)"
     )
   }
-  if (is_band && style == "tiles") {
-    stop("style = 'tiles' needs a lattice from umbrella_data(), not a band")
+  if (is_band && style != "points") {
+    stop(
+      "style = '",
+      style,
+      "' needs a lattice from umbrella_data(), not a band"
+    )
   }
 
   bnd <- if (!is.null(bounds)) .band_mask(bounds)
@@ -419,30 +442,43 @@ umbrella_plot <- function(
     } else {
       data[, c("mean", "sd"), drop = FALSE]
     }
-    if (is.null(point_size)) {
-      point_size <- if (nrow(pts) > 12000) {
-        0.045
-      } else if (nrow(pts) > 2000) {
-        0.12
-      } else {
-        0.35
+    if (style == "contour") {
+      # rings knocked out of the shaded panel rather than a ribbon, for the
+      # reason band_polygon() exists: where the umbrella genuinely stops, the
+      # shading must stay
+      region <- ggplot2::geom_polygon(
+        data = umbrella_contour(pts, by = contour_by),
+        ggplot2::aes(x = .data$mean, y = .data$y, group = .data$ring),
+        fill = if (shade == "outside") "white" else NA,
+        colour = line_colour,
+        linewidth = 0.4
+      )
+    } else {
+      if (is.null(point_size)) {
+        point_size <- if (nrow(pts) > 12000) {
+          0.045
+        } else if (nrow(pts) > 2000) {
+          0.12
+        } else {
+          0.35
+        }
       }
+      region <- ggplot2::geom_point(
+        data = pts,
+        ggplot2::aes(.data$mean, .data$sd),
+        colour = point_colour,
+        size = point_size,
+        shape = 16,
+        na.rm = TRUE
+      )
     }
-    region <- ggplot2::geom_point(
-      data = pts,
-      ggplot2::aes(.data$mean, .data$sd),
-      colour = point_colour,
-      size = point_size,
-      shape = 16,
-      na.rm = TRUE
-    )
     means <- range(data$mean)
     y_hi <- max(c(pts$sd, bnd$max_sd), na.rm = TRUE)
   }
   pad <- expand * diff(means)
 
-  ggplot2::ggplot() +
-    # the panel is infeasible everywhere except where the umbrella is drawn
+  # the panel is infeasible everywhere except where the umbrella is drawn
+  shading <- if (shade == "outside") {
     ggplot2::annotate(
       "rect",
       xmin = -Inf,
@@ -451,7 +487,11 @@ umbrella_plot <- function(
       ymax = Inf,
       fill = "grey10",
       alpha = 0.12
-    ) +
+    )
+  }
+
+  ggplot2::ggplot() +
+    shading +
     region +
     bounds_layers +
     ggplot2::coord_cartesian(
