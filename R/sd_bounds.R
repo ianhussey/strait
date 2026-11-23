@@ -229,13 +229,14 @@ sd_bounds <- function(l = NULL, u = NULL, a = NULL, b = NULL,
                       scoring = c("singleitem", "sumscored", "meanscored"),
                       n_items = 1, alpha = NULL) {
 
-  out <- function(r) tibble::tibble(min_sd = r$min_sd, max_sd = r$max_sd,
-                                    feasible = r$feasible,
-                                    min_rule = r$min_rule,
-                                    max_rule = r$max_rule,
-                                    grim = r$grim, grimmer = r$grimmer,
-                                    sd_in_bounds = r$sd_in_bounds,
-                                    note = r$note)
+  # new_tibble(), not tibble(): this runs once per mean in the curve and grid
+  # builders, and tibble()'s checks cost a hundred times the bounds themselves
+  out <- function(r) tibble::new_tibble(list(
+    min_sd = r$min_sd, max_sd = r$max_sd, feasible = r$feasible,
+    min_rule = r$min_rule, max_rule = r$max_rule,
+    grim = r$grim, grimmer = r$grimmer, sd_in_bounds = r$sd_in_bounds,
+    note = r$note
+  ), nrow = 1L)
 
   # -- validate ----------------------------------------------------------------
   Z <- match.arg(Z)
