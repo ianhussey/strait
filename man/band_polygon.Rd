@@ -13,8 +13,8 @@ band_polygon(d, by)
 \item{by}{The mean-grid spacing of \code{d}, used to tell a gap from jitter.}
 }
 \value{
-A long-format data frame with \code{mean}, \code{y} and a \code{ring} id, ready for
-\code{geom_polygon(aes(group = ring))}, or \code{NULL} if no row is finite.
+A long-format tibble with \code{mean}, \code{y} and a \code{ring} id, ready for
+\code{geom_polygon(aes(group = ring))}. Zero rows if no row is finite.
 }
 \description{
 Converts a \verb{(mean, min_sd, max_sd)} band into one or more closed polygons, so that a

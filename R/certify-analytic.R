@@ -125,11 +125,11 @@ analytic_window <- function(W, n, S, k_lo, k_hi, witness_budget = 5000) {
     return(TRUE)
   }
   if (k_lo - Qn < Qx - k_hi) {
-    got <- witness_search(W, n, S, k_lo, k_hi, budget = witness_budget)
-    if (isTRUE(got$possible)) {
+    search <- witness_search(W, n, S, k_lo, k_hi, budget = witness_budget)
+    if (isTRUE(search$possible)) {
       return(TRUE)
     }
-    if (isFALSE(got$possible)) return(FALSE) # tree exhausted: a proof
+    if (isFALSE(search$possible)) return(FALSE) # tree exhausted: a proof
   }
   hit_deficit(S, W, n, Qx - k_hi, Qx - k_lo)
 }
@@ -137,24 +137,24 @@ analytic_window <- function(W, n, S, k_lo, k_hi, witness_budget = 5000) {
 # Internal: the analytic engine for one reported tuple under one rounding
 # rule. Same contract as certify_fast() -- takes target_states() rows --
 # but total: always TRUE or FALSE, never NA.
-certify_analytic <- function(W, n, tg) {
-  if (is.null(tg) || !nrow(tg)) {
+certify_analytic <- function(W, n, targets) {
+  if (is.null(targets) || !nrow(targets)) {
     return(FALSE)
   }
-  for (i in seq_len(nrow(tg))) {
-    kw <- k_window(
-      tg$S[i],
-      tg$Q_lo[i],
-      tg$Q_hi[i],
-      tg$lo_incl[i],
-      tg$hi_incl[i],
+  for (i in seq_len(nrow(targets))) {
+    window <- k_window(
+      targets$S[i],
+      targets$Q_lo[i],
+      targets$Q_hi[i],
+      targets$lo_incl[i],
+      targets$hi_incl[i],
       n,
       W
     )
-    if (is.null(kw)) {
+    if (is.null(window)) {
       next
     }
-    if (analytic_window(W, n, tg$S[i], kw[1], kw[2])) return(TRUE)
+    if (analytic_window(W, n, targets$S[i], window[1], window[2])) return(TRUE)
   }
   FALSE
 }

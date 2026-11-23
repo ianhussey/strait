@@ -146,33 +146,33 @@ witness_search <- function(W, n, S, k_lo, k_hi, budget = SEARCH_BUDGET) {
     ys <- y_lo:y_hi
 
     j <- i - 1
-    Sp <- S - ys
-    kl <- k_lo - ys * ys
-    kh <- k_hi - ys * ys
+    S_rest <- S - ys
+    k_lo_rest <- k_lo - ys * ys
+    k_hi_rest <- k_hi - ys * ys
     if (j == 0) {
-      keep <- ys[Sp == 0 & kl <= 0 & kh >= 0]
-      return(if (length(keep)) list(y = keep, sc = numeric(length(keep))))
+      keep <- ys[S_rest == 0 & k_lo_rest <= 0 & k_hi_rest >= 0]
+      return(if (length(keep)) list(y = keep, score = numeric(length(keep))))
     }
 
-    m <- Sp %/% j
-    r <- Sp - j * m
-    qm <- (j - r) * m * m + r * (m + 1) * (m + 1)
+    m <- S_rest %/% j
+    r <- S_rest - j * m
+    q_min <- (j - r) * m * m + r * (m + 1) * (m + 1)
     # Structure-S on the remaining values, whose cap is the value just chosen.
-    # ys == 0 can only arise when Sp == 0, where the division is undefined and
+    # ys == 0 can only arise when S_rest == 0, where the division is undefined and
     # the true ceiling is 0.
-    nu <- Sp %/% ys
-    rem <- Sp - nu * ys
-    qM <- nu * ys * ys + rem * rem
-    qM[!is.finite(qM)] <- 0
+    nu <- S_rest %/% ys
+    rem <- S_rest - nu * ys
+    q_max <- nu * ys * ys + rem * rem
+    q_max[!is.finite(q_max)] <- 0
 
-    lo <- kl
-    ix <- qm > kl
-    lo[ix] <- qm[ix]
-    hi <- kh
-    ix <- qM < kh
-    hi[ix] <- qM[ix]
-    lo <- lo + ((lo %% 2) != (Sp %% 2))
-    # `Sp >= 0` and `Sp <= j * ys` need no test: the first is implied by
+    lo <- k_lo_rest
+    ix <- q_min > k_lo_rest
+    lo[ix] <- q_min[ix]
+    hi <- k_hi_rest
+    ix <- q_max < k_hi_rest
+    hi[ix] <- q_max[ix]
+    lo <- lo + ((lo %% 2) != (S_rest %% 2))
+    # `S_rest >= 0` and `S_rest <= j * ys` need no test: the first is implied by
     # y_hi <= S, the second by y_lo >= S / i, which gives i*y >= S and hence
     # (i - 1)*y >= S - y.
     ok <- lo <= hi
@@ -180,12 +180,12 @@ witness_search <- function(W, n, S, k_lo, k_hi, budget = SEARCH_BUDGET) {
       return(NULL)
     }
 
-    wid <- qM - qm
-    deg <- wid == 0 # a sandwich of one value: a forced child
-    wid[deg] <- 1
-    pos <- ((lo + hi) / 2 - qm) / wid
-    pos[deg] <- 0.5
-    list(y = ys[ok], sc = abs(pos - 0.5)[ok])
+    width <- q_max - q_min
+    degenerate <- width == 0 # a sandwich of one value: a forced child
+    width[degenerate] <- 1
+    position <- ((lo + hi) / 2 - q_min) / width
+    position[degenerate] <- 0.5
+    list(y = ys[ok], score = abs(position - 0.5)[ok])
   }
 
   # Depth-first, on an explicit stack rather than by recursion: the tree is n
@@ -208,8 +208,8 @@ witness_search <- function(W, n, S, k_lo, k_hi, budget = SEARCH_BUDGET) {
   f_pick <- integer(n)
   f_sorted <- logical(n)
   kids <- vector("list", n)
-  scs <- vector("list", n)
-  acc <- numeric(n)
+  scores <- vector("list", n)
+  placed <- numeric(n)
 
   nodes <- 0
   capped <- FALSE
@@ -228,61 +228,61 @@ witness_search <- function(W, n, S, k_lo, k_hi, budget = SEARCH_BUDGET) {
   f_at[1] <- 0L
   f_sorted[1] <- FALSE
   kids[[1]] <- root$y
-  scs[[1]] <- root$sc
+  scores[[1]] <- root$score
 
   while (d > 0L) {
     if (nodes >= budget) {
       capped <- TRUE
       break
     }
-    cd <- kids[[d]]
+    choices <- kids[[d]]
     if (!f_sorted[d]) {
       # first visit: best child only
-      k <- which.min(scs[[d]])
-      y <- cd[k]
+      k <- which.min(scores[[d]])
+      y <- choices[k]
       f_pick[d] <- k
       f_sorted[d] <- TRUE
       f_at[d] <- 0L
     } else if (f_at[d] == 0L) {
       # returned to: order the rest, once
-      sc <- scs[[d]]
-      sc[f_pick[d]] <- Inf # the child already tried sorts last
-      kids[[d]] <- cd[order(sc)][seq_len(length(cd) - 1L)]
+      score <- scores[[d]]
+      score[f_pick[d]] <- Inf # the child already tried sorts last
+      kids[[d]] <- choices[order(score)][seq_len(length(choices) - 1L)]
       f_at[d] <- 1L
       next
     } else {
       at <- f_at[d]
-      if (at > length(cd)) {
+      if (at > length(choices)) {
         # this subtree is exhausted
         d <- d - 1L
         next
       }
       f_at[d] <- at + 1L
-      y <- cd[at]
+      y <- choices[at]
     }
-    acc[d] <- y
+    placed[d] <- y
     nodes <- nodes + 1
     if (f_i[d] == 1) {
       # every value placed, window met
-      hit <- acc
+      hit <- placed
       break
     }
-    ni <- f_i[d] - 1
-    nS <- f_S[d] - y
-    nlo <- f_lo[d] - y * y
-    nhi <- f_hi[d] - y * y
-    nc <- children(ni, y, nS, nlo, nhi)
-    if (!is.null(nc)) {
+    next_i <- f_i[d] - 1
+    next_S <- f_S[d] - y
+    next_lo <- f_lo[d] - y * y
+    next_hi <- f_hi[d] - y * y
+    next_kids <- children(next_i, y, next_S, next_lo, next_hi)
+    if (!is.null(next_kids)) {
       d <- d + 1L
-      f_i[d] <- ni
-      f_S[d] <- nS
-      f_lo[d] <- nlo
-      f_hi[d] <- nhi
+      f_i[d] <- next_i
+      f_S[d] <- next_S
+      f_lo[d] <- next_lo
+      f_hi[d] <- next_hi
       f_at[d] <- 0L
       f_sorted[d] <- FALSE
       f_pick[d] <- 0L
-      kids[[d]] <- nc$y
-      scs[[d]] <- nc$sc
+      kids[[d]] <- next_kids$y
+      scores[[d]] <- next_kids$score
     }
   }
 
@@ -302,29 +302,36 @@ witness_search <- function(W, n, S, k_lo, k_hi, budget = SEARCH_BUDGET) {
 #
 # Returns TRUE / FALSE / NA, with NA meaning "no verdict within budget" --
 # the caller then falls back to attainable_target().
-certify_fast <- function(W, n, tg, budget = SEARCH_BUDGET) {
-  if (is.null(tg) || !nrow(tg)) {
+certify_fast <- function(W, n, targets, budget = SEARCH_BUDGET) {
+  if (is.null(targets) || !nrow(targets)) {
     return(FALSE)
   }
   unknown <- FALSE
-  for (i in seq_len(nrow(tg))) {
-    kw <- k_window(
-      tg$S[i],
-      tg$Q_lo[i],
-      tg$Q_hi[i],
-      tg$lo_incl[i],
-      tg$hi_incl[i],
+  for (i in seq_len(nrow(targets))) {
+    window <- k_window(
+      targets$S[i],
+      targets$Q_lo[i],
+      targets$Q_hi[i],
+      targets$lo_incl[i],
+      targets$hi_incl[i],
       n,
       W
     )
-    if (is.null(kw)) {
+    if (is.null(window)) {
       next
     } # layer 1 settles this candidate
-    res <- witness_search(W, n, tg$S[i], kw[1], kw[2], budget = budget)
-    if (isTRUE(res$possible)) {
+    search <- witness_search(
+      W,
+      n,
+      targets$S[i],
+      window[1],
+      window[2],
+      budget = budget
+    )
+    if (isTRUE(search$possible)) {
       return(TRUE)
     }
-    if (is.na(res$possible)) unknown <- TRUE
+    if (is.na(search$possible)) unknown <- TRUE
   }
   if (unknown) NA else FALSE
 }

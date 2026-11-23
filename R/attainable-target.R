@@ -67,18 +67,18 @@ lattice_cache <- new.env(parent = emptyenv())
 
 lattice_cached <- function(l, u, n, mg, max_cells = MAX_LATTICE_CELLS) {
   key <- paste(l, u, n, mg, sep = "\r")
-  hit <- get0(key, envir = lattice_cache, inherits = FALSE)
-  if (!is.null(hit)) {
-    return(hit)
+  cached <- get0(key, envir = lattice_cache, inherits = FALSE)
+  if (!is.null(cached)) {
+    return(cached)
   }
-  res <- attainable_lattice(l, u, n, mg, max_cells = max_cells)
+  lattice <- attainable_lattice(l, u, n, mg, max_cells = max_cells)
   # ponytail: keeps at most 4 designs, dropping all at once; a lattice can
   # take hundreds of MB. Use LRU eviction if callers alternate among more.
   if (length(ls(lattice_cache)) >= 4L) {
     rm(list = ls(lattice_cache), envir = lattice_cache)
   }
-  assign(key, res, envir = lattice_cache)
-  res
+  assign(key, lattice, envir = lattice_cache)
+  lattice
 }
 
 # Internal: the (S, Q) targets implied by one reported (mean, sd) under one
@@ -141,20 +141,25 @@ target_states <- function(
   ss_lo <- (n - 1) * (mg * sd_lo)^2
   ss_hi <- (n - 1) * (mg * sd_hi)^2
   base <- S^2 / n
-  data.frame(
-    S = S,
-    Q_lo = base + ss_lo,
-    Q_hi = base + ss_hi,
-    lo_incl = lo_incl,
-    hi_incl = iv_s$hi_incl
+  # new_tibble() rather than tibble(): this runs once per report and rule, and
+  # every column is built to length(S) here
+  tibble::new_tibble(
+    list(
+      S = S,
+      Q_lo = base + ss_lo,
+      Q_hi = base + ss_hi,
+      lo_incl = rep(lo_incl, length(S)),
+      hi_incl = rep(iv_s$hi_incl, length(S))
+    ),
+    nrow = length(S)
   )
 }
 
 # Internal: can n integers in [0, W] realise any of the given (S, Q-window)
 # targets? Exact in both directions. Returns TRUE / FALSE, or NA when the
 # corridor would still exceed max_cells (caller falls back to the lattice).
-attainable_target <- function(W, n, tg, max_cells = MAX_LATTICE_CELLS) {
-  if (is.null(tg) || !nrow(tg)) {
+attainable_target <- function(W, n, targets, max_cells = MAX_LATTICE_CELLS) {
+  if (is.null(targets) || !nrow(targets)) {
     return(FALSE)
   }
   ys <- 0:W
@@ -168,23 +173,25 @@ attainable_target <- function(W, n, tg, max_cells = MAX_LATTICE_CELLS) {
 
   # R = W*S - Q, on the same reduced axis the full lattice uses. Every term
   # y(W - y) is divisible by g, so R always is.
-  r_lo <- ceiling((W * tg$S - tg$Q_hi) / g - TOLERANCE)
-  r_hi <- floor((W * tg$S - tg$Q_lo) / g + TOLERANCE)
+  r_lo <- ceiling((W * targets$S - targets$Q_hi) / g - TOLERANCE)
+  r_hi <- floor((W * targets$S - targets$Q_lo) / g + TOLERANCE)
   # a strictly excluded SD endpoint cannot supply a target state exactly on it
-  ex_hi <- !tg$hi_incl & abs((W * tg$S - tg$Q_hi) / g - r_lo) < TOLERANCE
-  ex_lo <- !tg$lo_incl & abs((W * tg$S - tg$Q_lo) / g - r_hi) < TOLERANCE
+  ex_hi <- !targets$hi_incl &
+    abs((W * targets$S - targets$Q_hi) / g - r_lo) < TOLERANCE
+  ex_lo <- !targets$lo_incl &
+    abs((W * targets$S - targets$Q_lo) / g - r_hi) < TOLERANCE
   r_lo <- r_lo + ex_hi
   r_hi <- r_hi - ex_lo
   keep <- r_hi >= 0 & r_lo <= n * pm & r_lo <= r_hi
   if (!any(keep)) {
     return(FALSE)
   }
-  tg <- tg[keep, , drop = FALSE]
+  targets <- targets[keep, , drop = FALSE]
   r_lo <- pmax(0, r_lo[keep])
   r_hi <- pmin(n * pm, r_hi[keep])
 
-  S_min <- min(tg$S)
-  S_max <- max(tg$S)
+  S_min <- min(targets$S)
+  S_max <- max(targets$S)
   R_min <- min(r_lo)
   R_max <- max(r_hi)
 
@@ -193,25 +200,23 @@ attainable_target <- function(W, n, tg, max_cells = MAX_LATTICE_CELLS) {
   s_win <- function(t) c(max(0L, S_min - (n - t) * W), min(t * W, S_max))
   r_win <- function(t) c(max(0, R_min - (n - t) * pm), min(t * pm, R_max))
 
-  cells <- max(vapply(
-    seq_len(n),
-    function(t) {
+  cells <- seq_len(n) |>
+    purrr::map_dbl(function(t) {
       sw <- s_win(t)
       rw <- r_win(t)
       if (sw[2] < sw[1] || rw[2] < rw[1]) {
         return(0)
       }
       (sw[2] - sw[1] + 1) * (rw[2] - rw[1] + 1)
-    },
-    numeric(1)
-  ))
+    }) |>
+    max()
   if (cells > max_cells) {
     return(NA)
   }
 
   hit <- function(sa, ra, M) {
-    for (i in seq_len(nrow(tg))) {
-      si <- tg$S[i] - sa + 1L
+    for (i in seq_len(nrow(targets))) {
+      si <- targets$S[i] - sa + 1L
       if (si < 1L || si > nrow(M)) {
         next
       }

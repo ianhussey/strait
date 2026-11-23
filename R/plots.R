@@ -1,17 +1,17 @@
 # ggplot2 visualisations of the SD bounds, POMP-normalised bounds, and umbrella.
 
-bounds_point_layer <- function(pts, xvar, yvar) {
-  if (is.null(pts[["consistent"]])) {
-    pts$consistent <- NA
+bounds_point_layer <- function(reports, xvar, yvar) {
+  if (is.null(reports[["consistent"]])) {
+    reports$consistent <- NA
   }
-  pts$.consistent <- as.character(pts$consistent)
+  reports$consistent_label <- as.character(reports$consistent)
   list(
     ggplot2::geom_point(
-      data = pts,
+      data = reports,
       ggplot2::aes(
         x = .data[[xvar]],
         y = .data[[yvar]],
-        fill = .data$.consistent
+        fill = .data$consistent_label
       ),
       shape = 21,
       colour = "black",
@@ -79,21 +79,21 @@ sd_bounds_plot <- function(
   shade = c("outside", "inside"),
   expand = 0.03
 ) {
-  shade <- match.arg(shade)
-  cur <- band_mask(data)
+  shade <- rlang::arg_match(shade)
+  band <- band_mask(data)
 
   # Padding is a proportion of the scale width, not a fixed SD amount, so the
   # margin is visually constant across scales of very different widths.
-  drawn <- cur$mean[!is.na(cur$max_sd)]
-  lo_m <- min(drawn)
-  hi_m <- max(drawn)
-  pad <- expand * (hi_m - lo_m)
+  drawn <- band$mean[!is.na(band$max_sd)]
+  mean_lo <- min(drawn)
+  mean_hi <- max(drawn)
+  pad <- expand * (mean_hi - mean_lo)
   # Shading the outside needs finite limits, and finite limits will silently
   # clip an out-of-bounds point - exactly the case the plot exists to show -
   # so the ceiling of the view must account for the reported points as well.
-  y_hi <- max(c(cur$max_sd, reports$sd), na.rm = TRUE)
+  y_hi <- max(c(band$max_sd, reports$sd), na.rm = TRUE)
 
-  p <- ggplot2::ggplot(cur, ggplot2::aes(x = .data$mean))
+  p <- ggplot2::ggplot(band, ggplot2::aes(x = .data$mean))
   if (shade == "inside") {
     p <- p +
       ggplot2::geom_ribbon(
@@ -109,7 +109,7 @@ sd_bounds_plot <- function(
     # there. See band_polygon().
     # band_polygon() needs the grid spacing to tell a sampling gap from a
     # genuine one; see band_step().
-    rings <- band_polygon(cur, by = band_step(data))
+    rings <- band_polygon(band, by = band_step(data))
     p <- p +
       ggplot2::annotate(
         "rect",
@@ -120,7 +120,7 @@ sd_bounds_plot <- function(
         fill = "grey10",
         alpha = 0.12
       )
-    if (!is.null(rings)) {
+    if (nrow(rings)) {
       p <- p +
         ggplot2::geom_polygon(
           data = rings,
@@ -142,7 +142,7 @@ sd_bounds_plot <- function(
       na.rm = TRUE
     ) +
     ggplot2::coord_cartesian(
-      xlim = c(lo_m - pad, hi_m + pad),
+      xlim = c(mean_lo - pad, mean_hi + pad),
       ylim = c(-pad, y_hi + pad),
       expand = FALSE
     ) +
@@ -186,10 +186,9 @@ sd_bounds_pomp_plot <- function(
   reference = c("sharp", "parity"),
   title = NULL
 ) {
-  reference <- match.arg(reference)
+  reference <- rlang::arg_match(reference)
   if (reference == "parity") {
-    cur <- band_mask(data)
-    p <- ggplot2::ggplot(cur, ggplot2::aes(x = .data$pomp_mean)) +
+    p <- ggplot2::ggplot(band_mask(data), ggplot2::aes(x = .data$pomp_mean)) +
       ggplot2::geom_ribbon(
         ggplot2::aes(ymin = .data$floor_parity, ymax = .data$ceil_parity),
         fill = "grey85"
@@ -213,7 +212,7 @@ sd_bounds_pomp_plot <- function(
       p <- p + bounds_point_layer(reports, "pomp_mean", "pomp_sd_parity")
     }
   } else {
-    shade <- data.frame(
+    shade <- tibble::tibble(
       xmin = c(-Inf, 1, 0, 0),
       xmax = c(0, Inf, 1, 1),
       ymin = c(-Inf, -Inf, 1, -Inf),
@@ -232,7 +231,7 @@ sd_bounds_pomp_plot <- function(
         alpha = 0.12
       ) +
       ggplot2::geom_rect(
-        data = data.frame(x = 0),
+        data = tibble::tibble(x = 0),
         ggplot2::aes(xmin = 0, xmax = 1, ymin = 0, ymax = 1),
         fill = NA,
         colour = "black",
@@ -357,27 +356,25 @@ umbrella_plot <- function(
   shade = c("outside", "none"),
   expand = 0.03
 ) {
-  style <- match.arg(style)
-  shade <- match.arg(shade)
+  style <- rlang::arg_match(style)
+  shade <- rlang::arg_match(shade)
   is_band <- !"sd" %in% names(data)
   if (is_band && !all(c("min_sd", "max_sd") %in% names(data))) {
-    stop(
-      "`data` needs `mean` and `sd` (a lattice) or `mean`, `min_sd`, and `max_sd` (a band)"
+    cli::cli_abort(
+      "{.arg data} needs {.code mean} and {.code sd} (a lattice) or {.code mean}, {.code min_sd}, and {.code max_sd} (a band)"
     )
   }
   if (is_band && style != "points") {
-    stop(
-      "style = '",
-      style,
-      "' needs a lattice from umbrella_data(), not a band"
+    cli::cli_abort(
+      "{.arg style} = {.val {style}} needs a lattice from {.fn umbrella_data}, not a band"
     )
   }
 
-  bnd <- if (!is.null(bounds)) band_mask(bounds)
-  bounds_layers <- if (!is.null(bnd)) {
-    lapply(c("max_sd", "min_sd"), function(col) {
+  bounds_masked <- if (!is.null(bounds)) band_mask(bounds)
+  bounds_layers <- if (!is.null(bounds_masked)) {
+    purrr::map(c("max_sd", "min_sd"), function(col) {
       ggplot2::geom_line(
-        data = bnd,
+        data = bounds_masked,
         ggplot2::aes(.data$mean, .data[[col]]),
         inherit.aes = FALSE,
         colour = reference_colour,
@@ -390,14 +387,14 @@ umbrella_plot <- function(
 
   if (style == "tiles") {
     if (!all(c("consistent", "in_bounds", "grimmer") %in% names(data))) {
-      stop(
-        "style = 'tiles' needs the full umbrella_data() output, with `consistent`, `in_bounds`, and `grimmer`"
+      cli::cli_abort(
+        "{.code style = \"tiles\"} needs the full umbrella_data() output, with {.code consistent}, {.code in_bounds}, and {.code grimmer}"
       )
     }
-    data$category <- ifelse(
+    data$category <- dplyr::if_else(
       data$consistent,
       "consistent",
-      ifelse(
+      dplyr::if_else(
         data$in_bounds & !is.na(data$grimmer) & !data$grimmer,
         "GRIMMER-inconsistent",
         "out of bounds"
@@ -424,16 +421,16 @@ umbrella_plot <- function(
   }
 
   if (is_band) {
-    cur <- band_mask(data)
+    band <- band_mask(data)
     region <- ggplot2::geom_ribbon(
-      data = cur,
+      data = band,
       ggplot2::aes(x = .data$mean, ymin = .data$min_sd, ymax = .data$max_sd),
       fill = fill
     )
-    means <- range(cur$mean[!is.na(cur$max_sd)])
-    y_hi <- max(c(cur$max_sd, bnd$max_sd), na.rm = TRUE)
+    means <- range(band$mean[!is.na(band$max_sd)])
+    y_hi <- max(c(band$max_sd, bounds_masked$max_sd), na.rm = TRUE)
   } else {
-    pts <- if ("consistent" %in% names(data)) {
+    points <- if ("consistent" %in% names(data)) {
       data[
         !is.na(data$consistent) & data$consistent,
         c("mean", "sd"),
@@ -447,7 +444,7 @@ umbrella_plot <- function(
       # reason band_polygon() exists: where the umbrella genuinely stops, the
       # shading must stay
       region <- ggplot2::geom_polygon(
-        data = umbrella_contour(pts, by = contour_by),
+        data = umbrella_contour(points, by = contour_by),
         ggplot2::aes(x = .data$mean, y = .data$y, group = .data$ring),
         fill = if (shade == "outside") "white" else NA,
         colour = line_colour,
@@ -455,16 +452,16 @@ umbrella_plot <- function(
       )
     } else {
       if (is.null(point_size)) {
-        point_size <- if (nrow(pts) > 12000) {
+        point_size <- if (nrow(points) > 12000) {
           0.045
-        } else if (nrow(pts) > 2000) {
+        } else if (nrow(points) > 2000) {
           0.12
         } else {
           0.35
         }
       }
       region <- ggplot2::geom_point(
-        data = pts,
+        data = points,
         ggplot2::aes(.data$mean, .data$sd),
         colour = point_colour,
         size = point_size,
@@ -473,7 +470,7 @@ umbrella_plot <- function(
       )
     }
     means <- range(data$mean)
-    y_hi <- max(c(pts$sd, bnd$max_sd), na.rm = TRUE)
+    y_hi <- max(c(points$sd, bounds_masked$max_sd), na.rm = TRUE)
   }
   pad <- expand * diff(means)
 

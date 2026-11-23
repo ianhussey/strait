@@ -26,9 +26,10 @@ test_that("band_polygon() leaves an ungapped band as one ring", {
 })
 
 test_that("band_polygon() handles degenerate input", {
-  expect_null(band_polygon(data.frame(mean = 1, min_sd = NA, max_sd = NA), by = 0.1))
-  expect_null(band_polygon(data.frame(mean = numeric(0), min_sd = numeric(0),
-                                      max_sd = numeric(0)), by = 0.1))
+  empty <- tibble::tibble(mean = numeric(0), y = numeric(0), ring = numeric(0))
+  expect_identical(band_polygon(data.frame(mean = 1, min_sd = NA, max_sd = NA), by = 0.1), empty)
+  expect_identical(band_polygon(data.frame(mean = numeric(0), min_sd = numeric(0),
+                                           max_sd = numeric(0)), by = 0.1), empty)
 })
 
 test_that("sd_delta() is exactly the gap between the two ceilings", {

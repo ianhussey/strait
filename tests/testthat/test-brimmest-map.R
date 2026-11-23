@@ -61,7 +61,7 @@ test_that("brimmest_map() validates its inputs", {
   expect_error(brimmest_map(list(mean = 1, sd = 1)), "data frame")
   expect_error(brimmest_map(d, mean = 3, l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1),
                "both a column and a constant")
-  expect_error(brimmest_map(d, l = 1, u = 5, digits_mean = 1, digits_sd = 1), "'n' is required")
+  expect_error(brimmest_map(d, l = 1, u = 5, digits_mean = 1, digits_sd = 1), "`n` is required")
   expect_error(brimmest_map(d, l = 1, u = 5, n = 9), "digits_mean")
   expect_error(brimmest_map(d, l = 1, u = 5, n = 9, digits_mean = 1, digits_sd = 1,
                                  granularity = "integer"), "unknown constant")

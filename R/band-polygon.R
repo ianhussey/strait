@@ -11,11 +11,9 @@ band_mask <- function(d) {
   if (!is.null(d[["feasible"]])) {
     ok <- ok & d$feasible
   }
-  for (col in intersect(
-    c("min_sd", "max_sd", "floor_parity", "ceil_parity"),
-    names(d)
-  )) {
-    d[[col]][!ok] <- NA_real_
+  sd_cols <- c("min_sd", "max_sd", "floor_parity", "ceil_parity")
+  for (col_current in intersect(sd_cols, names(d))) {
+    d[[col_current]][!ok] <- NA_real_
   }
   d
 }
@@ -70,8 +68,8 @@ band_step <- function(d) {
 #' @param d A data frame with `mean`, `min_sd` and `max_sd`, e.g. from
 #'   [sd_region_data()] under a band rule.
 #' @param by The mean-grid spacing of `d`, used to tell a gap from jitter.
-#' @return A long-format data frame with `mean`, `y` and a `ring` id, ready for
-#'   `geom_polygon(aes(group = ring))`, or `NULL` if no row is finite.
+#' @return A long-format tibble with `mean`, `y` and a `ring` id, ready for
+#'   `geom_polygon(aes(group = ring))`. Zero rows if no row is finite.
 #' @seealso [sd_region_data()], [sd_region_plot()].
 #' @examples
 #' # a reported alpha leaves stretches near each limit where no composite exists
@@ -86,23 +84,20 @@ band_step <- function(d) {
 band_polygon <- function(d, by) {
   d <- d[is.finite(d$min_sd) & is.finite(d$max_sd), , drop = FALSE]
   if (!nrow(d)) {
-    return(NULL)
+    return(tibble::tibble(mean = numeric(0), y = numeric(0), ring = numeric(0)))
   }
   d <- d[order(d$mean), , drop = FALSE]
   run <- c(0, cumsum(diff(d$mean) > by * 1.5))
-  out <- do.call(
-    rbind,
-    lapply(unique(run), function(k) {
-      g <- d[run == k, , drop = FALSE]
-      data.frame(
-        mean = c(g$mean, rev(g$mean), g$mean[1]),
-        y = c(g$max_sd, rev(g$min_sd), g$max_sd[1]),
-        ring = k
+  unique(run) |>
+    purrr::map(function(ring) {
+      rows <- d[run == ring, , drop = FALSE]
+      tibble::tibble(
+        mean = c(rows$mean, rev(rows$mean), rows$mean[1]),
+        y = c(rows$max_sd, rev(rows$min_sd), rows$max_sd[1]),
+        ring = ring
       )
-    })
-  )
-  rownames(out) <- NULL
-  out
+    }) |>
+    dplyr::bind_rows()
 }
 
 #' The outline of an umbrella grid
@@ -150,10 +145,6 @@ umbrella_contour <- function(data, by = NULL) {
     data
   }
 
-  if (!nrow(points)) {
-    return(tibble::tibble(mean = numeric(0), y = numeric(0), ring = numeric(0)))
-  }
-
   means <- sort(unique(points$mean))
   index <- match(points$mean, means)
   envelope <- tibble::tibble(
@@ -165,7 +156,7 @@ umbrella_contour <- function(data, by = NULL) {
     by <- if (length(means) > 1) stats::median(diff(means)) else 1
   }
 
-  tibble::as_tibble(band_polygon(envelope, by = by))
+  band_polygon(envelope, by = by)
 }
 
 #' The count-parity correction to the mean-conditional ceiling
@@ -221,5 +212,5 @@ sd_delta <- function(mean, n, lower, upper, tol = 1e-9) {
   nu <- n * (mean - lower) / R
   muil <- n * (upper - mean) * (mean - lower) # SS of the uncorrected bound
   ss <- muil - frac(nl, tol) * frac(nu, tol) * R^2 # SS of the sharp bound
-  ifelse(muil <= 0, 1, pmax(0, ss) / muil)
+  dplyr::if_else(muil <= 0, 1, pmax(0, ss) / muil)
 }
