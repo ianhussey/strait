@@ -13,7 +13,8 @@ umbrella_data(
   scoring = "singleitem",
   n_items = 1,
   alpha = NULL,
-  rounding = "up_or_down"
+  rounding = "up_or_down",
+  shape = c("any", "unimodal")
 )
 }
 \arguments{
@@ -33,10 +34,17 @@ jointly GRIM-, GRIMMER- and alpha-consistent tuples.}
 
 \item{rounding}{Rounding method for mean and SD, named as in scrutiny
 (default \code{"up_or_down"}).}
+
+\item{shape}{\code{"any"} (default) or \code{"unimodal"}, as in \code{\link[=sd_bounds]{sd_bounds()}}. Under
+\code{"unimodal"} each cell is tested against the unimodal ceiling, but the
+grid still runs up to the ordinary ceiling, so the SDs that only a
+non-unimodal sample can have appear as failing cells rather than
+vanishing.}
 }
 \value{
 A tibble: \code{mean}, \code{sd}, \code{min_sd}, \code{max_sd}, \code{in_bounds},
-\code{grimmer}, \code{consistent}. \code{grimmer} is evaluated only for SDs inside the
+\code{grimmer}, \code{consistent}. \code{min_sd} and \code{max_sd} are the bounds each cell
+is tested against. \code{grimmer} is evaluated only for SDs inside the
 sharp bounds (elsewhere the tuple is already inconsistent and \code{grimmer}
 is \code{NA}); GRIM-inconsistent means are pruned before any SD is tested,
 which is why they are absent from the grid.

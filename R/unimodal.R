@@ -105,6 +105,8 @@ unimodal_ssd_max_any_mean <- function(n, top) {
 #' mode and then fall, or stay level, where a value that no observation takes
 #' counts as frequency 0. Unimodality lowers the ceiling of
 #' [sd_max_structure_s()], which puts the observations at the two limits.
+#' It is a property of the sample, which a sample from a unimodal population
+#' often lacks; see the `shape` constraint in [sd_bounds()].
 #'
 #' Given the mean, the ceiling is computed exactly by a recursion over the
 #' layers of the frequency distribution: every unimodal sample is a stack of

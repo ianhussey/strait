@@ -411,7 +411,7 @@ brim <- function(
 #'
 #' Recognised names (column or constant): `l`, `u`, `a`, `b`, `n`, `mean`,
 #' `digits_mean`, `sd`, `digits_sd`, `rounding`, `granularity`, `scoring`, `n_items`,
-#' `alpha`.
+#' `alpha`, `shape`.
 #'
 #' @param data A data frame, one reported statistic set per row.
 #' @param ... Constant arguments applied to all rows.
@@ -623,8 +623,14 @@ sd_bounds_curve <- function(
 #'   jointly GRIM-, GRIMMER- and alpha-consistent tuples.
 #' @param rounding Rounding method for mean and SD, named as in scrutiny
 #'   (default `"up_or_down"`).
+#' @param shape `"any"` (default) or `"unimodal"`, as in [sd_bounds()]. Under
+#'   `"unimodal"` each cell is tested against the unimodal ceiling, but the
+#'   grid still runs up to the ordinary ceiling, so the SDs that only a
+#'   non-unimodal sample can have appear as failing cells rather than
+#'   vanishing.
 #' @return A tibble: `mean`, `sd`, `min_sd`, `max_sd`, `in_bounds`,
-#'   `grimmer`, `consistent`. `grimmer` is evaluated only for SDs inside the
+#'   `grimmer`, `consistent`. `min_sd` and `max_sd` are the bounds each cell
+#'   is tested against. `grimmer` is evaluated only for SDs inside the
 #'   sharp bounds (elsewhere the tuple is already inconsistent and `grimmer`
 #'   is `NA`); GRIM-inconsistent means are pruned before any SD is tested,
 #'   which is why they are absent from the grid.
@@ -646,9 +652,11 @@ umbrella_data <- function(
   scoring = "singleitem",
   n_items = 1,
   alpha = NULL,
-  rounding = "up_or_down"
+  rounding = "up_or_down",
+  shape = c("any", "unimodal")
 ) {
   check_rounding(rounding)
+  shape <- rlang::arg_match(shape)
   step <- 10^(-digits)
   # round() the grids back onto the nearest double to each decimal. seq() by a
   # decimal step accumulates error (seq(0, 6, by = 0.1)[4] is 0.3 + 5.6e-17),
@@ -662,22 +670,29 @@ umbrella_data <- function(
     # sd_bounds() embeds the rounding-aware GRIM prefilter: a mean whose
     # rounding interval admits no integer sum is infeasible under strict granularity,
     # so none of its SDs need testing.
-    bounds <- sd_bounds(
-      l = l,
-      u = u,
-      n = n,
-      mean = mean_current,
-      digits_mean = digits,
-      rounding = rounding,
-      granularity = granularity,
-      scoring = scoring,
-      n_items = n_items,
-      alpha = alpha
-    )
-    if (!isTRUE(bounds$feasible) || is.na(bounds$max_sd)) {
+    bounds_for <- function(shape) {
+      sd_bounds(
+        l = l,
+        u = u,
+        n = n,
+        mean = mean_current,
+        digits_mean = digits,
+        rounding = rounding,
+        granularity = granularity,
+        scoring = scoring,
+        n_items = n_items,
+        alpha = alpha,
+        shape = shape
+      )
+    }
+    # the grid runs to the ordinary ceiling; the cells are tested against the
+    # bounds under `shape`, so cells above a unimodal ceiling fail visibly
+    grid_bounds <- bounds_for("any")
+    if (!isTRUE(grid_bounds$feasible) || is.na(grid_bounds$max_sd)) {
       return(NULL)
     }
-    sds <- seq(0, ceiling(bounds$max_sd / step) * step, by = step) |>
+    bounds <- if (shape == "any") grid_bounds else bounds_for(shape)
+    sds <- seq(0, ceiling(grid_bounds$max_sd / step) * step, by = step) |>
       round(digits)
     # each SD's own rounding interval, as sd_bounds() unrounds a reported SD
     interval <- unround_reported(sds, digits, rounding, "sd", "digits")

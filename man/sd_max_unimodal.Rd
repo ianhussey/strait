@@ -25,6 +25,8 @@ of the values \verb{lower, lower + 1, ..., upper} rise, or stay level, up to a
 mode and then fall, or stay level, where a value that no observation takes
 counts as frequency 0. Unimodality lowers the ceiling of
 \code{\link[=sd_max_structure_s]{sd_max_structure_s()}}, which puts the observations at the two limits.
+It is a property of the sample, which a sample from a unimodal population
+often lacks; see the \code{shape} constraint in \code{\link[=sd_bounds]{sd_bounds()}}.
 }
 \details{
 Given the mean, the ceiling is computed exactly by a recursion over the

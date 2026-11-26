@@ -118,11 +118,21 @@ combinable with \code{a}/\code{b} (open problem).
 default) assumes nothing. \code{"unimodal"}: the frequencies of the values on
 the response grid rise, or stay level, up to a mode and then fall, or stay
 level, where a value that no observation takes counts as frequency 0. A
-report fails this constraint if no unimodal sample is consistent with it,
-which is informative when unimodality is asserted or expected. Only the
-ceiling changes (see \code{\link[=sd_max_unimodal]{sd_max_unimodal()}}); the floor is attained by a
-unimodal sample. Requires \code{granularity = "integer"}, \code{l}, \code{u}, and \code{n};
-not combinable with \code{a}/\code{b} or \code{alpha} (open problems).
+report fails this constraint if no unimodal sample is consistent with it.
+Only the ceiling changes (see \code{\link[=sd_max_unimodal]{sd_max_unimodal()}}); the floor is attained
+by a unimodal sample. Requires \code{granularity = "integer"}, \code{l}, \code{u}, and
+\code{n}; not combinable with \code{a}/\code{b} or \code{alpha} (open problems).
+
+The constraint is on the SAMPLE's frequencies, not the population's, so
+a failure points to an error only when the report says the sample's own
+histogram is unimodal. Samples from a unimodal population often have
+dips: of samples of 30 from a uniform population on a 1-7 scale, about
+45 percent have an SD above the unimodal ceiling. Every point of the
+response grid counts, so for mean-scored data the points between the
+item values do too. If every respondent answers two items alike, nobody
+has a half-point mean, so the histogram is not unimodal and the SD can
+exceed the ceiling: \code{rep(1:4, each = 2)} has SD 1.20 against a ceiling
+of 1.00.
 }
 
 GRIM and GRIMMER verdicts are DEFERRED to the scrutiny package

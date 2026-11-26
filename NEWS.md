@@ -5,16 +5,22 @@
 * `sd_bounds()` and `brimmer()` take `shape = "unimodal"`, the assumption
   that the frequency distribution of the data is unimodal. Only the ceiling
   changes: it becomes the largest SD of a unimodal sample, given the mean
-  and `n`, computed exactly. A report then
-  fails the bounds test if no unimodal sample is consistent with it, which is
-  informative when authors assert unimodality or it is expected. Requires
-  `granularity = "integer"`, `l`, `u`, and `n`, and is not yet combinable
-  with attained extremes or `alpha`.
+  and `n`, computed exactly. A report then fails the bounds test if no
+  unimodal sample is consistent with it. The constraint is on the sample's
+  frequencies, which often have dips even when the population has none, so a
+  failure points to an error only when the report says the sample's
+  histogram is unimodal. Requires `granularity = "integer"`, `l`, `u`, and
+  `n`, and is not yet combinable with attained extremes or `alpha`.
 
 * `sd_max_unimodal()` is the corresponding primitive, at given means or over
   all means.
 
 * `brimmer_map()` passes `shape` on to `brimmer()`.
+
+* `umbrella_data()` takes `shape`. Under `"unimodal"` its grid still runs to
+  the ordinary ceiling, so the SDs that only a non-unimodal sample can have
+  show as failing cells. `sd_region_data()` passes it on for
+  `rule = "integer"` and refuses it for the other rules.
 
 ## Bug fixes
 

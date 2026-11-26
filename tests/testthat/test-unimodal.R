@@ -173,3 +173,35 @@ test_that("shape = 'unimodal' works without a mean and in brimmer_map()", {
   )
   expect_false(out$consistent)
 })
+
+test_that("umbrella_data() tests cells against the unimodal ceiling on the full grid", {
+  any_shape <- umbrella_data(l = 1, u = 5, n = 10, digits = 1)
+  unimodal <- umbrella_data(l = 1, u = 5, n = 10, digits = 1, shape = "unimodal")
+
+  # same cells, up to the ordinary ceiling
+  expect_identical(unimodal[c("mean", "sd")], any_shape[c("mean", "sd")])
+  # fewer pass, and some fail only for want of a unimodal sample
+  expect_true(all(!unimodal$consistent | any_shape$consistent))
+  expect_true(any(any_shape$consistent & !unimodal$in_bounds))
+  # the bounds reported per cell are the unimodal ones
+  first <- unimodal[1, ]
+  expect_equal(
+    first$max_sd,
+    sd_bounds(l = 1, u = 5, n = 10, mean = first$mean, digits_mean = 1,
+              rounding = "up_or_down", granularity = "integer",
+              shape = "unimodal")$max_sd
+  )
+})
+
+test_that("sd_region_data() takes shape = 'unimodal' for the integer rule only", {
+  any_shape <- sd_region_data(l = 1, u = 5, n = 10, rule = "integer", digits = 1)
+  unimodal <- sd_region_data(l = 1, u = 5, n = 10, rule = "integer", digits = 1,
+                             shape = "unimodal")
+  key <- \(d) paste(d$mean, d$sd)
+  expect_true(all(key(unimodal) %in% key(any_shape)))
+  expect_lt(nrow(unimodal), nrow(any_shape))
+  expect_error(
+    sd_region_data(l = 1, u = 5, n = 10, rule = "quasi", shape = "unimodal"),
+    "only for"
+  )
+})
