@@ -540,6 +540,14 @@ sd_bounds <- function(
   scale_to_grid <- function(x) if (is.null(x)) NULL else x * m
   lower_w <- scale_to_grid(lower)
   upper_w <- scale_to_grid(upper)
+  # granular limits passed the grid check within TOLERANCE; snap them onto
+  # the grid so that the integer-grid core sees whole numbers
+  if (granularity %in% c("integer", "quasiinteger")) {
+    if (!is.null(lower_w)) {
+      lower_w <- round(lower_w)
+    }
+    if (!is.null(upper_w)) upper_w <- round(upper_w)
+  }
   core_w <- function(exact_mean) {
     bounds <- sd_bounds_core(
       lower_w,

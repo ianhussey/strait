@@ -126,3 +126,50 @@ test_that("shape = 'unimodal' refuses constraints it does not support", {
                          n_items = 3, alpha = 0.8, shape = "unimodal"),
                "not supported")
 })
+
+test_that("sd_max_unimodal() validates its inputs and snaps a near-whole range", {
+  expect_error(sd_max_unimodal(3, n = 10, lower = 5, upper = 1), "at least")
+  expect_error(sd_max_unimodal(3, n = 1, lower = 1, upper = 5), "at least")
+  expect_error(sd_max_unimodal(3, n = 10.5, lower = 1, upper = 5), "whole")
+  expect_identical(
+    sd_max_unimodal(c(3, NA), n = 10, lower = 1, upper = 5)[2],
+    NA_real_
+  )
+  expect_equal(
+    sd_bounds(
+      l = 1 + 5e-10,
+      u = 5,
+      n = 10,
+      mean = 3,
+      granularity = "integer",
+      shape = "unimodal"
+    )$max_sd,
+    sd_max_unimodal(3, n = 10, lower = 1, upper = 5)
+  )
+})
+
+test_that("shape = 'unimodal' works without a mean and in brimmer_map()", {
+  expect_equal(
+    sd_bounds(
+      l = 1,
+      u = 5,
+      n = 10,
+      granularity = "integer",
+      shape = "unimodal"
+    )$max_sd,
+    sd_max_unimodal(n = 10, lower = 1, upper = 5)
+  )
+
+  reports <- data.frame(mean = 2.97, sd = 2.83)
+  out <- brimmer_map(
+    reports,
+    l = 1,
+    u = 7,
+    n = 30,
+    digits_mean = 2,
+    digits_sd = 2,
+    granularity = "integer",
+    shape = "unimodal"
+  )
+  expect_false(out$consistent)
+})

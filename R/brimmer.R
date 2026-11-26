@@ -450,7 +450,8 @@ brimmer_map <- function(data, ..., include_inputs = TRUE) {
     "granularity",
     "scoring",
     "n_items",
-    "alpha"
+    "alpha",
+    "shape"
   )
   consts <- list(...)
   unknown <- setdiff(names(consts), arg_names)

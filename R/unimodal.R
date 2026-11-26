@@ -3,8 +3,10 @@
 # smallest SD at every mean is attained by a unimodal sample: its
 # observations lie on the two integers bracketing the mean.
 
-# Guard on the recursion's tables, in cells summed over all blocks. A design
-# above it would take minutes, so it is refused.
+# Guard on the recursion's work, in table cells summed over all blocks. A
+# design above it would take minutes, so it is refused. Only the tables of two
+# neighbouring block lengths are kept at a time, so memory grows with
+# n^2 * top^2 rather than with the cells counted here.
 MAX_UNIMODAL_CELLS <- 5e8
 
 # Internal: the recursion's results, keyed by n and the number of steps
@@ -68,6 +70,12 @@ unimodal_max_sum_of_squares <- function(n, top) {
 
       tables[[paste(a, b)]] <- current
     }
+
+    # The next length needs only the tables of this length and of len + 1.
+    if (len + 2 <= top + 1) {
+      done <- 0:(top + 1 - (len + 2))
+      tables[paste(done, done + len + 1)] <- NULL
+    }
   }
 
   result <- purrr::reduce(tables[paste(0:top, 0:top)], pmax)[n + 1, ]
@@ -128,13 +136,22 @@ unimodal_ssd_max_any_mean <- function(n, top) {
 #' sd_max_unimodal(n = 10, lower = 1, upper = 5)
 #' @export
 sd_max_unimodal <- function(mean = NULL, n, lower, upper) {
-  top <- upper - lower
+  check_scalar(n, "n", whole = TRUE, min = 2)
+  check_scalar(lower, "lower")
+  check_scalar(upper, "upper")
+  check_scalar(upper - lower, "upper - lower", whole = TRUE, min = 1)
+  if (!is.null(mean) && !is.numeric(mean)) {
+    cli::cli_abort("{.arg mean} must be numeric or NULL")
+  }
+  n <- round(n)
+  top <- round(upper - lower)
   if (is.null(mean)) {
     return(sd_from_ss(unimodal_ssd_max_any_mean(n, top), n))
   }
 
   sums <- n * (mean - lower)
-  whole <- abs(sums - round(sums)) < TOLERANCE &
+  whole <- !is.na(sums) &
+    abs(sums - round(sums)) < TOLERANCE &
     sums > -TOLERANCE &
     sums < n * top + TOLERANCE
   y <- round(sums[whole])

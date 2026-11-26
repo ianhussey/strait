@@ -14,6 +14,19 @@
 * `sd_max_unimodal()` is the corresponding primitive, at given means or over
   all means.
 
+* `brimmer_map()` passes `shape` on to `brimmer()`.
+
+## Bug fixes
+
+* `sd_max_unimodal()` validates `n`, `lower`, and `upper`, returns `NA` for a
+  missing mean, and keeps only the tables of two neighbouring block lengths,
+  so that its memory grows with `n^2` times the square of the number of scale
+  values rather than its cube.
+
+* `sd_bounds()` rounds integer and quasi-integer limits onto the response grid
+  after checking them, so that limits within numerical tolerance of the grid
+  no longer make the unimodal ceiling fail.
+
 # strait 0.5.0
 
 ## Breaking changes
