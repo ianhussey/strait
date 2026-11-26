@@ -36,7 +36,14 @@ test_that("v_max_alpha() is a valid and attained ceiling", {
         ok <- m2 >= item_l - 1e-12 & m2 <= item_u + 1e-12
         brute <- max(item_var_max(m1[ok], n) + item_var_max(clamp(m2[ok]), n))
       } else {
-        grid <- item_l + (item_u - item_l) * (0:200) / 200
+        # A dense grid plus the kinks of the item ceiling, the multiples
+        # of 1 / n, where the maximisers lie.
+        grid <- c(
+          item_l + (item_u - item_l) * (0:200) / 200,
+          item_l + (0:((item_u - item_l) * n)) / n
+        ) |>
+          unique() |>
+          sort()
         allocation <- expand.grid(m1 = grid, m2 = grid)
         allocation$m3 <- mean_sum - allocation$m1 - allocation$m2
         allocation <- allocation[
