@@ -18,7 +18,8 @@ brimmer(
   granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1,
-  alpha = NULL
+  alpha = NULL,
+  shape = c("any", "unimodal")
 )
 }
 \arguments{
@@ -51,6 +52,10 @@ as in scrutiny (default \code{"up_or_down"}); NULL treats inputs as exact. See
 \item{n_items}{Positive whole number of response items (default 1).}
 
 \item{alpha}{Numeric scalar or NULL, reported Cronbach's alpha.}
+
+\item{shape}{"any" (default) or "unimodal", an assumed shape of the
+frequency distribution; see \code{\link[=sd_bounds]{sd_bounds()}}. Under \code{"unimodal"}, an SD
+above the unimodal ceiling fails the \code{bounds} test.}
 }
 \value{
 A one-row tibble: \code{consistent} (logical), \code{failed_tests}
@@ -124,6 +129,12 @@ brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
 # GRIM-impossible mean: inconsistent via feasibility (and grim)
 brimmer(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2,
         sd = 1.00, digits_sd = 2, granularity = "integer")
+
+# the ordinary report above needs most observations at the two limits, so
+# it is inconsistent with a unimodal frequency distribution
+brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+        sd = 2.83, digits_sd = 2, granularity = "integer",
+        shape = "unimodal")
 }
 \seealso{
 \code{\link[=brim]{brim()}} for the mean-side test, \code{\link[=brimmest]{brimmest()}} for the exact

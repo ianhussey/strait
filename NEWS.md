@@ -1,3 +1,19 @@
+# strait (development version)
+
+## New features
+
+* `sd_bounds()` and `brimmer()` take `shape = "unimodal"`, the assumption
+  that the frequency distribution of the data is unimodal. Only the ceiling
+  changes: it becomes the largest SD of a unimodal sample, given the mean
+  and `n`, computed exactly. A report then
+  fails the bounds test if no unimodal sample is consistent with it, which is
+  informative when authors assert unimodality or it is expected. Requires
+  `granularity = "integer"`, `l`, `u`, and `n`, and is not yet combinable
+  with attained extremes or `alpha`.
+
+* `sd_max_unimodal()` is the corresponding primitive, at given means or over
+  all means.
+
 # strait 0.5.0
 
 ## Breaking changes

@@ -38,12 +38,13 @@ reference:
       - band_polygon
 
   - title: Bound primitives
-    desc: One closed-form formula each; the pieces `sd_bounds()` dispatches to.
+    desc: One bound each; the pieces `sd_bounds()` dispatches to.
     contents:
       - sd_max_span
       - sd_max_span_n
       - sd_max_muilwijk
       - sd_max_structure_s
+      - sd_max_unimodal
       - sd_min_integer
       - sd_min_quasi_integer
       - sd_min_one_pin

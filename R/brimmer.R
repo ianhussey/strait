@@ -69,6 +69,9 @@
 #' @param scoring "singleitem" (default), "sumscored", or "meanscored".
 #' @param n_items Positive whole number of response items (default 1).
 #' @param alpha Numeric scalar or NULL, reported Cronbach's alpha.
+#' @param shape "any" (default) or "unimodal", an assumed shape of the
+#'   frequency distribution; see [sd_bounds()]. Under `"unimodal"`, an SD
+#'   above the unimodal ceiling fails the `bounds` test.
 #'
 #' @return A one-row tibble: `consistent` (logical), `failed_tests`
 #'   (comma-separated names, "" if none), then the [sd_bounds()] columns
@@ -94,6 +97,12 @@
 #' # GRIM-impossible mean: inconsistent via feasibility (and grim)
 #' brimmer(l = 1, u = 7, n = 30, mean = 3.51, digits_mean = 2,
 #'         sd = 1.00, digits_sd = 2, granularity = "integer")
+#'
+#' # the ordinary report above needs most observations at the two limits, so
+#' # it is inconsistent with a unimodal frequency distribution
+#' brimmer(l = 1, u = 7, n = 30, mean = 2.97, digits_mean = 2,
+#'         sd = 2.83, digits_sd = 2, granularity = "integer",
+#'         shape = "unimodal")
 #' @export
 brimmer <- function(
   l = NULL,
@@ -109,7 +118,8 @@ brimmer <- function(
   granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1,
-  alpha = NULL
+  alpha = NULL,
+  shape = c("any", "unimodal")
 ) {
   if (is.null(sd) && is.null(mean)) {
     cli::cli_abort(
@@ -159,7 +169,8 @@ brimmer <- function(
     granularity = granularity,
     scoring = scoring,
     n_items = n_items,
-    alpha = alpha
+    alpha = alpha,
+    shape = shape
   )
 
   # mean-free path: sd_bounds() skipped unrounding; redo the sd overlap with

@@ -18,7 +18,8 @@ sd_bounds(
   granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1,
-  alpha = NULL
+  alpha = NULL,
+  shape = c("any", "unimodal")
 )
 }
 \arguments{
@@ -54,6 +55,9 @@ the \code{"ties_*"} methods. See \code{\link[roundwork:unround]{roundwork::unrou
 
 \item{alpha}{Numeric scalar or NULL, reported Cronbach's alpha (requires
 \code{scoring = "sumscored"} or \code{"meanscored"}).}
+
+\item{shape}{"any" (default) or "unimodal", an assumed shape of the
+frequency distribution.}
 }
 \value{
 A one-row tibble: \code{min_sd}, \code{max_sd} (Inf if unbounded),
@@ -110,6 +114,15 @@ granularity (and, with \code{alpha}, doubles as the composite item count).
 consistency) and \code{l}, \code{u}, \code{mean}, \code{n}. For \code{"sumscored"}, \code{l}, \code{u}, \code{mean}
 are in SUM-score units; for \code{"meanscored"}, in mean-score units. Not
 combinable with \code{a}/\code{b} (open problem).
+\item \code{shape} — an assumed shape of the frequency distribution. \code{"any"} (the
+default) assumes nothing. \code{"unimodal"}: the frequencies of the values on
+the response grid rise, or stay level, up to a mode and then fall, or stay
+level, where a value that no observation takes counts as frequency 0. A
+report fails this constraint if no unimodal sample is consistent with it,
+which is informative when unimodality is asserted or expected. Only the
+ceiling changes (see \code{\link[=sd_max_unimodal]{sd_max_unimodal()}}); the floor is attained by a
+unimodal sample. Requires \code{granularity = "integer"}, \code{l}, \code{u}, and \code{n};
+not combinable with \code{a}/\code{b} or \code{alpha} (open problems).
 }
 
 GRIM and GRIMMER verdicts are DEFERRED to the scrutiny package
@@ -151,4 +164,8 @@ sd_bounds(l = 3, u = 15, n = 20, mean = 9, granularity = "integer",
 # the same composite reported as an item mean (l, u, mean in mean units)
 sd_bounds(l = 1, u = 5, n = 20, mean = 3, granularity = "integer",
           scoring = "meanscored", n_items = 3, alpha = 0.8)
+
+# assuming a unimodal frequency distribution lowers the ceiling
+sd_bounds(l = 1, u = 5, n = 30, mean = 4.5, granularity = "integer",
+          shape = "unimodal")
 }
