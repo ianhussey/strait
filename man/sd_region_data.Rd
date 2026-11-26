@@ -17,7 +17,8 @@ sd_region_data(
   digits = 2,
   by = NULL,
   round_digits = NULL,
-  rounding = "up"
+  rounding = "up",
+  shape = c("any", "unimodal")
 )
 }
 \arguments{
@@ -54,6 +55,13 @@ anti-conservative, so bounds are always returned at full precision.}
 scrutiny's single rounding methods, such as \code{"up"} (default), \code{"down"},
 \code{"even"}, \code{"ceiling"}, \code{"floor"}, \code{"trunc"}, or \code{"anti_trunc"}, applied
 by \code{\link[roundwork:reround]{roundwork::reround()}}.}
+
+\item{shape}{\code{"any"} (default) or \code{"unimodal"}, as in \code{\link[=sd_bounds]{sd_bounds()}}. Only
+the \code{"integer"} rule takes \code{"unimodal"}: its lattice then keeps the pairs
+whose SD lies under the unimodal ceiling. The bands have no unimodal
+ceiling between the means integer data can produce, and the
+\code{"attainable"} tuples would need an exact unimodal enumeration, so the
+other rules refuse it.}
 }
 \value{
 A tibble with \code{mean}, \code{min_sd}, \code{max_sd} and \code{sd}, and a \code{type}

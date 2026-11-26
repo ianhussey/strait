@@ -31,7 +31,7 @@ an error.
 \details{
 Recognised names (column or constant): \code{l}, \code{u}, \code{a}, \code{b}, \code{n}, \code{mean},
 \code{digits_mean}, \code{sd}, \code{digits_sd}, \code{rounding}, \code{granularity}, \code{scoring}, \code{n_items},
-\code{alpha}.
+\code{alpha}, \code{shape}.
 }
 \examples{
 reports <- data.frame(mean = c(2.97, 3.51, 4.20),

@@ -14,7 +14,8 @@ sd_bounds_core <- function(
   mean,
   granularity,
   alpha,
-  k_items
+  k_items,
+  shape = "any"
 ) {
   out <- list(
     min_sd = 0,
@@ -104,6 +105,17 @@ sd_bounds_core <- function(
     } else {
       out$max_sd <- sd_max_structure_s(mean, n, lower, upper)
       out$max_rule <- "Structure S (sharp mean-conditional ceiling)"
+    }
+  }
+  # unimodality lowers only the ceiling: the floor at every mean is attained
+  # by a unimodal sample, the observations on the two integers bracketing
+  # the mean
+  if (identical(shape, "unimodal")) {
+    out$max_sd <- sd_max_unimodal(mean, n, lower, upper)
+    out$max_rule <- if (is.null(mean)) {
+      "unimodal ceiling (maximum over all means)"
+    } else {
+      "unimodal ceiling (sharp mean-conditional)"
     }
   }
 
@@ -259,6 +271,25 @@ candidate_means <- function(m_lo, m_hi, n, grid_n = ENVELOPE_GRID_POINTS) {
 #'   consistency) and `l`, `u`, `mean`, `n`. For `"sumscored"`, `l`, `u`, `mean`
 #'   are in SUM-score units; for `"meanscored"`, in mean-score units. Not
 #'   combinable with `a`/`b` (open problem).
+#' * `shape` — an assumed shape of the frequency distribution. `"any"` (the
+#'   default) assumes nothing. `"unimodal"`: the frequencies of the values on
+#'   the response grid rise, or stay level, up to a mode and then fall, or stay
+#'   level, where a value that no observation takes counts as frequency 0. A
+#'   report fails this constraint if no unimodal sample is consistent with it.
+#'   Only the ceiling changes (see [sd_max_unimodal()]); the floor is attained
+#'   by a unimodal sample. Requires `granularity = "integer"`, `l`, `u`, and
+#'   `n`; not combinable with `a`/`b` or `alpha` (open problems).
+#'
+#'   The constraint is on the SAMPLE's frequencies, not the population's, so
+#'   a failure points to an error only when the report says the sample's own
+#'   histogram is unimodal. Samples from a unimodal population often have
+#'   dips: of samples of 30 from a uniform population on a 1-7 scale, about
+#'   45 percent have an SD above the unimodal ceiling. Every point of the
+#'   response grid counts, so for mean-scored data the points between the
+#'   item values do too. If every respondent answers two items alike, nobody
+#'   has a half-point mean, so the histogram is not unimodal and the SD can
+#'   exceed the ceiling: `rep(1:4, each = 2)` has SD 1.20 against a ceiling
+#'   of 1.00.
 #'
 #' GRIM and GRIMMER verdicts are DEFERRED to the scrutiny package
 #' (`scrutiny::grim()`, `scrutiny::grimmer()`) rather than reimplemented:
@@ -294,6 +325,8 @@ candidate_means <- function(m_lo, m_hi, n, grid_n = ENVELOPE_GRID_POINTS) {
 #'   1 for `scoring = "singleitem"`.
 #' @param alpha Numeric scalar or NULL, reported Cronbach's alpha (requires
 #'   `scoring = "sumscored"` or `"meanscored"`).
+#' @param shape "any" (default) or "unimodal", an assumed shape of the
+#'   frequency distribution.
 #'
 #' @return A one-row tibble: `min_sd`, `max_sd` (Inf if unbounded),
 #'   `feasible` (FALSE when the constraint set admits no sample, with
@@ -327,6 +360,10 @@ candidate_means <- function(m_lo, m_hi, n, grid_n = ENVELOPE_GRID_POINTS) {
 #' # the same composite reported as an item mean (l, u, mean in mean units)
 #' sd_bounds(l = 1, u = 5, n = 20, mean = 3, granularity = "integer",
 #'           scoring = "meanscored", n_items = 3, alpha = 0.8)
+#'
+#' # assuming a unimodal frequency distribution lowers the ceiling
+#' sd_bounds(l = 1, u = 5, n = 30, mean = 4.5, granularity = "integer",
+#'           shape = "unimodal")
 #' @export
 sd_bounds <- function(
   l = NULL,
@@ -342,7 +379,8 @@ sd_bounds <- function(
   granularity = c("continuous", "integer", "quasiinteger"),
   scoring = c("singleitem", "sumscored", "meanscored"),
   n_items = 1,
-  alpha = NULL
+  alpha = NULL,
+  shape = c("any", "unimodal")
 ) {
   # new_tibble(), not tibble(): this runs once per mean in the curve and grid
   # builders, and tibble()'s checks cost a hundred times the bounds themselves
@@ -368,6 +406,7 @@ sd_bounds <- function(
   # curve and grid builders, where arg_match() would double its cost
   granularity <- match.arg(granularity)
   scoring <- match.arg(scoring)
+  shape <- match.arg(shape)
   if (is.character(mean) || is.character(sd)) {
     cli::cli_abort(paste(
       "{.arg mean} and {.arg sd} must be numeric, with their decimal places in",
@@ -442,6 +481,24 @@ sd_bounds <- function(
       "observed maximum {.arg b} cannot lie above the wall {.arg u}"
     )
   }
+  if (shape == "unimodal") {
+    if (granularity != "integer") {
+      cli::cli_abort(
+        "{.code shape = 'unimodal'} requires {.code granularity = 'integer'}"
+      )
+    }
+    if (is.null(l) || is.null(u) || is.null(n)) {
+      cli::cli_abort(
+        "{.code shape = 'unimodal'} requires {.arg l}, {.arg u}, and {.arg n}"
+      )
+    }
+    if (!is.null(a) || !is.null(b) || !is.null(alpha)) {
+      cli::cli_abort(paste(
+        "{.code shape = 'unimodal'} with attained extremes or {.arg alpha} is",
+        "not supported (open problem)"
+      ))
+    }
+  }
 
   # -- granularity multiplier (m) and alpha item count (k) ---------------------
   # m rescales the reported (mean-score) scale to the integer sum scale on which
@@ -493,6 +550,14 @@ sd_bounds <- function(
   scale_to_grid <- function(x) if (is.null(x)) NULL else x * m
   lower_w <- scale_to_grid(lower)
   upper_w <- scale_to_grid(upper)
+  # granular limits passed the grid check within TOLERANCE; snap them onto
+  # the grid so that the integer-grid core sees whole numbers
+  if (granularity %in% c("integer", "quasiinteger")) {
+    if (!is.null(lower_w)) {
+      lower_w <- round(lower_w)
+    }
+    if (!is.null(upper_w)) upper_w <- round(upper_w)
+  }
   core_w <- function(exact_mean) {
     bounds <- sd_bounds_core(
       lower_w,
@@ -503,7 +568,8 @@ sd_bounds <- function(
       scale_to_grid(exact_mean),
       granularity,
       alpha,
-      k
+      k,
+      shape
     )
     if (!is.na(bounds$min_sd)) {
       bounds$min_sd <- bounds$min_sd / m

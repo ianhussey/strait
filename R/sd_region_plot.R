@@ -300,6 +300,12 @@ is_band <- function(data) {
 #'   by [roundwork::reround()].
 #' @param by Optional mean-grid spacing (default `(u - l) / 1000`); ignored by
 #'   the lattice rules, which step by `10^-digits`.
+#' @param shape `"any"` (default) or `"unimodal"`, as in [sd_bounds()]. Only
+#'   the `"integer"` rule takes `"unimodal"`: its lattice then keeps the pairs
+#'   whose SD lies under the unimodal ceiling. The bands have no unimodal
+#'   ceiling between the means integer data can produce, and the
+#'   `"attainable"` tuples would need an exact unimodal enumeration, so the
+#'   other rules refuse it.
 #' @return A tibble with `mean`, `min_sd`, `max_sd` and `sd`, and a `type`
 #'   attribute of `"band"` or `"points"`. Band rules fill `min_sd` and
 #'   `max_sd`, which are `NA` where no SD is possible, leave `sd` `NA`, and
@@ -343,9 +349,11 @@ sd_region_data <- function(
   digits = 2,
   by = NULL,
   round_digits = NULL,
-  rounding = "up"
+  rounding = "up",
+  shape = c("any", "unimodal")
 ) {
   rule <- rlang::arg_match(rule)
+  shape <- rlang::arg_match(shape)
   # alias: named for its author
   if (rule == "muilwijk") {
     rule <- "mean"
@@ -358,6 +366,11 @@ sd_region_data <- function(
     rule %in% c("alpha", "integer_alpha", "attainable_alpha") && is.null(alpha)
   ) {
     cli::cli_abort("{.arg rule} = {.val {rule}} requires {.arg alpha}")
+  }
+  if (shape == "unimodal" && rule != "integer") {
+    cli::cli_abort(
+      "{.code shape = 'unimodal'} is available only for {.code rule = 'integer'}"
+    )
   }
   k <- n_items
   # back-compatible default: a composite is in mean-score units unless told
@@ -383,7 +396,8 @@ sd_region_data <- function(
       granularity = "integer",
       scoring = scoring,
       n_items = k,
-      alpha = if (rule == "integer_alpha") alpha else NULL
+      alpha = if (rule == "integer_alpha") alpha else NULL,
+      shape = shape
     )
     out <- umbrella[which(umbrella$consistent), c("mean", "sd")] |>
       tibble::as_tibble() |>
