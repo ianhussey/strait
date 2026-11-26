@@ -24,7 +24,8 @@ List with \code{min_sd}, \code{max_sd}, \code{feasible}, \code{min_rule}, \code{
 }
 \description{
 Bounds of the sum score's sample SD given the composite limits, n, sum-score
-mean, granularity, and a reported alpha (the STRAIT article, Appendix H).
+mean, granularity, and a reported alpha (Appendix H of the accompanying
+article, in preparation).
 Ceiling: the mean-conditional ceiling divided by
 \verb{sqrt(k - (k - 1) alpha)}; under granularity, additionally the sharper
 quasi-integer \code{V_max} form, intersected with the alpha-free ceiling (alpha

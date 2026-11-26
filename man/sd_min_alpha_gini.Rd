@@ -22,7 +22,8 @@ Numeric scalar, the exact floor in sum-score SD units, or \code{NULL}.
 }
 \description{
 The exact alpha-conditional minimum SD for a \emph{strictly integer} composite
-(STRAIT article, Theorem H5 and Corollaries H5a-H5b): the least sample SD
+(Theorem H5 and Corollaries H5a-H5b of the accompanying article, in
+preparation): the least sample SD
 among integer sum-score profiles \eqn{S} with the given mean, integer values
 in \eqn{[l, u]}, whose design-factor cap
 \eqn{m_{\max}(S) = 2 n\, SS_S / \sum_{s,t}|S_s - S_t|} is at least the reported

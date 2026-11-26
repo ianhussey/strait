@@ -3,8 +3,8 @@
 # The bounds of the sample standard deviation under nested constraints, as a
 # family of small single-purpose functions governed by the sd_bounds()
 # dispatcher (see sd_bounds.R). The mathematics is the closed-form (not
-# constructive) derivation developed in the STRAIT article; each primitive here
-# implements one formula.
+# constructive) derivation developed in the accompanying article (in
+# preparation); each primitive here implements one formula.
 #
 # ARCHITECTURE
 #   Layer 0  utilities: bessel_factor, frac, is_grim_consistent, sd_from_ss
@@ -404,7 +404,8 @@ feasible_mean_band <- function(
 #' Allocation maximum of the item-variance sum (Theorem H3)
 #'
 #' The quasi-integer maximum of the summed item variances of a k-item integer
-#' battery at a given sum-score mean (the STRAIT article, Appendix H).
+#' battery at a given sum-score mean (Appendix H of the accompanying article,
+#' in preparation).
 #'
 #' @param mean_sum Numeric vector, sum-score mean(s).
 #' @param k Integer scalar, number of items.
@@ -448,7 +449,8 @@ count_vectors <- function(slots, total) {
 #' Sharp alpha-conditional composite floor via the Gini mean difference
 #'
 #' The exact alpha-conditional minimum SD for a *strictly integer* composite
-#' (STRAIT article, Theorem H5 and Corollaries H5a-H5b): the least sample SD
+#' (Theorem H5 and Corollaries H5a-H5b of the accompanying article, in
+#' preparation): the least sample SD
 #' among integer sum-score profiles \eqn{S} with the given mean, integer values
 #' in \eqn{[l, u]}, whose design-factor cap
 #' \eqn{m_{\max}(S) = 2 n\, SS_S / \sum_{s,t}|S_s - S_t|} is at least the reported
@@ -545,7 +547,8 @@ alpha_gini_envelope <- function(l, u, n, m, max_profiles = MAX_GINI_PROFILES) {
 #' SD bounds for a k-item composite with reported Cronbach's alpha
 #'
 #' Bounds of the sum score's sample SD given the composite limits, n, sum-score
-#' mean, granularity, and a reported alpha (the STRAIT article, Appendix H).
+#' mean, granularity, and a reported alpha (Appendix H of the accompanying
+#' article, in preparation).
 #' Ceiling: the mean-conditional ceiling divided by
 #' `sqrt(k - (k - 1) alpha)`; under granularity, additionally the sharper
 #' quasi-integer `V_max` form, intersected with the alpha-free ceiling (alpha

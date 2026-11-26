@@ -512,7 +512,7 @@ sd_region_data <- function(
 #' attainable `(mean, sd)` tuples. A second band can be drawn as a dashed
 #' reference, such as the sharp `"quasi"` band that the other rules are judged
 #' against. Together these reproduce the panels of the nested-constraints
-#' figure in the STRAIT article.
+#' figure in the accompanying article (in preparation).
 #'
 #' @param data Output of [sd_region_data()]: a band, with `mean`, `min_sd`, and
 #'   `max_sd`, or a lattice, with `mean` and `sd`, filtered by `consistent`

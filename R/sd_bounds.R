@@ -216,7 +216,8 @@ candidate_means <- function(m_lo, m_hi, n, grid_n = ENVELOPE_GRID_POINTS) {
 #'
 #' Computes the smallest and largest sample standard deviations consistent with
 #' whichever constraints are supplied, following the nested framework and the
-#' attained-extremes extensions of the STRAIT article. All constraints default
+#' attained-extremes extensions of the accompanying article (in preparation).
+#' All constraints default
 #' to NULL; supplying more of them can only narrow the bounds. With none
 #' supplied the only bound is `0 <= s < Inf`.
 #'

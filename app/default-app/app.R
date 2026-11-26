@@ -6,7 +6,8 @@
 # plots alike - so this app only handles input, layout, and presentation.
 #
 # Results can be read in the measure's own units or in the scale-free (POMP)
-# units of the STRAIT article, against either of two reference denominators;
+# units of the accompanying article (in preparation), against either of two
+# reference denominators;
 # see the "About" panel and `?sd_bounds_pomp_plot`.
 #
 # Hussey, I. (2026). strait: Bounds checks for reported summary statistics.
