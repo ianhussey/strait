@@ -413,8 +413,8 @@
 # strait 0.4.0
 
 A ground-up rewrite of the engine around the closed-form standard-deviation
-bounds derived in the STRAIT article. This is a breaking change: the API is new
-throughout.
+bounds derived in the accompanying article (in preparation). This is a
+breaking change: the API is new throughout.
 
 ## Breaking changes
 
@@ -448,8 +448,8 @@ throughout.
   `plot_sd_bounds()`, `plot_sd_bounds_pomp()` (native and POMP scales) and
   `plot_umbrella()` visualise it.
 * The alpha-conditional floor is sharpened for strictly integer composites via
-  the composite's Gini mean difference (`sd_min_alpha_gini()`, STRAIT article
-  Theorem H5): a reported positive alpha now yields a strictly positive minimum
+  the composite's Gini mean difference (`sd_min_alpha_gini()`, Theorem H5 of
+  the accompanying article, in preparation): a reported positive alpha now yields a strictly positive minimum
   SD even at whole-number sum-score means, where the earlier amplified floor
   vanished. The exact envelope is used when the composite range is small enough
   to enumerate; otherwise the proven amplified floor is retained (flagged in

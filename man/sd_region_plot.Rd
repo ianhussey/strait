@@ -50,7 +50,7 @@ possible: a band of sample SDs as a function of the mean, or a lattice of
 attainable \verb{(mean, sd)} tuples. A second band can be drawn as a dashed
 reference, such as the sharp \code{"quasi"} band that the other rules are judged
 against. Together these reproduce the panels of the nested-constraints
-figure in the STRAIT article.
+figure in the accompanying article (in preparation).
 }
 \examples{
 quasi <- sd_region_data(l = 1, u = 5, n = 7, rule = "quasi")
