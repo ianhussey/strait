@@ -1,12 +1,3 @@
-# strait (development version)
-
-## Minor improvements and bug fixes
-
-* New tests check `sd_min_quasi_integer()`, `sd_bounds_sample()`, and
-  `v_max_alpha()` against brute force: the quasi-integer floor at generic
-  and GRIM-consistent means and its gap to the interpolated integer floor,
-  and the ceiling and floor on the item-variance sum of an integer battery.
-
 # strait 0.5.0
 
 ## Breaking changes
